@@ -51,27 +51,55 @@ class Usuario:
         Returns:
             Dados do usuário se autenticado, None caso contrário
         """
+        print(f"\n[AUTENTICAR] Tentando autenticar: {email}")
+
         query = """
             SELECT * FROM usuarios
             WHERE email = %s AND ativo = true
         """
 
         usuario = fetch_one(query, (email,))
+        print(f"[AUTENTICAR] Usuário encontrado: {usuario is not None}")
 
         if not usuario:
+            print(f"[AUTENTICAR] ❌ Usuário não encontrado ou inativo: {email}")
             return None
 
-        # Verifica a senha
-        if bcrypt.checkpw(password.encode('utf-8'), usuario['password_hash'].encode('utf-8')):
-            # Remove o hash da senha antes de retornar
-            del usuario['password_hash']
+        try:
+            # Garante que password_hash seja string
+            password_hash = usuario['password_hash']
+            if isinstance(password_hash, bytes):
+                password_hash = password_hash.decode('utf-8')
 
-            log_sistema('info', f'Login realizado: {email}', 'autenticacao',
-                       {'usuario_id': usuario['id']})
+            print(f"[AUTENTICAR] Hash armazenado: {password_hash[:20]}...")
+            print(f"[AUTENTICAR] Verificando senha...")
 
-            return usuario
+            # Verifica a senha
+            if bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8')):
+                print(f"[AUTENTICAR] ✅ Senha correta!")
 
-        log_sistema('warning', f'Tentativa de login falhou: {email}', 'autenticacao')
+                # Remove o hash da senha antes de retornar
+                del usuario['password_hash']
+
+                try:
+                    log_sistema('info', f'Login realizado: {email}', 'autenticacao',
+                               {'usuario_id': usuario['id']})
+                except Exception as log_err:
+                    print(f"[AUTENTICAR] ⚠️ Erro ao registrar log (continuando): {log_err}")
+
+                return usuario
+            else:
+                print(f"[AUTENTICAR] ❌ Senha incorreta!")
+        except Exception as e:
+            print(f"[AUTENTICAR] ❌ Erro ao verificar senha: {e}")
+            import traceback
+            print(traceback.format_exc())
+
+        try:
+            log_sistema('warning', f'Tentativa de login falhou: {email}', 'autenticacao')
+        except Exception as log_err:
+            print(f"[AUTENTICAR] ⚠️ Erro ao registrar log de falha (ignorando): {log_err}")
+
         return None
 
     @staticmethod
