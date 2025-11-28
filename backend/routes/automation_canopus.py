@@ -1698,6 +1698,127 @@ def baixar_boletos_ponto_venda():
 
                                                     logger.info(f"💾 ✅ Download registrado no banco: {arquivo_nome}")
                                                     sys.stdout.flush()
+
+                                                    # EXTRAIR DADOS DO PDF E SALVAR NA TABELA BOLETOS
+                                                    try:
+                                                        logger.info("📄 Extraindo dados do PDF para tabela boletos...")
+                                                        sys.stdout.flush()
+
+                                                        from backend.services.pdf_extractor import extrair_dados_boleto
+
+                                                        dados_pdf = extrair_dados_boleto(str(arquivo_pdf))
+
+                                                        if dados_pdf.get('sucesso'):
+                                                            logger.info(f"✅ Dados extraídos: venc={dados_pdf.get('vencimento_str')}, valor=R$ {dados_pdf.get('valor', 0):.2f}")
+                                                            sys.stdout.flush()
+
+                                                            # Buscar cliente_final_id pelo CPF
+                                                            cur_import.execute("""
+                                                                SELECT id, consultor_id FROM clientes_finais
+                                                                WHERE cpf = %s AND ativo = TRUE
+                                                                LIMIT 1
+                                                            """, (cpf,))
+
+                                                            cliente_row = cur_import.fetchone()
+
+                                                            if cliente_row:
+                                                                cliente_final_id = cliente_row['id']
+                                                                consultor_id_boleto = cliente_row['consultor_id']
+
+                                                                # Buscar cliente_nexus_id do consultor
+                                                                cur_import.execute("""
+                                                                    SELECT cliente_nexus_id FROM consultores
+                                                                    WHERE id = %s
+                                                                    LIMIT 1
+                                                                """, (consultor_id_boleto,))
+
+                                                                consultor_nexus = cur_import.fetchone()
+                                                                cliente_nexus_id = consultor_nexus['cliente_nexus_id'] if consultor_nexus else 1
+
+                                                                # Verificar se boleto já existe
+                                                                numero_boleto = dados_pdf.get('nosso_numero') or dados_pdf.get('grupo_cota') or f"CANOPUS-{cpf}"
+
+                                                                cur_import.execute("""
+                                                                    SELECT id FROM boletos
+                                                                    WHERE cliente_final_id = %s
+                                                                    AND data_vencimento = %s
+                                                                    AND valor_original = %s
+                                                                    LIMIT 1
+                                                                """, (
+                                                                    cliente_final_id,
+                                                                    dados_pdf.get('vencimento'),
+                                                                    dados_pdf.get('valor', 0)
+                                                                ))
+
+                                                                boleto_existe = cur_import.fetchone()
+
+                                                                if not boleto_existe:
+                                                                    # Extrair mês e ano do vencimento
+                                                                    vencimento = dados_pdf.get('vencimento')
+                                                                    mes_ref = vencimento.month if vencimento else mes
+                                                                    ano_ref = vencimento.year if vencimento else (int(ano) if ano else 2025)
+
+                                                                    # Inserir boleto
+                                                                    cur_import.execute("""
+                                                                        INSERT INTO boletos (
+                                                                            cliente_final_id,
+                                                                            cliente_nexus_id,
+                                                                            numero_boleto,
+                                                                            valor_original,
+                                                                            data_vencimento,
+                                                                            data_emissao,
+                                                                            mes_referencia,
+                                                                            ano_referencia,
+                                                                            numero_parcela,
+                                                                            descricao,
+                                                                            status,
+                                                                            status_envio,
+                                                                            pdf_filename,
+                                                                            pdf_path,
+                                                                            pdf_size,
+                                                                            gerado_por,
+                                                                            created_at,
+                                                                            updated_at
+                                                                        ) VALUES (
+                                                                            %s, %s, %s, %s, %s, CURRENT_DATE, %s, %s,
+                                                                            1, %s, 'pendente', 'nao_enviado',
+                                                                            %s, %s, %s, 'automacao_canopus',
+                                                                            NOW(), NOW()
+                                                                        ) RETURNING id
+                                                                    """, (
+                                                                        cliente_final_id,
+                                                                        cliente_nexus_id,
+                                                                        numero_boleto,
+                                                                        dados_pdf.get('valor', 0),
+                                                                        dados_pdf.get('vencimento'),
+                                                                        mes_ref,
+                                                                        ano_ref,
+                                                                        f"Boleto {dados_pdf.get('grupo_cota', '')}",
+                                                                        arquivo_nome,
+                                                                        str(arquivo_pdf),
+                                                                        arquivo_tamanho
+                                                                    ))
+
+                                                                    boleto_id = cur_import.fetchone()['id']
+                                                                    conn_import.commit()
+
+                                                                    logger.info(f"💾 ✅ Boleto #{boleto_id} salvo na tabela boletos!")
+                                                                    sys.stdout.flush()
+                                                                else:
+                                                                    logger.info(f"⏭️ Boleto já existe na tabela boletos")
+                                                                    sys.stdout.flush()
+                                                            else:
+                                                                logger.warning(f"⚠️ Cliente não encontrado para CPF {cpf}")
+                                                                sys.stdout.flush()
+                                                        else:
+                                                            logger.warning(f"⚠️ Falha ao extrair dados do PDF")
+                                                            sys.stdout.flush()
+
+                                                    except Exception as e_boleto:
+                                                        logger.error(f"❌ Erro ao salvar boleto na tabela boletos: {e_boleto}")
+                                                        logger.exception("Traceback:")
+                                                        sys.stdout.flush()
+
                                                 else:
                                                     logger.info(f"⏭️ Download já registrado: {arquivo_nome}")
                                                     sys.stdout.flush()
