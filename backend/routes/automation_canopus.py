@@ -1523,8 +1523,29 @@ def baixar_boletos_ponto_venda():
 
                     atualizar_status(etapa='Login realizado! Iniciando processamento de clientes...')
 
+                    # Monitorar uso de memória
+                    import psutil
+                    import gc
+                    process = psutil.Process()
+
                     # Processar cada CPF na mesma sessão
                     for idx, cpf in enumerate(cpfs, 1):
+                        # Monitorar memória a cada 5 clientes
+                        if idx % 5 == 0:
+                            mem_info = process.memory_info()
+                            mem_mb = mem_info.rss / 1024 / 1024
+                            logger.info("=" * 80)
+                            logger.info(f"📊 MONITORAMENTO DE RECURSOS (Cliente {idx}/{len(cpfs)})")
+                            logger.info(f"   Memória RAM: {mem_mb:.1f} MB")
+                            if mem_mb > 400:  # Alerta se > 400MB (próximo do limite de 512MB)
+                                logger.warning(f"⚠️ MEMÓRIA ALTA! {mem_mb:.1f} MB / 512 MB limite")
+                                logger.info("   Executando garbage collection...")
+                                gc.collect()  # Forçar limpeza de memória Python
+                                mem_after = process.memory_info().rss / 1024 / 1024
+                                logger.info(f"   Memória após GC: {mem_after:.1f} MB")
+                            logger.info("=" * 80)
+                            sys.stdout.flush()
+
                         logger.info(f"📄 Processando {idx}/{len(cpfs)}: CPF {cpf}")
 
                         # Atualizar status com cliente atual
@@ -1722,6 +1743,8 @@ def baixar_boletos_ponto_venda():
                             logger.error("=" * 80)
                             await asyncio.sleep(5)
 
+                    # Monitoramento final de memória
+                    mem_final = process.memory_info().rss / 1024 / 1024
                     logger.info("=" * 80)
                     logger.info("🎉 DOWNLOADS CONCLUÍDOS!")
                     logger.info("=" * 80)
@@ -1735,6 +1758,9 @@ def baixar_boletos_ponto_venda():
                     logger.info("=" * 80)
                     logger.info(f"💾 Os boletos estão em: {pasta_destino}")
                     logger.info("💾 Registros salvos na tabela: downloads_canopus")
+                    logger.info(f"📊 Memória final: {mem_final:.1f} MB")
+                    logger.info("=" * 80)
+                    logger.info("✅ EXECUÇÃO FINALIZADA NORMALMENTE (SEM CRASH)")
                     logger.info("=" * 80)
                     sys.stdout.flush()
 
