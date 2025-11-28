@@ -150,6 +150,11 @@ def create_app():
             return render_template('login-cliente.html')
         return render_template('crm-cliente/cliente-debitos.html')
 
+    @app.route('/debug/boletos')
+    def debug_boletos():
+        """Página de debug para visualizar todos os boletos (sem filtro de cliente)"""
+        return render_template('debug_boletos.html')
+
     @app.route('/admin/dashboard')
     def admin_dashboard():
         """Dashboard administrativo"""

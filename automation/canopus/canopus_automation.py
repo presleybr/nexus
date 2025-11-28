@@ -1055,103 +1055,184 @@ class CanopusAutomation:
                                 await nova_aba_nossa.close()
                                 raise
 
-                        logger.warning("⚠️ Tentando extrair via JavaScript...")
+                        logger.info("📥 Iniciando extração do PDF via JavaScript...")
+                        sys.stdout.flush()
 
                         try:
-                            nova_aba_controlada.set_default_timeout(15000)  # 15 segundos
+                            nova_aba_controlada.set_default_timeout(30000)  # 30 segundos (aumentado)
+
                             pdf_data = await nova_aba_controlada.evaluate("""
                                 async () => {
-                                    console.log('[JS] Iniciando extração do PDF...');
+                                    console.log('[JS] ========================================');
+                                    console.log('[JS] Iniciando extração do PDF do Canopus');
+                                    console.log('[JS] ========================================');
 
                                     // Procurar embed tag
                                     const embed = document.querySelector('embed[type="application/pdf"]');
 
                                     if (!embed) {
-                                        console.log('[JS] ❌ Embed não encontrado no DOM');
-                                        return {success: false, error: 'Embed não encontrado'};
+                                        console.error('[JS] ❌ ERRO: Embed não encontrado no DOM!');
+                                        console.log('[JS] Tags encontradas:', document.querySelectorAll('embed').length);
+                                        return {success: false, error: 'Embed PDF não encontrado no DOM'};
                                     }
 
-                                    console.log('[JS] ✅ Embed encontrado, aguardando URL carregar...');
+                                    console.log('[JS] ✅ Embed encontrado!');
+                                    console.log('[JS] Aguardando URL do PDF carregar...');
 
-                                    // AGUARDAR ATIVAMENTE até o embed ter URL válida (não about:blank)
-                                    // Tenta por até 20 segundos (mais tempo)
+                                    // AGUARDAR ATIVAMENTE até o embed ter URL válida
+                                    // Aumentado para 30 segundos no Render
                                     let pdfUrl = null;
-                                    for (let i = 0; i < 67; i++) {  // 67 x 300ms = 20 segundos
+                                    const MAX_TENTATIVAS = 100;  // 100 x 300ms = 30 segundos
+
+                                    for (let i = 0; i < MAX_TENTATIVAS; i++) {
                                         const src = embed.src;
-                                        if (src && src !== 'about:blank' && src.includes('frmConCmImpressao')) {
+
+                                        // Verificar se tem URL válida do Canopus
+                                        if (src && src !== 'about:blank' &&
+                                            (src.includes('frmConCmImpressao') || src.includes('.aspx') || src.includes('pdf'))) {
                                             pdfUrl = src;
-                                            console.log(`[JS] ✅ PDF URL encontrada na tentativa ${i+1}: ${pdfUrl.substring(0, 80)}`);
+                                            console.log(`[JS] ✅ PDF URL encontrada na tentativa ${i+1}!`);
+                                            console.log(`[JS] URL: ${pdfUrl.substring(0, 100)}...`);
                                             break;
                                         }
-                                        if (i % 10 === 0) {  // Log a cada 3 segundos
-                                            console.log(`[JS] Tentativa ${i+1}/67: src ainda é "${src}"`);
+
+                                        // Log a cada 10 tentativas (3 segundos)
+                                        if (i % 10 === 0 && i > 0) {
+                                            console.log(`[JS] ⏳ Tentativa ${i}/${MAX_TENTATIVAS}: src="${src ? src.substring(0, 50) : 'null'}"`);
                                         }
+
                                         await new Promise(r => setTimeout(r, 300));
                                     }
 
-                                    // Se ainda não tem URL válida, usar window.location
+                                    // Validar se encontrou URL válida
                                     if (!pdfUrl || pdfUrl === 'about:blank') {
-                                        pdfUrl = window.location.href;
-                                        console.log('[JS] ⚠️ Usando window.location:', pdfUrl);
+                                        console.error('[JS] ❌ ERRO: URL do PDF não carregou após 30 segundos!');
+                                        console.error(`[JS] URL final: "${pdfUrl}"`);
+                                        return {
+                                            success: false,
+                                            error: 'Timeout: URL do PDF não carregou no embed'
+                                        };
                                     }
 
-                                    console.log('[JS] PDF URL final:', pdfUrl);
+                                    console.log('[JS] 📡 Fazendo download do PDF...');
+                                    console.log(`[JS] URL completa: ${pdfUrl}`);
 
                                     // Fazer fetch do PDF
                                     try {
-                                        console.log('[JS] Fazendo fetch do PDF...');
                                         const response = await fetch(pdfUrl);
-                                        console.log('[JS] Response recebida, status:', response.status);
+
+                                        console.log(`[JS] Response status: ${response.status}`);
+                                        console.log(`[JS] Content-Type: ${response.headers.get('content-type')}`);
+
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                                        }
 
                                         const blob = await response.blob();
-                                        console.log('[JS] Blob criado, tamanho:', blob.size, 'bytes');
+                                        console.log(`[JS] Blob recebido: ${blob.size} bytes (${(blob.size/1024).toFixed(1)} KB)`);
 
+                                        if (blob.size === 0) {
+                                            throw new Error('Blob vazio - PDF sem conteúdo');
+                                        }
+
+                                        // Validar que é realmente PDF
                                         const buffer = await blob.arrayBuffer();
-                                        const bytes = Array.from(new Uint8Array(buffer));
-                                        console.log('[JS] ✅ PDF convertido para array:', bytes.length, 'bytes');
+                                        const bytes = new Uint8Array(buffer);
+
+                                        // Verificar magic number do PDF (%PDF)
+                                        const isPDF = bytes[0] === 0x25 && bytes[1] === 0x50 &&
+                                                     bytes[2] === 0x44 && bytes[3] === 0x46;
+
+                                        if (!isPDF) {
+                                            console.error('[JS] ❌ ERRO: Arquivo não é PDF!');
+                                            console.error(`[JS] Primeiros bytes: ${Array.from(bytes.slice(0, 10))}`);
+                                            throw new Error('Arquivo baixado não é um PDF válido');
+                                        }
+
+                                        console.log('[JS] ✅ PDF VÁLIDO extraído com sucesso!');
+                                        console.log(`[JS] Tamanho: ${bytes.length} bytes (${(bytes.length/1024).toFixed(1)} KB)`);
 
                                         return {
                                             success: true,
-                                            bytes: bytes,
+                                            bytes: Array.from(bytes),
                                             size: bytes.length,
                                             url: pdfUrl
                                         };
-                                    } catch (e) {
-                                        console.log('[JS] ❌ Erro no fetch:', e.toString());
-                                        return {success: false, error: 'Erro no fetch: ' + e.toString()};
+
+                                    } catch (fetchError) {
+                                        console.error('[JS] ❌ ERRO no fetch do PDF:', fetchError.toString());
+                                        return {
+                                            success: false,
+                                            error: `Erro ao baixar PDF: ${fetchError.toString()}`
+                                        };
                                     }
                                 }
                             """)
 
+                            # Processar resultado
                             if pdf_data and pdf_data.get('success'):
                                 pdf_bytes = bytes(pdf_data['bytes'])
-                                logger.info(f"✅ PDF extraído do embed: {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
-                                logger.info(f"   URL do PDF: {pdf_data.get('url', 'N/A')[:80]}")
+                                tamanho_kb = len(pdf_bytes) / 1024
+                                logger.info("=" * 80)
+                                logger.info("✅ PDF EXTRAÍDO COM SUCESSO VIA JAVASCRIPT!")
+                                logger.info(f"   Tamanho: {len(pdf_bytes)} bytes ({tamanho_kb:.1f} KB)")
+                                logger.info(f"   URL: {pdf_data.get('url', 'N/A')[:100]}...")
+                                logger.info("=" * 80)
+                                sys.stdout.flush()
                             else:
-                                erro = pdf_data.get('error', 'Desconhecido') if pdf_data else 'Sem resposta'
-                                logger.warning(f"⚠️ Falha ao extrair PDF do embed: {erro}")
+                                erro = pdf_data.get('error', 'Desconhecido') if pdf_data else 'Sem resposta do JavaScript'
+                                logger.error("=" * 80)
+                                logger.error("❌ FALHA NA EXTRAÇÃO DO PDF")
+                                logger.error(f"   Erro: {erro}")
+                                logger.error("=" * 80)
+                                sys.stdout.flush()
+                                pdf_bytes = None  # Forçar validação a falhar
 
                         except Exception as e_extract:
-                            logger.warning(f"⚠️ Erro ao extrair PDF via JavaScript: {e_extract}")
+                            logger.error("=" * 80)
+                            logger.error("❌ EXCEPTION durante extração JavaScript")
+                            logger.error(f"   Tipo: {type(e_extract).__name__}")
+                            logger.error(f"   Mensagem: {str(e_extract)}")
+                            logger.error("=" * 80)
+                            sys.stdout.flush()
+                            pdf_bytes = None  # Forçar validação a falhar
 
-                    # Se não conseguiu extrair, usar page.pdf() como fallback
-                    if not pdf_bytes or len(pdf_bytes) < 10000:
-                        logger.warning("⚠️ PDF não extraído, usando page.pdf() como fallback...")
-                        pdf_bytes = await nova_aba_controlada.pdf(
-                            format='A4',
-                            print_background=True,
-                            prefer_css_page_size=True,
-                            margin={'top': '0mm', 'right': '0mm', 'bottom': '0mm', 'left': '0mm'}
-                        )
-                        logger.info(f"📄 PDF gerado via page.pdf(): {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
+                    # VALIDAÇÃO CRÍTICA: Verificar se extraiu PDF válido
+                    TAMANHO_MINIMO_PDF = 20000  # 20KB - boletos devem ter pelo menos isso
+
+                    if not pdf_bytes:
+                        logger.error("❌ ERRO CRÍTICO: Nenhum PDF foi extraído!")
+                        logger.error("   O embed do PDF não carregou ou não foi possível fazer fetch")
+                        raise Exception("Falha ao extrair PDF do Canopus - nenhum dado recebido")
+
+                    tamanho_kb = len(pdf_bytes) / 1024
+                    logger.info(f"📊 PDF extraído: {len(pdf_bytes)} bytes ({tamanho_kb:.1f} KB)")
+
+                    if len(pdf_bytes) < TAMANHO_MINIMO_PDF:
+                        logger.error(f"❌ ERRO CRÍTICO: PDF muito pequeno ({tamanho_kb:.1f} KB)")
+                        logger.error(f"   Tamanho mínimo esperado: {TAMANHO_MINIMO_PDF/1024:.1f} KB")
+                        logger.error(f"   Isso geralmente indica que o PDF não foi carregado corretamente")
+                        logger.error(f"   Possíveis causas:")
+                        logger.error(f"     1. Embed do PDF não carregou completamente")
+                        logger.error(f"     2. URL do PDF estava incorreta")
+                        logger.error(f"     3. Problema de rede/timeout")
+                        raise Exception(f"PDF inválido - tamanho muito pequeno ({tamanho_kb:.1f} KB < {TAMANHO_MINIMO_PDF/1024:.1f} KB)")
+
+                    # Validar que é realmente um PDF (bytes começam com %PDF)
+                    if not pdf_bytes.startswith(b'%PDF'):
+                        logger.error("❌ ERRO CRÍTICO: Arquivo não é um PDF válido!")
+                        logger.error(f"   Primeiros 50 bytes: {pdf_bytes[:50]}")
+                        raise Exception("Arquivo extraído não é um PDF válido (não começa com %PDF)")
+
+                    logger.info("✅ PDF válido! Salvando arquivo...")
 
                     # Salvar PDF
                     with open(caminho_final, 'wb') as f:
                         f.write(pdf_bytes)
 
                     logger.info(f"💾 PDF salvo: {nome_arquivo}")
-                    logger.info(f"📊 Tamanho do arquivo: {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
-                    logger.info(f"📁 Caminho completo: {caminho_final}")
+                    logger.info(f"📊 Tamanho final: {len(pdf_bytes)} bytes ({tamanho_kb:.1f} KB)")
+                    logger.info(f"📁 Caminho: {caminho_final}")
                     sys.stdout.flush()
 
                     # AGUARDAR 2 SEGUNDOS para você VER que o PDF foi salvo

@@ -1026,7 +1026,6 @@ class CanopusOrquestrador:
         stats = {
             'total_pdfs': 0,
             'importados': 0,
-            'ja_existentes': 0,
             'erros': 0,
             'sem_cliente': 0
         }
@@ -1112,21 +1111,9 @@ class CanopusOrquestrador:
                             cliente_cpf = cliente[1]
                             logger.info(f"✅ Cliente encontrado: {cliente[2]} (ID: {cliente_id})")
 
-                            # Verificar se boleto já existe
-                            cur.execute("""
-                                SELECT id FROM boletos
-                                WHERE cliente_final_id = %s
-                                  AND mes_referencia = %s
-                                  AND ano_referencia = %s
-                                  AND pdf_filename = %s
-                            """, (cliente_id, mes_num, ano, pdf_file.name))
-
-                            boleto_existente = cur.fetchone()
-
-                            if boleto_existente:
-                                logger.info(f"⏭️ Boleto já existe no banco")
-                                stats['ja_existentes'] += 1
-                                continue
+                            # REMOVIDO: Verificação de boleto já existente
+                            # Agora sempre importa todos os boletos da lista
+                            # (Solicitado pelo usuário para garantir download completo)
 
                             # Gerar número único do boleto
                             numero_boleto = f"CANOPUS-{cliente_cpf}-{mes_num:02d}{ano}"
@@ -1189,7 +1176,6 @@ class CanopusOrquestrador:
             logger.info("=" * 80)
             logger.info(f"📁 Total de PDFs: {stats['total_pdfs']}")
             logger.info(f"✅ Importados: {stats['importados']}")
-            logger.info(f"⏭️ Já existentes: {stats['ja_existentes']}")
             logger.info(f"⚠️ Sem cliente: {stats['sem_cliente']}")
             logger.info(f"❌ Erros: {stats['erros']}")
             logger.info("=" * 80)

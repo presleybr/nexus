@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Boletos Canopus</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #39FF14;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: #333;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #39FF14;
+        }
+
+        .stat-card h3 {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 2em;
+            color: #39FF14;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        thead {
+            background: #39FF14;
+            color: #1e1e1e;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #444;
+        }
+
+        th {
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        tr:hover {
+            background: #3a3a3a;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .badge-warning {
+            background: #ffc107;
+            color: #1e1e1e;
+        }
+
+        .badge-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .badge-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-right: 5px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+            font-size: 1.2em;
+        }
+
+        .error {
+            background: #dc3545;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .size-small {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .size-ok {
+            color: #28a745;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            position: relative;
+            width: 90%;
+            height: 90%;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1001;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .refresh-btn {
+            background: #39FF14;
+            color: #1e1e1e;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .refresh-btn:hover {
+            background: #2de00f;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug - Boletos Canopus</h1>
+        <p class="subtitle">Visualização de todos os boletos no sistema (sem filtro de cliente)</p>
+
+        <button class="refresh-btn" onclick="carregarBoletos()">🔄 Atualizar Dados</button>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <h3>Total de Boletos</h3>
+                <div class="value" id="total">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>PDFs Pequenos (&lt; 10KB)</h3>
+                <div class="value" id="pequenos">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>PDFs OK (&gt; 10KB)</h3>
+                <div class="value" id="ok">0</div>
+            </div>
+        </div>
+
+        <div id="error" style="display: none;" class="error"></div>
+        <div id="loading" class="loading">Carregando boletos...</div>
+
+        <table id="tabelaBoletos" style="display: none;">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Cliente Nexus ID</th>
+                    <th>Cliente</th>
+                    <th>CPF</th>
+                    <th>Mês/Ano</th>
+                    <th>Valor</th>
+                    <th>Tamanho PDF</th>
+                    <th>Arquivo</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="corpoBoletos">
+            </tbody>
+        </table>
+    </div>
+
+    <div id="modalPDF" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="fecharModal()">✕ Fechar</button>
+            <iframe id="iframePDF"></iframe>
+        </div>
+    </div>
+
+    <script>
+        async function carregarBoletos() {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const tabela = document.getElementById('tabelaBoletos');
+            const corpo = document.getElementById('corpoBoletos');
+
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            tabela.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/crm/boletos-debug/todos?limit=100');
+
+                if (!response.ok) {
+                    throw new Error(`Erro ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.erro || 'Erro desconhecido');
+                }
+
+                const boletos = data.boletos || [];
+
+                // Estatísticas
+                let pequenos = 0;
+                let ok = 0;
+
+                boletos.forEach(b => {
+                    const size = b.pdf_size || 0;
+                    if (size > 0 && size < 10000) {
+                        pequenos++;
+                    } else if (size >= 10000) {
+                        ok++;
+                    }
+                });
+
+                document.getElementById('total').textContent = boletos.length;
+                document.getElementById('pequenos').textContent = pequenos;
+                document.getElementById('ok').textContent = ok;
+
+                // Preencher tabela
+                corpo.innerHTML = '';
+
+                if (boletos.length === 0) {
+                    corpo.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: #888;">Nenhum boleto encontrado</td></tr>';
+                } else {
+                    boletos.forEach(boleto => {
+                        const tr = document.createElement('tr');
+
+                        const size = boleto.pdf_size || 0;
+                        const sizeKB = (size / 1024).toFixed(2);
+                        const sizeClass = size > 0 && size < 10000 ? 'size-small' : 'size-ok';
+                        const sizeText = size > 0 ? `${sizeKB} KB` : 'N/A';
+
+                        tr.innerHTML = `
+                            <td>${boleto.id}</td>
+                            <td><span class="badge badge-info">${boleto.cliente_nexus_id || 'N/A'}</span></td>
+                            <td>${boleto.nome_completo || 'N/A'}</td>
+                            <td>${boleto.cpf || 'N/A'}</td>
+                            <td>${boleto.mes_referencia}/${boleto.ano_referencia}</td>
+                            <td>R$ ${parseFloat(boleto.valor_original || 0).toFixed(2)}</td>
+                            <td class="${sizeClass}">${sizeText}</td>
+                            <td style="font-size: 0.8em; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${boleto.pdf_filename || 'N/A'}</td>
+                            <td>
+                                <button class="btn btn-primary" onclick="visualizarPDF(${boleto.id})" title="Visualizar PDF">👁️ Ver</button>
+                                <button class="btn btn-success" onclick="baixarPDF(${boleto.id})" title="Download PDF">📥 Baixar</button>
+                            </td>
+                        `;
+
+                        corpo.appendChild(tr);
+                    });
+                }
+
+                tabela.style.display = 'table';
+                loading.style.display = 'none';
+
+            } catch (err) {
+                console.error('Erro ao carregar boletos:', err);
+                error.textContent = `Erro: ${err.message}`;
+                error.style.display = 'block';
+                loading.style.display = 'none';
+            }
+        }
+
+        function visualizarPDF(boletoId) {
+            const modal = document.getElementById('modalPDF');
+            const iframe = document.getElementById('iframePDF');
+
+            iframe.src = `/api/crm/boletos/${boletoId}/visualizar`;
+            modal.classList.add('active');
+        }
+
+        function baixarPDF(boletoId) {
+            window.open(`/api/crm/boletos/${boletoId}/download`, '_blank');
+        }
+
+        function fecharModal() {
+            const modal = document.getElementById('modalPDF');
+            const iframe = document.getElementById('iframePDF');
+
+            modal.classList.remove('active');
+            iframe.src = '';
+        }
+
+        // Fechar modal com ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                fecharModal();
+            }
+        });
+
+        // Carregar boletos ao iniciar
+        document.addEventListener('DOMContentLoaded', carregarBoletos);
+    </script>
+</body>
+</html>

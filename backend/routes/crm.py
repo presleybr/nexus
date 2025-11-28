@@ -2235,3 +2235,183 @@ def get_graficos():
         import traceback
         traceback.print_exc()
         return jsonify({'erro': str(e)}), 500
+
+
+# ============================================================================
+# DEBUG: ENDPOINTS PARA VISUALIZAR BOLETOS
+# ============================================================================
+
+@crm_bp.route('/boletos-debug/todos', methods=['GET'])
+def listar_todos_boletos_debug():
+    """Lista TODOS os boletos (sem filtrar por cliente) - Para debug"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+
+        query = """
+            SELECT
+                b.id,
+                b.cliente_nexus_id,
+                b.cliente_final_id,
+                b.numero_boleto,
+                b.valor_original,
+                b.data_vencimento,
+                b.data_emissao,
+                b.mes_referencia,
+                b.ano_referencia,
+                b.status,
+                b.status_envio,
+                b.pdf_filename,
+                b.pdf_path,
+                b.pdf_size,
+                b.created_at,
+                cf.nome_completo,
+                cf.cpf,
+                cf.whatsapp
+            FROM boletos b
+            LEFT JOIN clientes_finais cf ON b.cliente_final_id = cf.id
+            ORDER BY b.created_at DESC
+            LIMIT %s
+        """
+
+        boletos = db.execute_query(query, (limit,))
+
+        return jsonify({
+            'success': True,
+            'count': len(boletos) if boletos else 0,
+            'boletos': boletos or []
+        }), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500
+
+
+@crm_bp.route('/boletos/<int:boleto_id>/visualizar', methods=['GET'])
+def visualizar_boleto_pdf(boleto_id):
+    """Retorna o PDF do boleto para visualização"""
+    try:
+        from io import BytesIO
+        import base64
+
+        # Buscar boleto no banco
+        query = """
+            SELECT
+                b.id,
+                b.pdf_filename,
+                b.pdf_path,
+                b.pdf_size,
+                b.pdf_data
+            FROM boletos b
+            WHERE b.id = %s
+        """
+
+        boleto = db.execute_query(query, (boleto_id,))
+
+        if not boleto or len(boleto) == 0:
+            return jsonify({'erro': 'Boleto não encontrado'}), 404
+
+        boleto = boleto[0]
+
+        # Verificar se tem PDF armazenado no banco
+        if boleto.get('pdf_data'):
+            # PDF está no banco (bytea)
+            pdf_bytes = boleto['pdf_data']
+            if isinstance(pdf_bytes, str):
+                # Se vier como base64 string
+                pdf_bytes = base64.b64decode(pdf_bytes)
+
+            return send_file(
+                BytesIO(pdf_bytes),
+                mimetype='application/pdf',
+                as_attachment=False,
+                download_name=boleto['pdf_filename'] or f'boleto_{boleto_id}.pdf'
+            )
+
+        # Se não tem no banco, tentar ler do arquivo
+        elif boleto.get('pdf_path'):
+            pdf_path = Path(boleto['pdf_path'])
+
+            if pdf_path.exists():
+                return send_file(
+                    pdf_path,
+                    mimetype='application/pdf',
+                    as_attachment=False,
+                    download_name=boleto['pdf_filename'] or f'boleto_{boleto_id}.pdf'
+                )
+            else:
+                return jsonify({
+                    'erro': 'Arquivo PDF não encontrado no sistema',
+                    'pdf_path': str(pdf_path),
+                    'pdf_size': boleto.get('pdf_size'),
+                    'mensagem': 'O arquivo pode ter sido removido ou não está acessível no Render'
+                }), 404
+
+        else:
+            return jsonify({'erro': 'Boleto não possui PDF associado'}), 404
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500
+
+
+@crm_bp.route('/boletos/<int:boleto_id>/download', methods=['GET'])
+def download_boleto_pdf(boleto_id):
+    """Download do PDF do boleto"""
+    try:
+        from io import BytesIO
+        import base64
+
+        # Buscar boleto no banco
+        query = """
+            SELECT
+                b.id,
+                b.pdf_filename,
+                b.pdf_path,
+                b.pdf_data
+            FROM boletos b
+            WHERE b.id = %s
+        """
+
+        boleto = db.execute_query(query, (boleto_id,))
+
+        if not boleto or len(boleto) == 0:
+            return jsonify({'erro': 'Boleto não encontrado'}), 404
+
+        boleto = boleto[0]
+
+        # Verificar se tem PDF armazenado no banco
+        if boleto.get('pdf_data'):
+            pdf_bytes = boleto['pdf_data']
+            if isinstance(pdf_bytes, str):
+                pdf_bytes = base64.b64decode(pdf_bytes)
+
+            return send_file(
+                BytesIO(pdf_bytes),
+                mimetype='application/pdf',
+                as_attachment=True,
+                download_name=boleto['pdf_filename'] or f'boleto_{boleto_id}.pdf'
+            )
+
+        # Se não tem no banco, tentar ler do arquivo
+        elif boleto.get('pdf_path'):
+            pdf_path = Path(boleto['pdf_path'])
+
+            if pdf_path.exists():
+                return send_file(
+                    pdf_path,
+                    mimetype='application/pdf',
+                    as_attachment=True,
+                    download_name=boleto['pdf_filename'] or f'boleto_{boleto_id}.pdf'
+                )
+            else:
+                return jsonify({'erro': 'Arquivo PDF não encontrado'}), 404
+
+        else:
+            return jsonify({'erro': 'Boleto não possui PDF associado'}), 404
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500

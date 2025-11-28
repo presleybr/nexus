@@ -2094,7 +2094,35 @@ def importar_boletos():
     from services.pdf_extractor import extrair_dados_boleto
 
     pasta_canopus = Path(r'D:\Nexus\automation\canopus\downloads\Danner')
-    cliente_nexus_id = 2  # ID da empresa Cred MS Consorcios
+
+    # Buscar cliente_nexus_id do usuário logado (não mais hardcoded)
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Buscar o primeiro (e único) cliente_nexus ativo
+                cur.execute("""
+                    SELECT id FROM clientes_nexus
+                    WHERE ativo = TRUE
+                    ORDER BY id
+                    LIMIT 1
+                """)
+                cliente_nexus_row = cur.fetchone()
+
+                if not cliente_nexus_row:
+                    logger.error("❌ Nenhum cliente_nexus encontrado na tabela!")
+                    return jsonify({
+                        'success': False,
+                        'error': 'Nenhum cliente Nexus cadastrado no sistema'
+                    }), 404
+
+                cliente_nexus_id = cliente_nexus_row['id']
+                logger.info(f"✅ Usando cliente_nexus_id: {cliente_nexus_id}")
+    except Exception as e:
+        logger.error(f"❌ Erro ao buscar cliente_nexus_id: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Erro ao buscar cliente Nexus: {str(e)}'
+        }), 500
 
     if not pasta_canopus.exists():
         return jsonify({
@@ -2231,24 +2259,10 @@ def importar_boletos():
                     logger.info(f"   ✅ Cliente criado (ID: {cliente_id})")
                     stats['clientes_criados'] += 1
 
-                # Verificar se boleto já existe para este cliente e mês
+                # REMOVIDO: Verificação de boleto já existente
+                # Agora sempre importa/cria boletos, mesmo se já existirem
                 mes_ref = vencimento.month if vencimento else datetime.now().month
                 ano_ref = vencimento.year if vencimento else datetime.now().year
-
-                cur.execute("""
-                    SELECT id FROM boletos
-                    WHERE cliente_final_id = %s
-                    AND mes_referencia = %s
-                    AND ano_referencia = %s
-                """, (cliente_id, mes_ref, ano_ref))
-
-                boleto_existente = cur.fetchone()
-
-                if boleto_existente:
-                    logger.info(f"   ℹ️  Boleto já existe para este cliente/mês")
-                    conn.commit()
-                    conn.close()
-                    continue
 
                 # Criar boleto
                 logger.info(f"   ➕ Criando boleto...")
@@ -2753,16 +2767,8 @@ def resetar_e_reimportar():
 
                 cliente_id = cliente[0]
 
-                # Verificar se boleto já existe
-                cur.execute("""
-                    SELECT id FROM boletos
-                    WHERE cliente_final_id = %s AND mes_referencia = %s
-                      AND ano_referencia = %s AND pdf_filename = %s
-                """, (cliente_id, mes_num, ano, pdf_file.name))
-
-                if cur.fetchone():
-                    logger.debug(f"   ⏭️  Boleto já existe: {pdf_file.name}")
-                    continue
+                # REMOVIDO: Verificação de boleto já existente
+                # Agora sempre importa boletos, mesmo se já existirem
 
                 # Dados do boleto
                 data_vencimento = datetime(ano, mes_num, 10).date()  # Dia 10 do mês
