@@ -503,36 +503,11 @@
                         <span class="step-indicator">2</span>
                         Importar Planilha para o Banco
                     </h3>
-                    <p>📊 Faça upload da planilha Excel ou use a baixada do Drive</p>
-
-                    <!-- Upload Manual de Planilha -->
-                    <div style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(52, 168, 83, 0.1); border: 2px dashed #34a853; border-radius: 8px;">
-                        <label style="display: block; margin-bottom: 0.75rem; color: #34a853; font-weight: 600;">
-                            📤 Upload Manual de Planilha:
-                        </label>
-                        <input
-                            type="file"
-                            id="inputPlanilhaUpload"
-                            accept=".xlsx,.xls,.xlsm"
-                            style="width: 100%; padding: 0.75rem; background: #1a1a1a; color: #fff; border: 2px solid #34a853; border-radius: 8px; cursor: pointer; margin-bottom: 0.75rem;"
-                        />
-                        <button class="btn-canopus" id="btnUploadPlanilha" style="width: 100%; background: linear-gradient(135deg, #34a853 0%, #2ecc71 100%); position: relative; z-index: 1;">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="17 8 12 3 7 8"></polyline>
-                                <line x1="12" y1="3" x2="12" y2="15"></line>
-                            </svg>
-                            Fazer Upload e Importar
-                        </button>
-                    </div>
-
-                    <div style="text-align: center; margin: 1rem 0; color: #666;">
-                        <span style="background: #0a0a0a; padding: 0 1rem;">OU</span>
-                    </div>
+                    <p>📊 Baixa automaticamente do Google Drive e importa para o banco de dados</p>
 
                     <!-- Seleção de Pontos de Venda -->
-                    <div style="margin-bottom: 1rem;">
-                        <label style="display: block; margin-bottom: 0.5rem; color: #34a853; font-weight: 600; position: relative; z-index: 1;">
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.75rem; color: #34a853; font-weight: 600; position: relative; z-index: 1;">
                             📍 Selecione os Pontos de Venda:
                         </label>
                         <select id="selectPontosVenda" style="width: 100%; padding: 0.75rem; background: #1a1a1a; color: #fff; border: 2px solid #34a853; border-radius: 8px; font-size: 0.95rem; cursor: pointer; position: relative; z-index: 1;">
@@ -542,15 +517,14 @@
                         </select>
                     </div>
 
-                    <!-- Botão Importar Planilha do Drive -->
-                    <button class="btn-canopus" id="btnImportarPlanilha" style="width: 100%; background: #34a853; position: relative; z-index: 1;">
+                    <!-- Botão Importar do Google Drive -->
+                    <button class="btn-canopus" id="btnImportarPlanilha" style="width: 100%; background: linear-gradient(135deg, #34a853 0%, #2ecc71 100%); position: relative; z-index: 1;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="12" y1="18" x2="12" y2="12"></line>
-                            <line x1="9" y1="15" x2="15" y2="15"></line>
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
-                        Importar do Google Drive
+                        Baixar do Drive e Importar
                     </button>
                 </div>
 
@@ -734,100 +708,19 @@
 
         carregarLinkDrive();
 
-        // Upload manual de planilha
-        document.getElementById('btnUploadPlanilha').addEventListener('click', async () => {
-            const btn = document.getElementById('btnUploadPlanilha');
-            const fileInput = document.getElementById('inputPlanilhaUpload');
-            const selectPontosVenda = document.getElementById('selectPontosVenda');
-
-            // Verificar se arquivo foi selecionado
-            if (!fileInput.files || fileInput.files.length === 0) {
-                alert('Por favor, selecione um arquivo Excel (.xlsx, .xls)');
-                return;
-            }
-
-            const file = fileInput.files[0];
-            const pontosVenda = selectPontosVenda.value;
-
-            // Validar extensão
-            const allowedExtensions = ['.xlsx', '.xls', '.xlsm'];
-            const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-
-            if (!allowedExtensions.includes(fileExt)) {
-                alert('Tipo de arquivo inválido. Use: .xlsx, .xls ou .xlsm');
-                return;
-            }
-
-            // Confirmar upload
-            let mensagemConfirmacao = `Deseja fazer upload e importar:\n\n`;
-            mensagemConfirmacao += `Arquivo: ${file.name}\n`;
-            mensagemConfirmacao += `Tamanho: ${(file.size / 1024).toFixed(2)} KB\n`;
-            mensagemConfirmacao += `Pontos de Venda: ${pontosVenda === 'ambos' ? '17308 + 24627' : pontosVenda}\n`;
-
-            if (!confirm(mensagemConfirmacao)) {
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerHTML = '<span>Processando upload...</span>';
-
-            try {
-                // Criar FormData para enviar arquivo
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('pontos_venda', pontosVenda);
-
-                adicionarLog('info', `📤 Enviando ${file.name}...`);
-
-                const response = await fetch('/api/automation/upload-planilha', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    let mensagemSucesso = `✓ Upload e importação concluídos!\n\n`;
-                    mensagemSucesso += `Arquivo: ${result.data.arquivo}\n`;
-                    mensagemSucesso += `Extraídos: ${result.data.total_extraidos}\n`;
-                    mensagemSucesso += `Novos clientes: ${result.data.importados}\n`;
-                    mensagemSucesso += `Atualizados: ${result.data.atualizados}\n`;
-                    mensagemSucesso += `Erros: ${result.data.erros}\n`;
-                    mensagemSucesso += `Total processado: ${result.data.total_processados}`;
-
-                    alert(mensagemSucesso);
-
-                    adicionarLog('success', `✅ Planilha importada: ${result.data.total_processados} clientes`);
-
-                    // Limpar input de arquivo
-                    fileInput.value = '';
-                } else {
-                    alert('Erro ao processar planilha: ' + result.error);
-                    adicionarLog('error', `❌ Erro: ${result.error}`);
-                }
-            } catch (error) {
-                console.error('Erro:', error);
-                alert('Erro ao conectar com o servidor');
-                adicionarLog('error', '❌ Erro de conexão');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>Fazer Upload e Importar';
-            }
-        });
-
-        // Importar planilha
+        // Importar planilha do Google Drive
         document.getElementById('btnImportarPlanilha').addEventListener('click', async () => {
             const btn = document.getElementById('btnImportarPlanilha');
             const pontosVendaSelecionados = document.getElementById('selectPontosVenda').value;
 
             // Mensagem de confirmação dinâmica baseada na seleção
-            let mensagemConfirmacao = 'Deseja importar/atualizar a planilha do Dener?\n\n';
+            let mensagemConfirmacao = 'Deseja baixar do Google Drive e importar?\n\n';
             if (pontosVendaSelecionados === 'ambos') {
-                mensagemConfirmacao += 'Isso irá importar todos os clientes dos PV 17308 E 24627 para o banco de dados.';
+                mensagemConfirmacao += 'Isso irá baixar a planilha do Drive e importar todos os clientes dos PV 17308 E 24627 para o banco de dados.';
             } else if (pontosVendaSelecionados === '17308') {
-                mensagemConfirmacao += 'Isso irá importar todos os clientes do PV 17308 para o banco de dados.';
+                mensagemConfirmacao += 'Isso irá baixar a planilha do Drive e importar todos os clientes do PV 17308 para o banco de dados.';
             } else {
-                mensagemConfirmacao += 'Isso irá importar todos os clientes do PV 24627 para o banco de dados.';
+                mensagemConfirmacao += 'Isso irá baixar a planilha do Drive e importar todos os clientes do PV 24627 para o banco de dados.';
             }
 
             if (!confirm(mensagemConfirmacao)) {
@@ -835,7 +728,9 @@
             }
 
             btn.disabled = true;
-            btn.innerHTML = '<span>Importando...</span>';
+            btn.innerHTML = '<span>⏳ Baixando e importando...</span>';
+
+            adicionarLog('info', '📥 Baixando planilha do Google Drive...');
 
             try {
                 const response = await fetch('/api/automation/importar-planilha-dener', {
@@ -869,7 +764,7 @@
                 adicionarLog('error', 'Erro de conexão');
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>Importar Planilha do Dener';
+                btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Baixar do Drive e Importar';
             }
         });
 
