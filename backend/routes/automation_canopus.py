@@ -1267,9 +1267,74 @@ def baixar_boletos_ponto_venda():
         import threading
 
         # Criar lista de CPFs
-        cpfs = [c['cpf'] for c in clientes]
+        cpfs_todos = [c['cpf'] for c in clientes]
 
-        logger.info(f"🎯 Iniciando downloads para {len(cpfs)} CPFs do PV {ponto_venda}")
+        logger.info(f"📋 Total de clientes no PV: {len(cpfs_todos)}")
+        sys.stdout.flush()
+
+        # ========================================================================
+        # VERIFICAR QUAIS CPFs JÁ FORAM BAIXADOS NO BANCO DE DADOS
+        # ========================================================================
+        cpfs_ja_baixados = set()
+        try:
+            with get_db_connection() as conn_check:
+                with conn_check.cursor() as cur_check:
+                    # Buscar todos os CPFs que já têm download registrado
+                    # para este mês/ano
+                    cur_check.execute("""
+                        SELECT DISTINCT cpf
+                        FROM downloads_canopus
+                        WHERE status = 'sucesso'
+                        AND EXTRACT(MONTH FROM data_download) = %s
+                        AND EXTRACT(YEAR FROM data_download) = %s
+                    """, (mes, ano if ano else 2025))
+
+                    downloads_existentes = cur_check.fetchall()
+                    cpfs_ja_baixados = {d['cpf'] for d in downloads_existentes}
+
+                    logger.info("=" * 80)
+                    logger.info(f"📊 VERIFICAÇÃO DE DOWNLOADS EXISTENTES")
+                    logger.info(f"   Total de clientes no PV: {len(cpfs_todos)}")
+                    logger.info(f"   Já baixados (no banco): {len(cpfs_ja_baixados)}")
+                    logger.info(f"   Faltam baixar: {len(cpfs_todos) - len(cpfs_ja_baixados)}")
+                    logger.info("=" * 80)
+                    sys.stdout.flush()
+
+                    if cpfs_ja_baixados:
+                        logger.info(f"✅ CPFs já baixados (primeiros 10): {list(cpfs_ja_baixados)[:10]}")
+                        sys.stdout.flush()
+
+        except Exception as e:
+            logger.warning(f"⚠️ Erro ao verificar downloads existentes: {e}")
+            logger.info("   Continuando com todos os CPFs...")
+            sys.stdout.flush()
+            cpfs_ja_baixados = set()
+
+        # Filtrar apenas CPFs que ainda NÃO foram baixados
+        # Mantém a ordem original
+        cpfs = [cpf for cpf in cpfs_todos if cpf not in cpfs_ja_baixados]
+
+        logger.info("=" * 80)
+        logger.info(f"🎯 INICIANDO DOWNLOADS")
+        logger.info(f"   CPFs a processar: {len(cpfs)}")
+        if len(cpfs) > 0:
+            logger.info(f"   Primeiro CPF: {cpfs[0]}")
+            logger.info(f"   Último CPF: {cpfs[-1]}")
+        logger.info("=" * 80)
+        sys.stdout.flush()
+
+        # Se não há CPFs para processar, retornar sucesso
+        if len(cpfs) == 0:
+            logger.info("✅ TODOS OS BOLETOS JÁ FORAM BAIXADOS!")
+            logger.info(f"   Total de {len(cpfs_ja_baixados)} boletos já registrados no banco.")
+            sys.stdout.flush()
+            return jsonify({
+                'success': True,
+                'message': 'Todos os boletos já foram baixados',
+                'total_clientes': len(cpfs_todos),
+                'ja_baixados': len(cpfs_ja_baixados),
+                'faltam': 0
+            })
 
         # Estatísticas compartilhadas
         stats = {
@@ -1278,7 +1343,8 @@ def baixar_boletos_ponto_venda():
             'cpf_nao_encontrado': 0,
             'sem_boleto': 0,
             'total': len(cpfs),
-            'processados': 0
+            'processados': 0,
+            'ja_baixados': len(cpfs_ja_baixados)  # Adicionar contagem de já baixados
         }
 
         # Função para processar em background
@@ -1446,17 +1512,10 @@ def baixar_boletos_ponto_venda():
                                 if cliente_info and cliente_info.get('nome'):
                                     nome_cliente = str(cliente_info['nome']).strip().upper().replace(' ', '_')
                                     logger.info(f"✅ Nome do cliente encontrado no banco: {nome_cliente}")
+                                    sys.stdout.flush()
                             except Exception as e:
                                 logger.warning(f"⚠️ Erro ao buscar nome do cliente no banco: {e}")
-
-                            # Se encontrou o nome, verificar se arquivo já existe
-                            if nome_cliente:
-                                arquivo_esperado = pasta_destino / f"{nome_cliente}_{mes}.pdf"
-                                if arquivo_esperado.exists():
-                                    logger.info(f"⏭️ PULANDO: Boleto já existe - {arquivo_esperado.name}")
-                                    stats['sucessos'] += 1  # Contar como sucesso (já tem o boleto)
-                                    stats['processados'] += 1
-                                    continue
+                                sys.stdout.flush()
 
                             # NÃO passar nome_arquivo - deixar gerar automaticamente com nome do cliente
                             # Processar cliente
@@ -1639,10 +1698,13 @@ def baixar_boletos_ponto_venda():
                     logger.info(f"⚠️ CPF não encontrado: {stats['cpf_nao_encontrado']}")
                     logger.info(f"📄 Sem boleto: {stats['sem_boleto']}")
                     logger.info(f"📊 Total processados: {stats['processados']}/{stats['total']}")
+                    logger.info(f"⏭️ Já baixados anteriormente: {stats['ja_baixados']}")
+                    logger.info(f"📈 Total geral: {stats['processados'] + stats['ja_baixados']}")
                     logger.info("=" * 80)
                     logger.info(f"💾 Os boletos estão em: {pasta_destino}")
-                    logger.info("🔄 Use o botão 'Importar Boletos' no frontend para importar ao banco")
+                    logger.info("💾 Registros salvos na tabela: downloads_canopus")
                     logger.info("=" * 80)
+                    sys.stdout.flush()
 
                     # Finalizar execução com sucesso
                     finalizar_execucao(sucesso=True)
@@ -1670,12 +1732,14 @@ def baixar_boletos_ponto_venda():
         logger.info("📤 Retornando resposta ao cliente...")
         return jsonify({
             'success': True,
-            'message': f'Download iniciado em background para {len(clientes)} clientes do PV {ponto_venda}. O Chromium abrirá em alguns segundos.',
+            'message': f'Download iniciado para {len(cpfs)} clientes (de {len(cpfs_todos)} total). {len(cpfs_ja_baixados)} já foram baixados anteriormente.',
             'data': {
                 'ponto_venda': ponto_venda,
-                'total_clientes': len(clientes),
+                'total_clientes': len(cpfs_todos),
+                'ja_baixados': len(cpfs_ja_baixados),
+                'a_processar': len(cpfs),
                 'status': 'iniciado',
-                'info': 'Acompanhe o progresso nos logs do terminal'
+                'info': 'Acompanhe o progresso em tempo real no monitoramento'
             }
         })
 
