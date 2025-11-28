@@ -33,6 +33,11 @@ services:
         value: INFO
       - key: DOWNLOAD_BASE_DIR
         value: /app/automation/canopus/downloads
+      # Forçar logs em tempo real (unbuffered)
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: PYTHONIOENCODING
+        value: utf-8
       # Adicione suas credenciais Canopus como variáveis secretas no painel do Render
       - key: CANOPUS_URL
         sync: false  # Definir manualmente no painel

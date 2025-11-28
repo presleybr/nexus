@@ -8,9 +8,33 @@ from flask_session import Session
 from flask_cors import CORS
 import os
 import sys
+import logging
 
 # Adiciona o diretório backend ao path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# =============================================
+# CONFIGURAÇÃO DE LOGGING PARA RENDER
+# =============================================
+# Forçar unbuffered stdout/stderr para logs em tempo real
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
+# Configurar logging raiz para enviar tudo para stdout
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ],
+    force=True  # Sobrescrever configurações anteriores
+)
+
+# Garantir que werkzeug (servidor Flask) também logue corretamente
+logging.getLogger('werkzeug').setLevel(logging.INFO)
+logging.getLogger('werkzeug').handlers = [logging.StreamHandler(sys.stdout)]
+
+print("[INIT] Logging configurado para output em tempo real", flush=True)
 
 from config import Config
 from models import Database, log_sistema

@@ -67,13 +67,14 @@ RUN mkdir -p automation/canopus/downloads/Danner \
     boletos \
     logs
 
-# Variáveis de ambiente padrão
+# Variáveis de ambiente padrão para logs em tempo real
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=utf-8
 ENV FLASK_APP=backend/app.py
 ENV PORT=5000
 
 # Expor porta
 EXPOSE 5000
 
-# Comando de inicialização
-CMD ["python", "backend/app.py"]
+# Comando de inicialização (com -u para unbuffered)
+CMD ["python", "-u", "backend/app.py"]
