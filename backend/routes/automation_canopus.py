@@ -1141,8 +1141,18 @@ def baixar_boletos_ponto_venda():
                     return
 
                 # Abrir navegador UMA VEZ
-                logger.info("🌐 Abrindo Chromium...")
-                async with CanopusAutomation(headless=False) as bot:
+                # Detectar se está no Render (sem interface gráfica)
+                # Render define RENDER=true ou verifica se DATABASE_URL começa com postgresql://
+                is_render = (
+                    os.getenv('RENDER') is not None or
+                    os.getenv('IS_RENDER') == 'true' or
+                    'render.com' in os.getenv('DATABASE_URL', '')
+                )
+                headless_mode = is_render  # True no Render, False localmente
+
+                logger.info(f"🌐 Ambiente: {'Render (servidor)' if is_render else 'Local'}")
+                logger.info(f"🌐 Abrindo Chromium (headless={headless_mode})...")
+                async with CanopusAutomation(headless=headless_mode) as bot:
                     logger.info("✅ Chromium aberto!")
 
                     # Fazer login
