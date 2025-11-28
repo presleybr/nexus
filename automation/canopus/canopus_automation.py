@@ -863,7 +863,18 @@ class CanopusAutomation:
 
                         logger.info(f"📥 Interceptando resposta: {url[:70]}...")
                         logger.info(f"   Content-Type: {content_type}")
+                        logger.info(f"   Status: {response.status}")
                         sys.stdout.flush()
+
+                        # IMPORTANTE: Aguardar a resposta completar antes de acessar body
+                        # Isso evita erros de "Response body is unavailable"
+                        try:
+                            await response.finished()
+                            logger.info("✅ Resposta finalizada, acessando body...")
+                            sys.stdout.flush()
+                        except Exception as e_finish:
+                            logger.warning(f"⚠️ Erro ao aguardar finish: {e_finish}")
+                            sys.stdout.flush()
 
                         body = await response.body()
                         tamanho = len(body)
@@ -977,6 +988,12 @@ class CanopusAutomation:
                     # Capturar logs do console JavaScript
                     page.on('console', lambda msg: logger.info(f"[CONSOLE] {msg.text}"))
 
+                    # IMPORTANTE: Registrar handler de response NESTA aba específica
+                    # Isso garante que capturamos o PDF antes do browser processar
+                    page.on('response', interceptar_pdf)
+                    logger.info("🎯 Handler de PDF registrado na nova aba")
+                    sys.stdout.flush()
+
                 self.context.on('page', capturar_nova_aba)
 
                 # Clicar no botão
@@ -1031,8 +1048,55 @@ class CanopusAutomation:
 
                     # Se não foi interceptado, tentar JavaScript (se a aba ainda estiver aberta)
                     if not pdf_bytes:
-                        # Verificar se temos alguma URL interceptada (mesmo que não seja o PDF completo)
-                        if todas_respostas_pdf and len(todas_respostas_pdf) > 0:
+                        # ESTRATÉGIA 1: Tentar extrair PDF diretamente da nova aba que foi aberta
+                        logger.info("🔄 Tentando extrair PDF da aba popup que foi aberta...")
+                        sys.stdout.flush()
+
+                        try:
+                            # Aguardar um pouco para garantir que a aba carregou o PDF
+                            await asyncio.sleep(2)
+
+                            # Verificar a URL atual da aba
+                            url_atual = nova_aba_pdf.url
+                            logger.info(f"📍 URL da aba popup: {url_atual[:100]}")
+                            sys.stdout.flush()
+
+                            # Se a URL contém PDF ou é a página de impressão, tentar extrair
+                            if 'frmConCmImpressao' in url_atual or 'pdf' in url_atual.lower():
+                                logger.info("🎯 URL válida detectada, tentando fetch direto...")
+                                sys.stdout.flush()
+
+                                # Fazer fetch direto da URL na aba
+                                pdf_data_fetch = await nova_aba_pdf.evaluate(f"""
+                                    async () => {{
+                                        try {{
+                                            const response = await fetch('{url_atual}');
+                                            if (!response.ok) throw new Error('Fetch falhou: ' + response.status);
+
+                                            const blob = await response.blob();
+                                            const buffer = await blob.arrayBuffer();
+                                            const bytes = new Uint8Array(buffer);
+
+                                            console.log('[FETCH] PDF baixado: ' + bytes.length + ' bytes');
+                                            return {{success: true, bytes: Array.from(bytes)}};
+                                        }} catch(e) {{
+                                            console.error('[FETCH] Erro: ' + e.message);
+                                            return {{success: false, error: e.message}};
+                                        }}
+                                    }}
+                                """)
+
+                                if pdf_data_fetch and pdf_data_fetch.get('success'):
+                                    pdf_bytes = bytes(pdf_data_fetch['bytes'])
+                                    logger.info(f"✅ PDF extraído por fetch direto: {len(pdf_bytes)} bytes")
+                                    sys.stdout.flush()
+
+                        except Exception as e_fetch:
+                            logger.warning(f"⚠️ Fetch direto falhou: {e_fetch}")
+                            sys.stdout.flush()
+
+                        # ESTRATÉGIA 2: Se ainda não temos PDF, verificar respostas interceptadas
+                        if not pdf_bytes and todas_respostas_pdf and len(todas_respostas_pdf) > 0:
                             # Pegar a URL da última response interceptada
                             ultima_url = todas_respostas_pdf[-1]['url']
                             logger.info(f"🔗 Abrindo PDF em nova aba controlada: {ultima_url[:80]}...")
