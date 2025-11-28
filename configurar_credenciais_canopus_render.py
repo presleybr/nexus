@@ -108,7 +108,9 @@ cur.execute("""
 """)
 
 for col in cur.fetchall():
-    print(f"  {col['column_name']:<25} {col['data_type']:<25} NULL={col['is_nullable']}")
+    print(f"  {col['column_name']:<25} {col['dat' \
+    '' \
+    'a_type']:<25} NULL={col['is_nullable']}")
 
 cur.close()
 conn.close()

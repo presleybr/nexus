@@ -1,13 +1,17 @@
 -- ============================================================================
--- CRIAR USUÁRIO CREDMS NO BANCO DO RENDER
--- Execute este SQL no DBeaver conectado ao banco do Render
+-- SCRIPT PARA CRIAR USUÁRIO CREDMS NO RENDER
+-- ============================================================================
+-- Email: credms@nexusbrasi.ai
+-- Senha: credms123
+-- CNPJ: 30.767.662/0001-52
+-- WhatsApp: +55 67 9890-5585
 -- ============================================================================
 
--- LIMPAR usuário anterior (se existir)
+-- 1. Limpar registros existentes (se houver)
 DELETE FROM clientes_nexus WHERE email_contato = 'credms@nexusbrasi.ai';
 DELETE FROM usuarios WHERE email = 'credms@nexusbrasi.ai';
 
--- CRIAR usuário
+-- 2. Criar usuário com hash correto (senha: credms123)
 INSERT INTO usuarios (email, password_hash, tipo, ativo, created_at, updated_at)
 VALUES (
     'credms@nexusbrasi.ai',
@@ -18,7 +22,7 @@ VALUES (
     CURRENT_TIMESTAMP
 );
 
--- CRIAR empresa
+-- 3. Criar cliente Nexus associado
 INSERT INTO clientes_nexus (
     usuario_id,
     nome_empresa,
@@ -39,18 +43,16 @@ SELECT
 FROM usuarios u
 WHERE u.email = 'credms@nexusbrasi.ai';
 
--- VERIFICAR
-SELECT
-    '✅ USUÁRIO CRIADO COM SUCESSO NO RENDER!' as status;
-
+-- 4. Verificar criação
 SELECT
     u.id,
     u.email,
     u.tipo,
     u.ativo,
-    cn.nome_empresa,
-    cn.cnpj,
-    cn.whatsapp_numero
+    LENGTH(u.password_hash) as hash_length,
+    c.nome_empresa,
+    c.cnpj,
+    c.whatsapp_numero
 FROM usuarios u
-LEFT JOIN clientes_nexus cn ON cn.usuario_id = u.id
+LEFT JOIN clientes_nexus c ON c.usuario_id = u.id
 WHERE u.email = 'credms@nexusbrasi.ai';

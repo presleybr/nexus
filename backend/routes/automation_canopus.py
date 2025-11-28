@@ -1065,6 +1065,49 @@ def status_execucao():
     })
 
 
+@automation_canopus_bp.route('/verificar-arquivos', methods=['GET'])
+def verificar_arquivos():
+    """
+    Verifica arquivos PDF salvos no servidor
+    """
+    import os
+
+    # Caminho dos downloads
+    base_dir = os.getenv('DOWNLOAD_BASE_DIR', str(Path(__file__).resolve().parent.parent.parent / 'automation' / 'canopus' / 'downloads'))
+    pasta_destino = Path(base_dir) / 'Danner'
+
+    resultado = {
+        'base_dir': str(base_dir),
+        'pasta_destino': str(pasta_destino),
+        'pasta_existe': pasta_destino.exists(),
+        'arquivos': [],
+        'total_arquivos': 0,
+        'tamanho_total_mb': 0
+    }
+
+    if pasta_destino.exists():
+        arquivos = []
+        tamanho_total = 0
+
+        for arquivo in pasta_destino.glob('*.pdf'):
+            stat = arquivo.stat()
+            arquivos.append({
+                'nome': arquivo.name,
+                'tamanho_kb': round(stat.st_size / 1024, 2),
+                'modificado': datetime.fromtimestamp(stat.st_mtime).isoformat()
+            })
+            tamanho_total += stat.st_size
+
+        resultado['arquivos'] = sorted(arquivos, key=lambda x: x['modificado'], reverse=True)[:20]  # Últimos 20
+        resultado['total_arquivos'] = len(list(pasta_destino.glob('*.pdf')))
+        resultado['tamanho_total_mb'] = round(tamanho_total / (1024 * 1024), 2)
+
+    return jsonify({
+        'success': True,
+        'data': resultado
+    })
+
+
 # ============================================================================
 # ROTAS PARA O FRONTEND DO CLIENTE
 # ============================================================================
