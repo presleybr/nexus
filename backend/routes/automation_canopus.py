@@ -1264,19 +1264,34 @@ def baixar_boletos_ponto_venda():
                     logger.info("🔐 FAZENDO LOGIN NO PONTO 24627")
                     logger.info(f"👤 Usuário: {usuario}")
                     logger.info(f"🏢 Código Empresa: {codigo_empresa}")
+                    logger.info(f"🔐 Senha: {'*' * len(senha)}")
                     logger.info("=" * 80)
 
-                    login_ok = await bot.login(
-                        usuario=usuario,
-                        senha=senha,
-                        codigo_empresa=codigo_empresa,
-                        ponto_venda='24627'
-                    )
+                    try:
+                        login_ok = await bot.login(
+                            usuario=usuario,
+                            senha=senha,
+                            codigo_empresa=codigo_empresa,
+                            ponto_venda='24627'
+                        )
+                    except Exception as e_login:
+                        logger.error(f"❌ EXCEPTION durante login: {e_login}")
+                        logger.exception("Traceback completo:")
+                        atualizar_status(etapa=f'Erro no login: {str(e_login)}', erro=str(e_login))
+                        finalizar_execucao(sucesso=False)
+                        return
 
                     if not login_ok:
                         logger.error("=" * 80)
                         logger.error("❌ FALHA NO LOGIN")
+                        logger.error("Possíveis causas:")
+                        logger.error("  1. Senha incorreta")
+                        logger.error("  2. Usuário bloqueado")
+                        logger.error("  3. Sistema Canopus indisponível")
+                        logger.error("  4. Seletores CSS mudaram")
                         logger.error("=" * 80)
+                        atualizar_status(etapa='Falha no login - verifique credenciais', erro='Login falhou')
+                        finalizar_execucao(sucesso=False)
                         return
 
                     logger.info("=" * 80)
