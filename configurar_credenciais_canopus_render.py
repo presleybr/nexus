@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Configura credenciais do Canopus no banco do Render
 """
+import sys
 import psycopg
 from psycopg.rows import dict_row
+
+# Configurar encoding para Windows
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 
 DATABASE_URL = 'postgresql://nexus_user:nc68h5fdIbK8ZGdcqWcMo7aYHxhDSffN@dpg-d4kldk0gjchc73a8hm7g-a.oregon-postgres.render.com/nexus_crm_14w2'
 
@@ -23,7 +30,7 @@ cur.execute("""
     )
 """)
 
-tabela_existe = cur.fetchone()[0]
+tabela_existe = cur.fetchone()['exists']
 
 if not tabela_existe:
     print("❌ Tabela credenciais_canopus não existe!")
