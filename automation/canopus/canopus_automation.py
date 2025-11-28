@@ -940,6 +940,22 @@ class CanopusAutomation:
                 logger.info("Clicando em 'Emitir Cobrança'...")
                 await self.screenshot("antes_emitir")
 
+                # IMPORTANTE: Injetar script NO CONTEXTO antes da aba abrir
+                # Isso previne que a aba feche automaticamente
+                try:
+                    await self.context.add_init_script("""
+                        // Bloquear window.close() para prevenir fechamento automático
+                        window.close = function() {
+                            console.log('[BLOQUEADO] Tentativa de fechar aba bloqueada!');
+                        };
+                        console.log('[SCRIPT] Script de prevenção de fechamento carregado');
+                    """)
+                    logger.info("🔒 Script de prevenção de fechamento injetado no contexto")
+                    sys.stdout.flush()
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro ao injetar script no contexto: {e}")
+                    sys.stdout.flush()
+
                 # Capturar a nova aba que será aberta
                 nova_aba_pdf = None
 
@@ -947,27 +963,17 @@ class CanopusAutomation:
                     nonlocal nova_aba_pdf
                     nova_aba_pdf = page
                     logger.info(f"📄 Nova aba detectada: {page.url}")
+                    sys.stdout.flush()
 
                     # Capturar logs do console JavaScript
                     page.on('console', lambda msg: logger.info(f"[CONSOLE] {msg.text}"))
-
-                    # IMPORTANTE: Injetar script para PREVENIR fechamento automático da aba
-                    # Sobrescrever window.close() para evitar que o site feche a aba
-                    try:
-                        await page.add_init_script("""
-                            window.close = function() {
-                                console.log('[BLOQUEADO] Tentativa de fechar aba bloqueada!');
-                            };
-                        """)
-                        logger.info("🔒 Script de prevenção de fechamento injetado")
-                    except Exception as e:
-                        logger.warning(f"⚠️ Erro ao injetar script: {e}")
 
                 self.context.on('page', capturar_nova_aba)
 
                 # Clicar no botão
                 await self.page.click(botao_emitir)
                 logger.info("✅ Clique executado")
+                sys.stdout.flush()
 
                 # Aguardar nova aba ser capturada (até 3 segundos)
                 contador = 0
@@ -980,9 +986,11 @@ class CanopusAutomation:
 
                 if not nova_aba_pdf:
                     logger.error("❌ Nova aba com PDF não abriu")
+                    sys.stdout.flush()
                     raise Exception("Nova aba com PDF não abriu")
 
                 logger.info(f"✅ Nova aba capturada: {nova_aba_pdf.url[:80] if nova_aba_pdf.url else 'carregando...'}")
+                sys.stdout.flush()
 
                 # ESTRATÉGIA: Aguardar o interceptador capturar o PDF real
                 # O site faz uma segunda request com o PDF depois do HTML
@@ -993,11 +1001,13 @@ class CanopusAutomation:
 
                     # Aguardar até 10 segundos pelo interceptador pegar o PDF real
                     logger.info("⏳ Aguardando interceptador capturar PDF real (até 10s)...")
+                    sys.stdout.flush()
                     for tentativa in range(100):  # 100 x 100ms = 10 segundos
                         if pdf_bytes_interceptado and len(pdf_bytes_interceptado) > 10000:
                             pdf_bytes = pdf_bytes_interceptado
                             logger.info(f"✅ PDF INTERCEPTADO: {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
                             logger.info(f"   URL: {pdf_url_interceptado[:80] if pdf_url_interceptado else 'N/A'}")
+                            sys.stdout.flush()
                             break
                         await asyncio.sleep(0.1)
 
@@ -1122,9 +1132,13 @@ class CanopusAutomation:
                         f.write(pdf_bytes)
 
                     logger.info(f"💾 PDF salvo: {nome_arquivo}")
+                    logger.info(f"📊 Tamanho do arquivo: {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
+                    logger.info(f"📁 Caminho completo: {caminho_final}")
+                    sys.stdout.flush()
 
                     # AGUARDAR 2 SEGUNDOS para você VER que o PDF foi salvo
                     logger.info("✅ PDF salvo com sucesso! Aguardando 2 segundos...")
+                    sys.stdout.flush()
                     await asyncio.sleep(2)
 
                     # Fechar abas (pode ter 2: popup original + nossa aba)
