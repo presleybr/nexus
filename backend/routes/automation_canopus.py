@@ -1111,79 +1111,72 @@ def verificar_arquivos():
 @automation_canopus_bp.route('/verificar-boletos-banco', methods=['GET'])
 def verificar_boletos_banco():
     """
-    Verifica boletos registrados no banco de dados
+    Verifica downloads registrados na tabela downloads_canopus
     """
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Total de boletos
-                cur.execute("SELECT COUNT(*) as total FROM boletos")
+                # Total de downloads
+                cur.execute("SELECT COUNT(*) as total FROM downloads_canopus")
                 total = cur.fetchone()['total']
 
-                # Últimos 10 boletos
+                # Últimos 10 downloads
                 cur.execute("""
                     SELECT
-                        b.id,
-                        b.numero_boleto,
-                        b.valor,
-                        b.data_vencimento,
-                        b.mes_referencia,
-                        b.ano_referencia,
-                        b.arquivo_pdf,
-                        b.status,
-                        b.created_at,
+                        d.id,
+                        d.cpf,
+                        d.nome_arquivo,
+                        d.caminho_arquivo,
+                        d.tamanho_bytes,
+                        d.status,
+                        d.data_download,
+                        d.created_at,
                         cf.nome_completo as cliente_nome,
-                        cf.cpf
-                    FROM boletos b
-                    LEFT JOIN clientes_finais cf ON cf.id = b.cliente_final_id
-                    ORDER BY b.created_at DESC
+                        c.nome as consultor_nome
+                    FROM downloads_canopus d
+                    LEFT JOIN clientes_finais cf ON cf.cpf = d.cpf
+                    LEFT JOIN consultores c ON c.id = d.consultor_id
+                    ORDER BY d.created_at DESC
                     LIMIT 10
                 """)
-                ultimos_boletos = cur.fetchall()
+                ultimos_downloads = cur.fetchall()
 
-                # Estatísticas por mês
+                # Estatísticas por status
                 cur.execute("""
                     SELECT
-                        mes_referencia,
-                        ano_referencia,
+                        status,
                         COUNT(*) as total,
-                        SUM(valor) as valor_total,
-                        status
-                    FROM boletos
-                    GROUP BY mes_referencia, ano_referencia, status
-                    ORDER BY ano_referencia DESC, mes_referencia DESC
+                        SUM(tamanho_bytes) as tamanho_total
+                    FROM downloads_canopus
+                    GROUP BY status
+                    ORDER BY total DESC
                 """)
                 estatisticas = cur.fetchall()
 
-                # Boletos de dezembro/2025
+                # Downloads por consultor
                 cur.execute("""
-                    SELECT COUNT(*) as total
-                    FROM boletos
-                    WHERE mes_referencia = 12 AND ano_referencia = 2025
+                    SELECT
+                        c.nome as consultor_nome,
+                        COUNT(d.id) as total_downloads
+                    FROM downloads_canopus d
+                    LEFT JOIN consultores c ON c.id = d.consultor_id
+                    GROUP BY c.nome
+                    ORDER BY total_downloads DESC
                 """)
-                dezembro_2025 = cur.fetchone()['total']
-
-                # Boletos sem PDF
-                cur.execute("""
-                    SELECT COUNT(*) as total
-                    FROM boletos
-                    WHERE arquivo_pdf IS NULL OR arquivo_pdf = ''
-                """)
-                sem_pdf = cur.fetchone()['total']
+                por_consultor = cur.fetchall()
 
                 return jsonify({
                     'success': True,
                     'data': {
-                        'total_boletos': total,
-                        'ultimos_boletos': ultimos_boletos,
-                        'estatisticas_por_mes': estatisticas,
-                        'dezembro_2025': dezembro_2025,
-                        'boletos_sem_pdf': sem_pdf
+                        'total_downloads': total,
+                        'ultimos_downloads': ultimos_downloads,
+                        'estatisticas_por_status': estatisticas,
+                        'downloads_por_consultor': por_consultor
                     }
                 })
 
     except Exception as e:
-        logger.error(f"Erro ao verificar boletos: {e}")
+        logger.error(f"Erro ao verificar downloads: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -1484,92 +1477,63 @@ def baixar_boletos_ponto_venda():
                                 logger.info(f"📁 Arquivo: {resultado.get('dados_boleto', {}).get('arquivo_nome', 'N/A')}")
                                 logger.info("=" * 80)
 
-                                # IMPORTAR PDF PARA O BANCO AUTOMATICAMENTE
+                                # REGISTRAR DOWNLOAD NA TABELA downloads_canopus
                                 try:
                                     arquivo_pdf = resultado.get('dados_boleto', {}).get('arquivo_caminho')
+                                    arquivo_nome = resultado.get('dados_boleto', {}).get('arquivo_nome')
+                                    arquivo_tamanho = resultado.get('dados_boleto', {}).get('arquivo_tamanho', 0)
+
                                     if arquivo_pdf and Path(arquivo_pdf).exists():
-                                        atualizar_status(etapa=f'Importando boleto para o banco de dados... ({idx}/{len(cpfs)})')
+                                        atualizar_status(etapa=f'Registrando download no banco... ({idx}/{len(cpfs)})')
 
-                                        # Importar extrator de PDF
-                                        from services.pdf_extractor import extrair_dados_boleto
+                                        with get_db_connection() as conn_import:
+                                            with conn_import.cursor() as cur_import:
+                                                # Buscar consultor_id pelo CPF do cliente
+                                                cur_import.execute("""
+                                                    SELECT consultor_id FROM clientes_finais
+                                                    WHERE cpf = %s AND ativo = TRUE
+                                                    LIMIT 1
+                                                """, (cpf,))
 
-                                        # Extrair dados do PDF
-                                        dados_pdf = extrair_dados_boleto(str(arquivo_pdf))
+                                                consultor_row = cur_import.fetchone()
+                                                consultor_id = consultor_row['consultor_id'] if consultor_row else None
 
-                                        if dados_pdf and dados_pdf.get('sucesso'):
-                                            # Salvar no banco
-                                            with get_db_connection() as conn_import:
-                                                with conn_import.cursor() as cur_import:
-                                                    # Buscar cliente_final_id pelo CPF
+                                                # Verificar se download já existe
+                                                cur_import.execute("""
+                                                    SELECT id FROM downloads_canopus
+                                                    WHERE cpf = %s AND nome_arquivo = %s
+                                                """, (cpf, arquivo_nome))
+
+                                                if not cur_import.fetchone():
+                                                    # Inserir registro de download
                                                     cur_import.execute("""
-                                                        SELECT id FROM clientes_finais
-                                                        WHERE cpf = %s AND ativo = TRUE
-                                                        LIMIT 1
-                                                    """, (cpf,))
+                                                        INSERT INTO downloads_canopus (
+                                                            consultor_id,
+                                                            cpf,
+                                                            nome_arquivo,
+                                                            caminho_arquivo,
+                                                            tamanho_bytes,
+                                                            status,
+                                                            data_download,
+                                                            created_at
+                                                        ) VALUES (
+                                                            %s, %s, %s, %s, %s, 'sucesso', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                                                        )
+                                                    """, (
+                                                        consultor_id,
+                                                        cpf,
+                                                        arquivo_nome,
+                                                        str(arquivo_pdf),
+                                                        arquivo_tamanho
+                                                    ))
+                                                    conn_import.commit()
+                                                    logger.info(f"💾 Download registrado no banco: {arquivo_nome}")
+                                                else:
+                                                    logger.info(f"⏭️ Download já registrado: {arquivo_nome}")
 
-                                                    cliente_row = cur_import.fetchone()
-                                                    if cliente_row:
-                                                        cliente_final_id = cliente_row['id']
-
-                                                        # Verificar se boleto já existe
-                                                        numero_boleto = dados_pdf.get('numero_boleto') or dados_pdf.get('linha_digitavel', '')[:20]
-
-                                                        cur_import.execute("""
-                                                            SELECT id FROM boletos WHERE numero_boleto = %s
-                                                        """, (numero_boleto,))
-
-                                                        if not cur_import.fetchone():
-                                                            # Inserir boleto
-                                                            # Converter nome do mês para número
-                                                            meses_map = {
-                                                                'JANEIRO': 1, 'FEVEREIRO': 2, 'MARÇO': 3, 'ABRIL': 4,
-                                                                'MAIO': 5, 'JUNHO': 6, 'JULHO': 7, 'AGOSTO': 8,
-                                                                'SETEMBRO': 9, 'OUTUBRO': 10, 'NOVEMBRO': 11, 'DEZEMBRO': 12
-                                                            }
-                                                            mes_num = meses_map.get(str(mes).upper(), datetime.now().month)
-
-                                                            cur_import.execute("""
-                                                                INSERT INTO boletos (
-                                                                    cliente_nexus_id,
-                                                                    cliente_final_id,
-                                                                    numero_boleto,
-                                                                    linha_digitavel,
-                                                                    codigo_barras,
-                                                                    valor,
-                                                                    data_vencimento,
-                                                                    mes_referencia,
-                                                                    ano_referencia,
-                                                                    nome_beneficiario,
-                                                                    arquivo_pdf,
-                                                                    status,
-                                                                    created_at
-                                                                ) VALUES (
-                                                                    2, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pendente', CURRENT_TIMESTAMP
-                                                                )
-                                                            """, (
-                                                                cliente_final_id,
-                                                                numero_boleto,
-                                                                dados_pdf.get('linha_digitavel'),
-                                                                dados_pdf.get('codigo_barras'),
-                                                                dados_pdf.get('valor'),
-                                                                dados_pdf.get('vencimento'),
-                                                                mes_num,
-                                                                int(ano) if ano else 2025,
-                                                                dados_pdf.get('beneficiario'),
-                                                                Path(arquivo_pdf).name
-                                                            ))
-                                                            conn_import.commit()
-                                                            logger.info(f"💾 Boleto importado para o banco: {numero_boleto}")
-                                                        else:
-                                                            logger.info(f"⏭️ Boleto já existe no banco: {numero_boleto}")
-                                                    else:
-                                                        logger.warning(f"⚠️ Cliente não encontrado no banco para CPF: {cpf}")
-                                        else:
-                                            logger.warning(f"⚠️ Não foi possível extrair dados do PDF: {arquivo_pdf}")
-                                    else:
-                                        logger.warning(f"⚠️ Arquivo PDF não encontrado: {arquivo_pdf}")
                                 except Exception as e_import:
-                                    logger.error(f"❌ Erro ao importar PDF para banco: {e_import}")
+                                    logger.error(f"❌ Erro ao registrar download no banco: {e_import}")
+                                    logger.exception("Traceback:")
 
                                 # Atualizar status com sucesso
                                 atualizar_status(
