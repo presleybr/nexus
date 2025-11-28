@@ -1108,6 +1108,88 @@ def verificar_arquivos():
     })
 
 
+@automation_canopus_bp.route('/verificar-boletos-banco', methods=['GET'])
+def verificar_boletos_banco():
+    """
+    Verifica boletos registrados no banco de dados
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Total de boletos
+                cur.execute("SELECT COUNT(*) as total FROM boletos")
+                total = cur.fetchone()['total']
+
+                # Últimos 10 boletos
+                cur.execute("""
+                    SELECT
+                        b.id,
+                        b.numero_boleto,
+                        b.valor,
+                        b.data_vencimento,
+                        b.mes_referencia,
+                        b.ano_referencia,
+                        b.arquivo_pdf,
+                        b.status,
+                        b.created_at,
+                        cf.nome_completo as cliente_nome,
+                        cf.cpf
+                    FROM boletos b
+                    LEFT JOIN clientes_finais cf ON cf.id = b.cliente_final_id
+                    ORDER BY b.created_at DESC
+                    LIMIT 10
+                """)
+                ultimos_boletos = cur.fetchall()
+
+                # Estatísticas por mês
+                cur.execute("""
+                    SELECT
+                        mes_referencia,
+                        ano_referencia,
+                        COUNT(*) as total,
+                        SUM(valor) as valor_total,
+                        status
+                    FROM boletos
+                    GROUP BY mes_referencia, ano_referencia, status
+                    ORDER BY ano_referencia DESC, mes_referencia DESC
+                """)
+                estatisticas = cur.fetchall()
+
+                # Boletos de dezembro/2025
+                cur.execute("""
+                    SELECT COUNT(*) as total
+                    FROM boletos
+                    WHERE mes_referencia = 12 AND ano_referencia = 2025
+                """)
+                dezembro_2025 = cur.fetchone()['total']
+
+                # Boletos sem PDF
+                cur.execute("""
+                    SELECT COUNT(*) as total
+                    FROM boletos
+                    WHERE arquivo_pdf IS NULL OR arquivo_pdf = ''
+                """)
+                sem_pdf = cur.fetchone()['total']
+
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'total_boletos': total,
+                        'ultimos_boletos': ultimos_boletos,
+                        'estatisticas_por_mes': estatisticas,
+                        'dezembro_2025': dezembro_2025,
+                        'boletos_sem_pdf': sem_pdf
+                    }
+                })
+
+    except Exception as e:
+        logger.error(f"Erro ao verificar boletos: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 # ============================================================================
 # ROTAS PARA O FRONTEND DO CLIENTE
 # ============================================================================
