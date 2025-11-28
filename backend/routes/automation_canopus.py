@@ -1231,7 +1231,14 @@ def baixar_boletos_ponto_venda():
                             senha = credencial_row['senha']
                             codigo_empresa = credencial_row.get('codigo_empresa', '0101')
 
-                            logger.info(f"✅ Credenciais obtidas - Usuário: {usuario}, Código Empresa: {codigo_empresa}")
+                            # IMPORTANTE: No Canopus, o login precisa do código do PV com zeros à esquerda
+                            # Exemplo: 24627 -> 0000024627 (total de 10 dígitos)
+                            usuario_login = ponto_venda.zfill(10)  # Preenche com zeros à esquerda até 10 dígitos
+
+                            logger.info(f"✅ Credenciais obtidas")
+                            logger.info(f"   Usuário (original): {usuario}")
+                            logger.info(f"   Usuário (login): {usuario_login} (PV com zeros)")
+                            logger.info(f"   Código Empresa: {codigo_empresa}")
                             logger.info(f"🔐 Senha: {'*' * len(senha)}")
 
                 except Exception as e:
@@ -1258,21 +1265,21 @@ def baixar_boletos_ponto_venda():
                     logger.info("✅ Chromium aberto!")
 
                     # Fazer login
-                    atualizar_status(etapa=f'Fazendo login no sistema (usuário: {usuario})...')
+                    atualizar_status(etapa=f'Fazendo login no sistema (PV: {usuario_login})...')
 
                     logger.info("=" * 80)
                     logger.info("🔐 FAZENDO LOGIN NO PONTO 24627")
-                    logger.info(f"👤 Usuário: {usuario}")
+                    logger.info(f"👤 Usuário (login): {usuario_login}")
                     logger.info(f"🏢 Código Empresa: {codigo_empresa}")
                     logger.info(f"🔐 Senha: {'*' * len(senha)}")
                     logger.info("=" * 80)
 
                     try:
                         login_ok = await bot.login(
-                            usuario=usuario,
+                            usuario=usuario_login,  # Usar PV com zeros à esquerda
                             senha=senha,
                             codigo_empresa=codigo_empresa,
-                            ponto_venda='24627'
+                            ponto_venda=ponto_venda
                         )
                     except Exception as e_login:
                         logger.error(f"❌ EXCEPTION durante login: {e_login}")
