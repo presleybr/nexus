@@ -65,16 +65,14 @@ def handle_errors(f):
 
 
 def get_db_connection():
-    """Retorna conexão com banco de dados"""
+    """Retorna conexão com banco de dados usando configuração centralizada"""
     import psycopg
     from psycopg.rows import dict_row
+    from config import Config
 
+    # Usar DATABASE_URL do Config (já configurado para Render ou local)
     return psycopg.connect(
-        host='localhost',
-        port=5434,
-        dbname='nexus_crm',
-        user='postgres',
-        password='nexus2025',
+        Config.DATABASE_URL,
         row_factory=dict_row
     )
 
