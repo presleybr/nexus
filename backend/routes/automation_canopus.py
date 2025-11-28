@@ -1273,66 +1273,97 @@ def baixar_boletos_ponto_venda():
         sys.stdout.flush()
 
         # ========================================================================
-        # VERIFICAR QUAIS CPFs JÁ FORAM BAIXADOS NO BANCO DE DADOS
+        # ENCONTRAR ÚLTIMO BOLETO BAIXADO E CONTINUAR SEQUENCIALMENTE
         # ========================================================================
-        cpfs_ja_baixados = set()
+        indice_inicio = 0
+        ultimo_cpf_baixado = None
+        total_ja_baixados = 0
+
         try:
             with get_db_connection() as conn_check:
                 with conn_check.cursor() as cur_check:
-                    # Buscar todos os CPFs que já têm download registrado
-                    # para este mês/ano
+                    # Buscar o ÚLTIMO CPF baixado (mais recente) para este mês/ano
+                    # que também está na lista de CPFs do PV
                     cur_check.execute("""
-                        SELECT DISTINCT cpf
+                        SELECT cpf, data_download, nome_arquivo
                         FROM downloads_canopus
                         WHERE status = 'sucesso'
                         AND EXTRACT(MONTH FROM data_download) = %s
                         AND EXTRACT(YEAR FROM data_download) = %s
-                    """, (mes, ano if ano else 2025))
+                        AND cpf = ANY(%s)
+                        ORDER BY data_download DESC
+                        LIMIT 1
+                    """, (mes, ano if ano else 2025, cpfs_todos))
 
-                    downloads_existentes = cur_check.fetchall()
-                    cpfs_ja_baixados = {d['cpf'] for d in downloads_existentes}
+                    ultimo_download = cur_check.fetchone()
 
-                    logger.info("=" * 80)
-                    logger.info(f"📊 VERIFICAÇÃO DE DOWNLOADS EXISTENTES")
-                    logger.info(f"   Total de clientes no PV: {len(cpfs_todos)}")
-                    logger.info(f"   Já baixados (no banco): {len(cpfs_ja_baixados)}")
-                    logger.info(f"   Faltam baixar: {len(cpfs_todos) - len(cpfs_ja_baixados)}")
-                    logger.info("=" * 80)
-                    sys.stdout.flush()
+                    if ultimo_download:
+                        ultimo_cpf_baixado = ultimo_download['cpf']
+                        data_ultimo = ultimo_download['data_download']
+                        nome_arquivo = ultimo_download['nome_arquivo']
 
-                    if cpfs_ja_baixados:
-                        logger.info(f"✅ CPFs já baixados (primeiros 10): {list(cpfs_ja_baixados)[:10]}")
+                        # Encontrar posição deste CPF na lista ordenada
+                        try:
+                            indice_ultimo = cpfs_todos.index(ultimo_cpf_baixado)
+                            indice_inicio = indice_ultimo + 1  # Começar do próximo
+                            total_ja_baixados = indice_inicio
+
+                            logger.info("=" * 80)
+                            logger.info(f"📊 RETOMANDO DOWNLOAD A PARTIR DO ÚLTIMO BOLETO")
+                            logger.info(f"   Total de clientes no PV: {len(cpfs_todos)}")
+                            logger.info(f"   Último baixado: {ultimo_cpf_baixado}")
+                            logger.info(f"   Arquivo: {nome_arquivo}")
+                            logger.info(f"   Data: {data_ultimo}")
+                            logger.info(f"   Posição: {indice_ultimo + 1}/{len(cpfs_todos)}")
+                            logger.info(f"   Já processados: {total_ja_baixados}")
+                            logger.info(f"   Faltam processar: {len(cpfs_todos) - indice_inicio}")
+                            logger.info("=" * 80)
+                            sys.stdout.flush()
+
+                        except ValueError:
+                            # CPF não encontrado na lista (caso raro)
+                            logger.warning(f"⚠️ Último CPF baixado ({ultimo_cpf_baixado}) não está na lista atual")
+                            logger.info("   Iniciando do começo...")
+                            sys.stdout.flush()
+                            indice_inicio = 0
+                    else:
+                        logger.info("=" * 80)
+                        logger.info(f"📊 INICIANDO DOWNLOAD PELA PRIMEIRA VEZ")
+                        logger.info(f"   Total de clientes no PV: {len(cpfs_todos)}")
+                        logger.info(f"   Nenhum download anterior encontrado")
+                        logger.info("=" * 80)
                         sys.stdout.flush()
 
         except Exception as e:
-            logger.warning(f"⚠️ Erro ao verificar downloads existentes: {e}")
-            logger.info("   Continuando com todos os CPFs...")
+            logger.warning(f"⚠️ Erro ao verificar último download: {e}")
+            logger.exception("Traceback:")
+            logger.info("   Continuando do início...")
             sys.stdout.flush()
-            cpfs_ja_baixados = set()
+            indice_inicio = 0
 
-        # Filtrar apenas CPFs que ainda NÃO foram baixados
-        # Mantém a ordem original
-        cpfs = [cpf for cpf in cpfs_todos if cpf not in cpfs_ja_baixados]
+        # Pegar apenas os CPFs a partir do índice de início (continuar sequencialmente)
+        cpfs = cpfs_todos[indice_inicio:]
 
         logger.info("=" * 80)
-        logger.info(f"🎯 INICIANDO DOWNLOADS")
+        logger.info(f"🎯 INICIANDO DOWNLOADS SEQUENCIAIS")
+        logger.info(f"   Índice de início: {indice_inicio + 1}/{len(cpfs_todos)}")
         logger.info(f"   CPFs a processar: {len(cpfs)}")
         if len(cpfs) > 0:
-            logger.info(f"   Primeiro CPF: {cpfs[0]}")
-            logger.info(f"   Último CPF: {cpfs[-1]}")
+            logger.info(f"   Primeiro CPF: {cpfs[0]} (posição {indice_inicio + 1})")
+            logger.info(f"   Último CPF: {cpfs[-1]} (posição {len(cpfs_todos)})")
         logger.info("=" * 80)
         sys.stdout.flush()
 
         # Se não há CPFs para processar, retornar sucesso
         if len(cpfs) == 0:
             logger.info("✅ TODOS OS BOLETOS JÁ FORAM BAIXADOS!")
-            logger.info(f"   Total de {len(cpfs_ja_baixados)} boletos já registrados no banco.")
+            logger.info(f"   Total de {len(cpfs_todos)} boletos já registrados no banco.")
             sys.stdout.flush()
             return jsonify({
                 'success': True,
                 'message': 'Todos os boletos já foram baixados',
                 'total_clientes': len(cpfs_todos),
-                'ja_baixados': len(cpfs_ja_baixados),
+                'ja_baixados': len(cpfs_todos),
                 'faltam': 0
             })
 
@@ -1344,7 +1375,8 @@ def baixar_boletos_ponto_venda():
             'sem_boleto': 0,
             'total': len(cpfs),
             'processados': 0,
-            'ja_baixados': len(cpfs_ja_baixados)  # Adicionar contagem de já baixados
+            'ja_baixados': total_ja_baixados,  # Quantos já foram processados anteriormente
+            'indice_inicio': indice_inicio  # Posição de onde começou
         }
 
         # Função para processar em background
@@ -1730,14 +1762,20 @@ def baixar_boletos_ponto_venda():
 
         # Retornar imediatamente
         logger.info("📤 Retornando resposta ao cliente...")
+        if total_ja_baixados > 0:
+            mensagem = f'Retomando download: {len(cpfs)} clientes restantes (de {len(cpfs_todos)} total). Já processados: {total_ja_baixados}.'
+        else:
+            mensagem = f'Download iniciado para {len(cpfs)} clientes.'
+
         return jsonify({
             'success': True,
-            'message': f'Download iniciado para {len(cpfs)} clientes (de {len(cpfs_todos)} total). {len(cpfs_ja_baixados)} já foram baixados anteriormente.',
+            'message': mensagem,
             'data': {
                 'ponto_venda': ponto_venda,
                 'total_clientes': len(cpfs_todos),
-                'ja_baixados': len(cpfs_ja_baixados),
+                'ja_baixados': total_ja_baixados,
                 'a_processar': len(cpfs),
+                'indice_inicio': indice_inicio + 1,
                 'status': 'iniciado',
                 'info': 'Acompanhe o progresso em tempo real no monitoramento'
             }
