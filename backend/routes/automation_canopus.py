@@ -3,13 +3,16 @@ Rotas de Automação Canopus
 API REST para gerenciar automação de download de boletos
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
+from werkzeug.utils import secure_filename
 from functools import wraps
 import logging
 import asyncio
 from datetime import datetime
 from pathlib import Path
 import sys
+import tempfile
+import os
 
 # Configurar logger PRIMEIRO
 logger = logging.getLogger(__name__)
@@ -75,6 +78,215 @@ def get_db_connection():
         Config.DATABASE_URL,
         row_factory=dict_row
     )
+
+
+# ============================================================================
+# UPLOAD E PROCESSAMENTO DE PLANILHAS
+# ============================================================================
+
+@automation_canopus_bp.route('/upload-planilha', methods=['POST'])
+@handle_errors
+def upload_planilha():
+    """
+    Endpoint para upload de planilha Excel e importação de clientes
+    Aceita arquivo .xlsx ou .xls e processa automaticamente
+    """
+    logger.info("📤 Recebendo upload de planilha...")
+
+    # Verificar se arquivo foi enviado
+    if 'file' not in request.files:
+        return jsonify({
+            'success': False,
+            'error': 'Nenhum arquivo enviado'
+        }), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({
+            'success': False,
+            'error': 'Nenhum arquivo selecionado'
+        }), 400
+
+    # Validar extensão
+    allowed_extensions = {'.xlsx', '.xls', '.xlsm'}
+    file_ext = os.path.splitext(file.filename)[1].lower()
+
+    if file_ext not in allowed_extensions:
+        return jsonify({
+            'success': False,
+            'error': f'Tipo de arquivo inválido. Use: {", ".join(allowed_extensions)}'
+        }), 400
+
+    # Obter parâmetros
+    pontos_venda_param = request.form.get('pontos_venda', '24627')
+
+    # Determinar quais PVs processar
+    if pontos_venda_param == 'ambos':
+        filtro_pv = ['17308', '24627']
+    elif pontos_venda_param == '17308':
+        filtro_pv = ['17308']
+    else:
+        filtro_pv = ['24627']
+
+    logger.info(f"📊 Arquivo: {file.filename}")
+    logger.info(f"📍 Pontos de venda: {pontos_venda_param}")
+
+    # Salvar arquivo temporariamente
+    temp_file = None
+    try:
+        # Criar arquivo temporário
+        temp_fd, temp_path = tempfile.mkstemp(suffix=file_ext)
+        temp_file = temp_path
+
+        # Salvar upload
+        file.save(temp_path)
+        logger.info(f"💾 Arquivo salvo temporariamente: {temp_path}")
+
+        # Importar extrator
+        from services.excel_extractor import extrair_clientes_planilha
+
+        # ====================================================================
+        # ETAPA 1: EXTRAIR DADOS DA PLANILHA
+        # ====================================================================
+        logger.info("🔍 Extraindo dados da planilha...")
+
+        resultado_extracao = extrair_clientes_planilha(
+            arquivo_excel=temp_path,
+            pontos_venda=filtro_pv
+        )
+
+        if not resultado_extracao['sucesso']:
+            return jsonify({
+                'success': False,
+                'error': f"Erro ao processar planilha: {resultado_extracao.get('erro', 'Erro desconhecido')}"
+            }), 500
+
+        clientes = resultado_extracao['clientes']
+        logger.info(f"✅ {len(clientes)} clientes extraídos")
+        logger.info(f"📊 Por PV: {resultado_extracao['estatisticas_pv']}")
+
+        if len(clientes) == 0:
+            return jsonify({
+                'success': False,
+                'error': 'Nenhum cliente válido encontrado na planilha para os PVs selecionados'
+            }), 400
+
+        # ====================================================================
+        # ETAPA 2: IMPORTAR PARA O BANCO DE DADOS
+        # ====================================================================
+        logger.info(f"💾 Importando {len(clientes)} clientes para o banco...")
+
+        importados = 0
+        atualizados = 0
+        erros = 0
+        erros_detalhes = []
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        for idx, cliente in enumerate(clientes, 1):
+            try:
+                cpf = cliente['cpf']
+                nome = cliente['nome']
+                pv = cliente['ponto_venda']
+
+                # Verificar se cliente já existe
+                cur.execute("""
+                    SELECT id FROM clientes_finais
+                    WHERE cpf = %s AND ponto_venda = %s
+                """, (cpf, pv))
+
+                existing = cur.fetchone()
+
+                if existing:
+                    # Atualizar
+                    cur.execute("""
+                        UPDATE clientes_finais
+                        SET nome_completo = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    """, (nome, existing['id']))
+                    atualizados += 1
+                else:
+                    # Buscar cliente_nexus
+                    cur.execute("SELECT id FROM clientes_nexus ORDER BY id LIMIT 1")
+                    cliente_nexus_row = cur.fetchone()
+                    cliente_nexus_id = cliente_nexus_row['id'] if cliente_nexus_row else None
+
+                    # Inserir novo
+                    numero_contrato = f"CANOPUS-{pv}-{cpf}"
+                    whatsapp = '5567999999999'  # Placeholder
+
+                    cur.execute("""
+                        INSERT INTO clientes_finais (
+                            cliente_nexus_id,
+                            nome_completo,
+                            cpf,
+                            telefone_celular,
+                            whatsapp,
+                            ponto_venda,
+                            numero_contrato,
+                            ativo,
+                            created_at,
+                            updated_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """, (cliente_nexus_id, nome, cpf, whatsapp, whatsapp, pv, numero_contrato))
+
+                    importados += 1
+
+                # Commit a cada 100
+                if idx % 100 == 0:
+                    conn.commit()
+                    logger.info(f"   Checkpoint: {idx}/{len(clientes)} processados")
+
+            except Exception as e:
+                erros += 1
+                erro_msg = f"Erro ao processar {nome} (CPF: {cpf}): {str(e)}"
+                erros_detalhes.append(erro_msg)
+                logger.error(erro_msg)
+                continue
+
+        # Commit final
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        logger.info(f"✅ Importação concluída!")
+        logger.info(f"   Novos: {importados}, Atualizados: {atualizados}, Erros: {erros}")
+
+        return jsonify({
+            'success': True,
+            'message': f'Planilha processada com sucesso',
+            'data': {
+                'arquivo': file.filename,
+                'total_extraidos': len(clientes),
+                'importados': importados,
+                'atualizados': atualizados,
+                'erros': erros,
+                'total_processados': importados + atualizados,
+                'pontos_venda': filtro_pv,
+                'estatisticas_pv': resultado_extracao['estatisticas_pv'],
+                'erros_detalhes': erros_detalhes[:10]  # Primeiros 10 erros
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao processar upload: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Erro ao processar arquivo: {str(e)}'
+        }), 500
+
+    finally:
+        # Limpar arquivo temporário
+        if temp_file and os.path.exists(temp_file):
+            try:
+                os.close(temp_fd)
+                os.unlink(temp_file)
+                logger.info(f"🗑️ Arquivo temporário removido")
+            except Exception as e:
+                logger.warning(f"Erro ao remover arquivo temporário: {e}")
 
 
 # ============================================================================
