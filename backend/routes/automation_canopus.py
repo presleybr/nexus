@@ -17,16 +17,21 @@ import os
 # Configurar logger PRIMEIRO
 logger = logging.getLogger(__name__)
 
-# ESTRATÉGIA DE PATHS: Adicionar backend PRIMEIRO, depois canopus
-# Isso garante que models.database funcione, e depois o orquestrador adiciona canopus em primeiro
+# ESTRATÉGIA DE PATHS: Adicionar backend PRIMEIRO, depois root (para automation)
+# Isso garante que models.database funcione, e também que automation.canopus seja importável
 backend_path = Path(__file__).resolve().parent.parent
-automation_path = Path(__file__).resolve().parent.parent.parent / "automation" / "canopus"
+root_path = backend_path.parent  # Diretório raiz que contém 'automation' e 'backend'
+automation_path = root_path / "automation" / "canopus"
 
 # Backend primeiro (para Database funcionar)
 if str(backend_path) not in sys.path:
     sys.path.insert(0, str(backend_path))
 
-# Canopus path (mas o orquestrador.py vai reorganizar internamente)
+# Root path (para poder importar automation.canopus.*)
+if str(root_path) not in sys.path:
+    sys.path.insert(0, str(root_path))
+
+# Canopus path direto (para imports legados do orquestrador)
 if str(automation_path) not in sys.path:
     sys.path.append(str(automation_path))  # Append, não insert(0)
 
@@ -1083,15 +1088,15 @@ def baixar_boletos_ponto_venda():
 
                 # Adicionar paths necessários
                 backend_path = Path(__file__).resolve().parent.parent
-                automation_path = backend_path.parent / "automation" / "canopus"
-
-                if str(automation_path) not in sys.path:
-                    sys.path.insert(0, str(automation_path))
-                    logger.info(f"📂 Path adicionado ao sys.path: {automation_path}")
+                root_path = backend_path.parent  # Diretório raiz que contém 'automation' e 'backend'
 
                 if str(backend_path) not in sys.path:
                     sys.path.insert(0, str(backend_path))
                     logger.info(f"📂 Path adicionado ao sys.path: {backend_path}")
+
+                if str(root_path) not in sys.path:
+                    sys.path.insert(0, str(root_path))
+                    logger.info(f"📂 Path adicionado ao sys.path: {root_path}")
 
                 # Agora sim importar
                 from automation.canopus.canopus_automation import CanopusAutomation
