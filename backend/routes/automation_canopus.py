@@ -1474,11 +1474,13 @@ def baixar_boletos_ponto_venda():
 
                 logger.info(f"🌐 Ambiente: {'Render (servidor)' if is_render else 'Local'}")
                 logger.info(f"🌐 Abrindo Chromium (headless={headless_mode})...")
+                sys.stdout.flush()
 
                 atualizar_status(etapa='Abrindo navegador Chromium...')
 
                 async with CanopusAutomation(headless=headless_mode) as bot:
                     logger.info("✅ Chromium aberto!")
+                    sys.stdout.flush()
 
                     # Fazer login
                     atualizar_status(etapa=f'Fazendo login no sistema (PV: {usuario_login})...')
@@ -1489,6 +1491,7 @@ def baixar_boletos_ponto_venda():
                     logger.info(f"🏢 Código Empresa: {codigo_empresa}")
                     logger.info(f"🔐 Senha: {'*' * len(senha)}")
                     logger.info("=" * 80)
+                    sys.stdout.flush()
 
                     try:
                         login_ok = await bot.login(
@@ -1500,6 +1503,7 @@ def baixar_boletos_ponto_venda():
                     except Exception as e_login:
                         logger.error(f"❌ EXCEPTION durante login: {e_login}")
                         logger.exception("Traceback completo:")
+                        sys.stdout.flush()
                         atualizar_status(etapa=f'Erro no login: {str(e_login)}', erro=str(e_login))
                         finalizar_execucao(sucesso=False)
                         return
@@ -1513,6 +1517,7 @@ def baixar_boletos_ponto_venda():
                         logger.error("  3. Sistema Canopus indisponível")
                         logger.error("  4. Seletores CSS mudaram")
                         logger.error("=" * 80)
+                        sys.stdout.flush()
                         atualizar_status(etapa='Falha no login - verifique credenciais', erro='Login falhou')
                         finalizar_execucao(sucesso=False)
                         return
@@ -1520,6 +1525,7 @@ def baixar_boletos_ponto_venda():
                     logger.info("=" * 80)
                     logger.info("✅ LOGIN REALIZADO COM SUCESSO!")
                     logger.info("=" * 80)
+                    sys.stdout.flush()
 
                     atualizar_status(etapa='Login realizado! Iniciando processamento de clientes...')
 
@@ -1537,16 +1543,20 @@ def baixar_boletos_ponto_venda():
                             logger.info("=" * 80)
                             logger.info(f"📊 MONITORAMENTO DE RECURSOS (Cliente {idx}/{len(cpfs)})")
                             logger.info(f"   Memória RAM: {mem_mb:.1f} MB")
+                            sys.stdout.flush()
                             if mem_mb > 400:  # Alerta se > 400MB (próximo do limite de 512MB)
                                 logger.warning(f"⚠️ MEMÓRIA ALTA! {mem_mb:.1f} MB / 512 MB limite")
                                 logger.info("   Executando garbage collection...")
+                                sys.stdout.flush()
                                 gc.collect()  # Forçar limpeza de memória Python
                                 mem_after = process.memory_info().rss / 1024 / 1024
                                 logger.info(f"   Memória após GC: {mem_after:.1f} MB")
+                                sys.stdout.flush()
                             logger.info("=" * 80)
                             sys.stdout.flush()
 
                         logger.info(f"📄 Processando {idx}/{len(cpfs)}: CPF {cpf}")
+                        sys.stdout.flush()
 
                         # Atualizar status com cliente atual
                         atualizar_status(
@@ -1588,6 +1598,7 @@ def baixar_boletos_ponto_venda():
                                 logger.info(f"✅ SUCESSO! Boleto {idx}/{len(cpfs)} baixado: {cpf}")
                                 logger.info(f"📁 Arquivo: {resultado.get('dados_boleto', {}).get('arquivo_nome', 'N/A')}")
                                 logger.info("=" * 80)
+                                sys.stdout.flush()
 
                                 # REGISTRAR DOWNLOAD NA TABELA downloads_canopus
                                 try:
