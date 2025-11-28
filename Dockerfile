@@ -77,4 +77,5 @@ ENV PORT=5000
 EXPOSE 5000
 
 # Comando de inicialização (com -u para unbuffered)
-CMD ["python", "-u", "backend/app.py"]
+# Redirecionar stderr para stdout para capturar TODOS os logs (incluindo Chromium)
+CMD ["sh", "-c", "python -u backend/app.py 2>&1"]

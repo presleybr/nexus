@@ -242,7 +242,11 @@ class CanopusAutomation:
 
         try:
             # Iniciar Playwright
+            logger.info("🚀 Iniciando Playwright...")
+            sys.stdout.flush()
             self.playwright = await async_playwright().start()
+            logger.info("✅ Playwright iniciado")
+            sys.stdout.flush()
 
             # Configurações do navegador
             pw_config = self.config.PLAYWRIGHT_CONFIG
@@ -253,7 +257,16 @@ class CanopusAutomation:
                 '--disable-dev-shm-usage',
             ]
 
+            # Argumentos para FORÇAR logs do Chromium
+            chromium_log_args = [
+                '--enable-logging=stderr',  # Logs para stderr
+                '--v=1',  # Verbose level 1
+            ]
+
             # Lançar navegador
+            logger.info(f"🌐 Lançando navegador (headless={self.headless})...")
+            sys.stdout.flush()
+
             if pw_config['browser_type'] == 'firefox':
                 self.browser = await self.playwright.firefox.launch(
                     headless=self.headless,
@@ -267,11 +280,19 @@ class CanopusAutomation:
             else:  # chromium (padrão)
                 self.browser = await self.playwright.chromium.launch(
                     headless=self.headless,
-                    args=pw_config['browser_args'] + anti_detection_args,
-                    slow_mo=pw_config['slow_mo']
+                    args=pw_config['browser_args'] + anti_detection_args + chromium_log_args,
+                    slow_mo=pw_config['slow_mo'],
+                    # Forçar logs do Chromium para stderr (que será capturado)
+                    chromium_sandbox=False  # Desabilitar sandbox para melhor logging
                 )
 
+            logger.info("✅ Navegador lançado com sucesso")
+            sys.stdout.flush()
+
             # Criar contexto
+            logger.info("🔧 Criando contexto do navegador...")
+            sys.stdout.flush()
+
             self.context = await self.browser.new_context(
                 viewport=pw_config['viewport'],
                 user_agent=pw_config['user_agent'],
@@ -297,12 +318,20 @@ class CanopusAutomation:
             """)
 
             # Criar página
+            logger.info("📄 Criando nova página...")
+            sys.stdout.flush()
             self.page = await self.context.new_page()
+            logger.info("✅ Página criada")
+            sys.stdout.flush()
 
             # Configurar timeouts
-            self.page.set_default_timeout(self.config.TIMEOUTS['navegacao'])
+            timeout_nav = self.config.TIMEOUTS['navegacao']
+            self.page.set_default_timeout(timeout_nav)
+            logger.info(f"⏱️ Timeout configurado: {timeout_nav}ms")
+            sys.stdout.flush()
 
-            logger.info("✅ Navegador iniciado")
+            logger.info("✅ Navegador iniciado com sucesso!")
+            sys.stdout.flush()
             self.stats['inicio_sessao'] = datetime.now()
 
         except Exception as e:
