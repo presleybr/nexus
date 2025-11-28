@@ -863,10 +863,12 @@ class CanopusAutomation:
 
                         logger.info(f"📥 Interceptando resposta: {url[:70]}...")
                         logger.info(f"   Content-Type: {content_type}")
+                        sys.stdout.flush()
 
                         body = await response.body()
                         tamanho = len(body)
-                        logger.info(f"📦 Corpo recebido: {tamanho} bytes")
+                        logger.info(f"📦 Corpo recebido: {tamanho} bytes ({tamanho/1024:.1f} KB)")
+                        sys.stdout.flush()
 
                         # Armazenar TODAS as respostas para análise posterior
                         todas_respostas_pdf.append({
@@ -880,19 +882,26 @@ class CanopusAutomation:
                         is_real_pdf = body.startswith(b'%PDF')
                         if is_real_pdf:
                             logger.info(f"✅ PDF REAL detectado! (começa com %PDF)")
+                            sys.stdout.flush()
                         else:
                             # NÃO é PDF real - logar conteúdo
                             preview = body[:300].decode('latin-1', errors='ignore')
-                            logger.warning(f"⚠️ NÃO é PDF real! Preview: {preview}")
+                            logger.warning(f"⚠️ NÃO é PDF real! Preview: {preview[:100]}")
+                            sys.stdout.flush()
 
                         # Só capturar se for um PDF REAL com header correto
                         if is_real_pdf and (pdf_bytes_interceptado is None or tamanho > len(pdf_bytes_interceptado)):
                             pdf_bytes_interceptado = body
                             pdf_url_interceptado = url
-                            logger.info(f"🎯 PDF CAPTURADO: {tamanho} bytes de {url[:50]}...")
+                            logger.info(f"🎯 PDF CAPTURADO: {tamanho} bytes ({tamanho/1024:.1f} KB) de {url[:50]}...")
+                            sys.stdout.flush()
 
                 except Exception as e:
-                    logger.debug(f"Erro ao interceptar resposta: {e}")
+                    logger.error(f"❌ Erro ao interceptar resposta: {e}")
+                    sys.stdout.flush()
+                    import traceback
+                    traceback.print_exc()
+                    sys.stdout.flush()
 
             # Preparar nome do arquivo
             if not nome_arquivo:
@@ -1010,6 +1019,15 @@ class CanopusAutomation:
                             sys.stdout.flush()
                             break
                         await asyncio.sleep(0.1)
+
+                    # Log do resultado da espera
+                    if pdf_bytes_interceptado:
+                        logger.warning(f"⚠️ PDF interceptado mas muito pequeno: {len(pdf_bytes_interceptado)} bytes")
+                        sys.stdout.flush()
+                    else:
+                        logger.warning(f"⚠️ Nenhum PDF foi interceptado após 10s de espera")
+                        logger.info(f"📊 Respostas capturadas: {len(todas_respostas_pdf)}")
+                        sys.stdout.flush()
 
                     # Se não foi interceptado, tentar JavaScript (se a aba ainda estiver aberta)
                     if not pdf_bytes:
@@ -1173,7 +1191,7 @@ class CanopusAutomation:
                         'arquivo_nome': nome_arquivo,
                         'arquivo_caminho': str(caminho_final),
                         'arquivo_tamanho': len(pdf_bytes),
-                        'pdf_url': url_pdf_capturada,
+                        'pdf_url': pdf_url_interceptado if pdf_url_interceptado else 'N/A',
                         'data_download': datetime.now(),
                         'sucesso': True,
                     }
