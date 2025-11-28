@@ -53,6 +53,7 @@ playwright/.auth/
 trace.zip
 screenshots/
 *.png
+!frontend/static/images/*.png
 test-results/
 
 # Logs
