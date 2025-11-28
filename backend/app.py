@@ -14,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from config import Config
 from models import Database, log_sistema
+from health import health_bp
 from routes import auth_bp, crm_bp, whatsapp_bp, automation_bp, webhook_bp
 from routes.crm_disparo_individual import disparo_individual_bp
 from routes.whatsapp_baileys import whatsapp_baileys_bp
@@ -46,6 +47,7 @@ def create_app():
     Config.init_directories()
 
     # Registra blueprints (rotas)
+    app.register_blueprint(health_bp)  # Health check para Render.com
     app.register_blueprint(auth_bp)
     app.register_blueprint(crm_bp)
     app.register_blueprint(disparo_individual_bp)  # Disparo individual para teste

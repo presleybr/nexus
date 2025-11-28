@@ -15,17 +15,35 @@ class Config:
     # Configurações do Flask
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'nexus-crm-secret-key-2024')
     FLASK_ENV = os.getenv('FLASK_ENV', 'development')
-    FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
+    FLASK_PORT = int(os.getenv('PORT', os.getenv('FLASK_PORT', 5000)))  # Render usa PORT
 
     # Configurações do Banco de Dados PostgreSQL
-    DB_HOST = os.getenv('DB_HOST', 'localhost')
-    DB_PORT = int(os.getenv('DB_PORT', 5432))
-    DB_NAME = os.getenv('DB_NAME', 'nexus_crm')
-    DB_USER = os.getenv('DB_USER', 'postgres')
-    DB_PASSWORD = os.getenv('DB_PASSWORD', 'postgres')
+    # PRIORIZA DATABASE_URL do Render.com, senão usa vars individuais
+    DATABASE_URL = os.getenv('DATABASE_URL')
 
-    # String de conexão PostgreSQL
-    DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    if DATABASE_URL:
+        # Render fornece DATABASE_URL completa - extrair componentes se necessário
+        # Formato: postgresql://user:pass@host:port/dbname
+        import re
+        match = re.match(r'postgresql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)', DATABASE_URL)
+        if match:
+            DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME = match.groups()
+            DB_PORT = int(DB_PORT)
+        else:
+            # Fallback se regex falhar
+            DB_HOST = 'localhost'
+            DB_PORT = 5432
+            DB_NAME = 'nexus_crm'
+            DB_USER = 'postgres'
+            DB_PASSWORD = 'postgres'
+    else:
+        # Desenvolvimento local - usar variáveis individuais
+        DB_HOST = os.getenv('DB_HOST', 'localhost')
+        DB_PORT = int(os.getenv('DB_PORT', 5432))
+        DB_NAME = os.getenv('DB_NAME', 'nexus_crm')
+        DB_USER = os.getenv('DB_USER', 'postgres')
+        DB_PASSWORD = os.getenv('DB_PASSWORD', 'postgres')
+        DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
     # Configurações de Automação
     AUTOMATION_ENABLED = os.getenv('AUTOMATION_ENABLED', 'true').lower() == 'true'

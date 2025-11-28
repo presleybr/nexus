@@ -40,9 +40,11 @@ class Database:
         """
         try:
             if cls._connection_pool is None:
-                conninfo = f"host={Config.DB_HOST} port={Config.DB_PORT} dbname={Config.DB_NAME} user={Config.DB_USER} password={Config.DB_PASSWORD}"
+                # Usa DATABASE_URL diretamente (compatível com Render.com)
+                conninfo = Config.DATABASE_URL
                 cls._connection_pool = ConnectionPool(conninfo, min_size=minconn, max_size=maxconn)
-                logger.info("✅ Pool de conexões PostgreSQL inicializado com sucesso")
+                logger.info(f"✅ Pool de conexões PostgreSQL inicializado com sucesso")
+                logger.info(f"   Conectado a: {Config.DB_HOST}:{Config.DB_PORT}/{Config.DB_NAME}")
         except Exception as e:
             logger.error(f"❌ Erro ao inicializar pool de conexões: {e}")
             raise
@@ -220,9 +222,12 @@ def check_database_exists() -> bool:
         True se existe, False caso contrário
     """
     try:
-        conninfo = f"host={Config.DB_HOST} port={Config.DB_PORT} dbname=postgres user={Config.DB_USER} password={Config.DB_PASSWORD}"
+        # Conecta ao banco postgres para verificar se nexus_crm existe
+        # Substitui o nome do banco na URL por 'postgres'
+        import re
+        postgres_url = re.sub(r'/[^/]+$', '/postgres', Config.DATABASE_URL)
 
-        with psycopg.connect(conninfo, autocommit=True) as conn:
+        with psycopg.connect(postgres_url, autocommit=True) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
                     "SELECT 1 FROM pg_database WHERE datname = %s",
@@ -239,9 +244,12 @@ def check_database_exists() -> bool:
 def create_database():
     """Cria o banco de dados se não existir"""
     try:
-        conninfo = f"host={Config.DB_HOST} port={Config.DB_PORT} dbname=postgres user={Config.DB_USER} password={Config.DB_PASSWORD}"
+        # Conecta ao banco postgres para criar nexus_crm
+        # Substitui o nome do banco na URL por 'postgres'
+        import re
+        postgres_url = re.sub(r'/[^/]+$', '/postgres', Config.DATABASE_URL)
 
-        with psycopg.connect(conninfo, autocommit=True) as conn:
+        with psycopg.connect(postgres_url, autocommit=True) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(f"CREATE DATABASE {Config.DB_NAME}")
                 logger.info(f"✅ Banco de dados '{Config.DB_NAME}' criado com sucesso")
