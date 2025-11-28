@@ -21,34 +21,46 @@ document.addEventListener('DOMContentLoaded', function() {
         btnLogin.textContent = 'Entrando...';
 
         try {
+            console.log('[LOGIN] Enviando requisição para /api/auth/login');
+            console.log('[LOGIN] Email:', email);
+
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'include', // IMPORTANTE: Para cookies/sessões
                 body: JSON.stringify({ email, password })
             });
 
+            console.log('[LOGIN] Response status:', response.status);
+            console.log('[LOGIN] Response ok:', response.ok);
+
             const data = await response.json();
+            console.log('[LOGIN] Response data:', data);
 
             if (response.ok && data.sucesso) {
+                console.log('[LOGIN] ✅ Login bem-sucedido!');
                 showAlert('Login realizado com sucesso! Redirecionando...', 'success');
 
                 // Redireciona baseado no tipo de usuário
                 setTimeout(() => {
                     if (data.usuario.tipo === 'admin') {
+                        console.log('[LOGIN] Redirecionando para admin dashboard');
                         window.location.href = '/admin/dashboard';
                     } else {
+                        console.log('[LOGIN] Redirecionando para CRM dashboard');
                         window.location.href = '/crm/dashboard';
                     }
                 }, 1000);
             } else {
+                console.error('[LOGIN] ❌ Falha no login:', data);
                 showAlert(data.erro || 'Credenciais inválidas', 'error');
                 btnLogin.disabled = false;
                 btnLogin.textContent = 'Entrar';
             }
         } catch (error) {
-            console.error('Erro no login:', error);
+            console.error('[LOGIN] ❌ Erro no login:', error);
             showAlert('Erro ao conectar com o servidor', 'error');
             btnLogin.disabled = false;
             btnLogin.textContent = 'Entrar';
