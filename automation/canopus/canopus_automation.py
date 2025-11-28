@@ -60,19 +60,20 @@ def buscar_cliente_banco(cpf: str) -> Optional[Dict[str, Any]]:
     try:
         import psycopg
         from psycopg.rows import dict_row
+        import os
 
         # Limpar CPF (remover pontos e hífens)
         cpf_limpo = ''.join(filter(str.isdigit, cpf))
 
-        # Conectar ao banco
-        conn = psycopg.connect(
-            host='localhost',
-            port=5434,
-            dbname='nexus_crm',
-            user='postgres',
-            password='nexus2025',
-            row_factory=dict_row
-        )
+        # Usar DATABASE_URL do ambiente (funciona tanto local quanto Render)
+        database_url = os.getenv('DATABASE_URL',
+            'postgresql://nexus_user:nc68h5fdIbK8ZGdcqWcMo7aYHxhDSffN@dpg-d4kldk0gjchc73a8hm7g-a.oregon-postgres.render.com/nexus_crm_14w2')
+
+        logger.info(f"🔍 DEBUG: Conectando ao banco para buscar CPF {cpf}")
+        sys.stdout.flush()
+
+        # Conectar ao banco usando DATABASE_URL
+        conn = psycopg.connect(database_url, row_factory=dict_row)
 
         with conn.cursor() as cur:
             cur.execute("""
@@ -87,17 +88,24 @@ def buscar_cliente_banco(cpf: str) -> Optional[Dict[str, Any]]:
         conn.close()
 
         if resultado:
+            logger.info(f"✅ DEBUG: Cliente encontrado - Nome: {resultado['nome_completo']}")
+            sys.stdout.flush()
             return {
                 'nome': resultado['nome_completo'],
                 'cpf': resultado['cpf'],
                 'ponto_venda': resultado['ponto_venda']
             }
         else:
-            logger.warning(f"Cliente com CPF {cpf} não encontrado no banco")
+            logger.warning(f"⚠️ Cliente com CPF {cpf} não encontrado no banco")
+            sys.stdout.flush()
             return None
 
     except Exception as e:
-        logger.error(f"Erro ao buscar cliente no banco: {e}")
+        logger.error(f"❌ Erro ao buscar cliente no banco: {e}")
+        sys.stdout.flush()
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush()
         return None
 
 
