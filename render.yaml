@@ -45,11 +45,17 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
+      echo "🧹 Limpando cache Python..."
+      find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+      find . -type f -name "*.pyc" -delete 2>/dev/null || true
+      echo "📦 Instalando dependências..."
+      pip install --upgrade pip --no-cache-dir
+      pip install -r requirements.txt --no-cache-dir --force-reinstall
+      echo "🎭 Instalando Playwright..."
       playwright install chromium
       playwright install-deps chromium
-    startCommand: python backend/app.py
+      echo "✅ Build concluído!"
+    startCommand: python -u backend/app.py
 
   # ---------------------------------------------------------------------------
   # Frontend Static Site
