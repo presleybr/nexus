@@ -1337,9 +1337,96 @@ def baixar_boletos_ponto_venda():
                                 logger.info(f"📁 Arquivo: {resultado.get('dados_boleto', {}).get('arquivo_nome', 'N/A')}")
                                 logger.info("=" * 80)
 
+                                # IMPORTAR PDF PARA O BANCO AUTOMATICAMENTE
+                                try:
+                                    arquivo_pdf = resultado.get('dados_boleto', {}).get('arquivo_caminho')
+                                    if arquivo_pdf and Path(arquivo_pdf).exists():
+                                        atualizar_status(etapa=f'Importando boleto para o banco de dados... ({idx}/{len(cpfs)})')
+
+                                        # Importar extrator de PDF
+                                        from services.pdf_extractor import extrair_dados_boleto
+
+                                        # Extrair dados do PDF
+                                        dados_pdf = extrair_dados_boleto(str(arquivo_pdf))
+
+                                        if dados_pdf and dados_pdf.get('sucesso'):
+                                            # Salvar no banco
+                                            with get_db_connection() as conn_import:
+                                                with conn_import.cursor() as cur_import:
+                                                    # Buscar cliente_final_id pelo CPF
+                                                    cur_import.execute("""
+                                                        SELECT id FROM clientes_finais
+                                                        WHERE cpf = %s AND ativo = TRUE
+                                                        LIMIT 1
+                                                    """, (cpf,))
+
+                                                    cliente_row = cur_import.fetchone()
+                                                    if cliente_row:
+                                                        cliente_final_id = cliente_row['id']
+
+                                                        # Verificar se boleto já existe
+                                                        numero_boleto = dados_pdf.get('numero_boleto') or dados_pdf.get('linha_digitavel', '')[:20]
+
+                                                        cur_import.execute("""
+                                                            SELECT id FROM boletos WHERE numero_boleto = %s
+                                                        """, (numero_boleto,))
+
+                                                        if not cur_import.fetchone():
+                                                            # Inserir boleto
+                                                            # Converter nome do mês para número
+                                                            meses_map = {
+                                                                'JANEIRO': 1, 'FEVEREIRO': 2, 'MARÇO': 3, 'ABRIL': 4,
+                                                                'MAIO': 5, 'JUNHO': 6, 'JULHO': 7, 'AGOSTO': 8,
+                                                                'SETEMBRO': 9, 'OUTUBRO': 10, 'NOVEMBRO': 11, 'DEZEMBRO': 12
+                                                            }
+                                                            mes_num = meses_map.get(str(mes).upper(), datetime.now().month)
+
+                                                            cur_import.execute("""
+                                                                INSERT INTO boletos (
+                                                                    cliente_nexus_id,
+                                                                    cliente_final_id,
+                                                                    numero_boleto,
+                                                                    linha_digitavel,
+                                                                    codigo_barras,
+                                                                    valor,
+                                                                    data_vencimento,
+                                                                    mes_referencia,
+                                                                    ano_referencia,
+                                                                    nome_beneficiario,
+                                                                    arquivo_pdf,
+                                                                    status,
+                                                                    created_at
+                                                                ) VALUES (
+                                                                    2, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pendente', CURRENT_TIMESTAMP
+                                                                )
+                                                            """, (
+                                                                cliente_final_id,
+                                                                numero_boleto,
+                                                                dados_pdf.get('linha_digitavel'),
+                                                                dados_pdf.get('codigo_barras'),
+                                                                dados_pdf.get('valor'),
+                                                                dados_pdf.get('vencimento'),
+                                                                mes_num,
+                                                                int(ano) if ano else 2025,
+                                                                dados_pdf.get('beneficiario'),
+                                                                Path(arquivo_pdf).name
+                                                            ))
+                                                            conn_import.commit()
+                                                            logger.info(f"💾 Boleto importado para o banco: {numero_boleto}")
+                                                        else:
+                                                            logger.info(f"⏭️ Boleto já existe no banco: {numero_boleto}")
+                                                    else:
+                                                        logger.warning(f"⚠️ Cliente não encontrado no banco para CPF: {cpf}")
+                                        else:
+                                            logger.warning(f"⚠️ Não foi possível extrair dados do PDF: {arquivo_pdf}")
+                                    else:
+                                        logger.warning(f"⚠️ Arquivo PDF não encontrado: {arquivo_pdf}")
+                                except Exception as e_import:
+                                    logger.error(f"❌ Erro ao importar PDF para banco: {e_import}")
+
                                 # Atualizar status com sucesso
                                 atualizar_status(
-                                    etapa=f'Boleto baixado com sucesso! ({idx}/{len(cpfs)})',
+                                    etapa=f'Boleto baixado e importado! ({idx}/{len(cpfs)})',
                                     progresso=idx
                                 )
 
