@@ -364,6 +364,12 @@
         .log-entry.error { color: #ef4444; }
         .log-entry.warning { color: #ffc107; }
         .log-entry.info { color: #3b82f6; }
+
+        /* Animação do spinner */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -582,6 +588,52 @@
                         </svg>
                         Iniciar Download de Boletos
                     </button>
+
+                    <!-- Card de Monitoramento em Tempo Real -->
+                    <div id="monitorCard" style="margin-top: 1.5rem; padding: 1.5rem; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid rgba(66,133,244,0.3); display: none;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                            <h4 style="margin: 0; color: #4285f4; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <svg id="statusSpinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+                                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path>
+                                </svg>
+                                Monitoramento em Tempo Real
+                            </h4>
+                            <div id="statusBadge" style="padding: 0.25rem 0.75rem; background: #39FF14; color: #000; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">
+                                ATIVO
+                            </div>
+                        </div>
+
+                        <!-- Contador de progresso -->
+                        <div style="text-align: center; margin-bottom: 1rem;">
+                            <div style="font-size: 2.5rem; font-weight: 700; color: #4285f4;">
+                                <span id="progressCount">0</span> / <span id="progressTotal">0</span>
+                            </div>
+                            <div style="color: rgba(255,255,255,0.7); font-size: 0.9rem; margin-top: 0.25rem;">
+                                boletos processados
+                            </div>
+                        </div>
+
+                        <!-- Barra de progresso -->
+                        <div style="margin-bottom: 1rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="color: rgba(255,255,255,0.7); font-size: 0.85rem;">Progresso</span>
+                                <span id="progressPercentage" style="color: #4285f4; font-weight: 600; font-size: 0.85rem;">0%</span>
+                            </div>
+                            <div style="width: 100%; height: 12px; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden;">
+                                <div id="realProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #4285f4, #34a853); transition: width 0.5s ease;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Etapa atual -->
+                        <div style="padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px; border-left: 3px solid #4285f4;">
+                            <div style="color: rgba(255,255,255,0.6); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem;">
+                                Etapa Atual
+                            </div>
+                            <div id="currentStep" style="color: #fff; font-size: 0.95rem; line-height: 1.5;">
+                                Aguardando início...
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- ETAPA 4: Importar Boletos -->
@@ -1026,7 +1078,14 @@
 
                     adicionarLog('success', `✅ ${result.message}`);
                     adicionarLog('info', `Total de clientes: ${result.data.total_clientes}`);
-                    adicionarLog('warning', '⏳ O Chromium abrirá em alguns segundos... Aguarde!');
+                    adicionarLog('warning', '⏳ O processamento está rodando em background no servidor...');
+
+                    // Mostrar card de monitoramento
+                    document.getElementById('monitorCard').style.display = 'block';
+                    document.getElementById('progressTotal').textContent = result.data.total_clientes;
+
+                    // Iniciar polling do status de execução
+                    iniciarPollingStatus();
 
                     // Iniciar polling para atualizar lista de boletos a cada 5 segundos
                     let boletosPollingInterval = setInterval(() => {
@@ -1042,12 +1101,13 @@
                 } else {
                     adicionarLog('error', 'Erro ao iniciar download: ' + result.error);
                     alert('Erro ao iniciar download: ' + result.error);
+                    btn.disabled = false;
+                    btn.innerHTML = 'Iniciar Download';
                 }
             } catch (error) {
                 console.error('Erro:', error);
                 adicionarLog('error', 'Erro ao conectar com o servidor');
                 alert('Erro ao conectar com o servidor');
-            } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Iniciar Download';
             }
@@ -1096,6 +1156,77 @@ Os boletos importados já estão prontos para envio via WhatsApp!`;
 
         function mostrarProgresso() {
             document.getElementById('progressSection').classList.add('active');
+        }
+
+        // Polling do status de execução em tempo real
+        let pollingStatusInterval = null;
+
+        function iniciarPollingStatus() {
+            // Limpar qualquer polling anterior
+            if (pollingStatusInterval) {
+                clearInterval(pollingStatusInterval);
+            }
+
+            // Atualizar imediatamente
+            atualizarStatusMonitoramento();
+
+            // Atualizar a cada 2 segundos
+            pollingStatusInterval = setInterval(atualizarStatusMonitoramento, 2000);
+        }
+
+        async function atualizarStatusMonitoramento() {
+            try {
+                const response = await fetch('/api/automation/status-execucao');
+                const result = await response.json();
+
+                if (result.success) {
+                    const status = result.status;
+
+                    // Atualizar contador
+                    document.getElementById('progressCount').textContent = status.clientes_processados;
+                    document.getElementById('progressTotal').textContent = status.total_clientes;
+
+                    // Atualizar porcentagem
+                    document.getElementById('progressPercentage').textContent = status.porcentagem + '%';
+                    document.getElementById('realProgressBar').style.width = status.porcentagem + '%';
+
+                    // Atualizar etapa atual
+                    document.getElementById('currentStep').textContent = status.etapa_atual;
+
+                    // Atualizar status badge
+                    const badge = document.getElementById('statusBadge');
+                    const spinner = document.getElementById('statusSpinner');
+                    const btn = document.getElementById('btnIniciarDownload');
+
+                    if (status.ativo) {
+                        badge.textContent = 'ATIVO';
+                        badge.style.background = '#39FF14';
+                        badge.style.color = '#000';
+                        spinner.style.display = 'inline';
+                        btn.disabled = true;
+                        btn.innerHTML = '<span>Processando...</span>';
+                    } else {
+                        badge.textContent = status.porcentagem === 100 ? 'CONCLUÍDO' : 'INATIVO';
+                        badge.style.background = status.porcentagem === 100 ? '#34a853' : '#666';
+                        badge.style.color = '#fff';
+                        spinner.style.display = 'none';
+                        btn.disabled = false;
+                        btn.innerHTML = 'Iniciar Download';
+
+                        // Parar polling se não está ativo
+                        if (pollingStatusInterval) {
+                            clearInterval(pollingStatusInterval);
+                            pollingStatusInterval = null;
+
+                            if (status.porcentagem === 100) {
+                                adicionarLog('success', '✅ Download de boletos concluído!');
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao atualizar status:', error);
+            }
         }
 
         function iniciarPolling(execucaoId) {

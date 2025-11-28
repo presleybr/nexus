@@ -54,6 +54,75 @@ automation_canopus_bp = Blueprint('automation_canopus', __name__, url_prefix='/a
 
 
 # ============================================================================
+# CONTROLE DE STATUS DE EXECUÇÃO
+# ============================================================================
+
+# Status global da execução de downloads
+execution_status = {
+    'ativo': False,
+    'ponto_venda': None,
+    'total_clientes': 0,
+    'clientes_processados': 0,
+    'etapa_atual': 'Aguardando início...',
+    'porcentagem': 0,
+    'inicio': None,
+    'ultimo_update': None,
+    'erros': []
+}
+
+def atualizar_status(etapa: str = None, progresso: int = None, total: int = None, erro: str = None):
+    """Atualiza o status da execução"""
+    global execution_status
+
+    if etapa:
+        execution_status['etapa_atual'] = etapa
+
+    if progresso is not None:
+        execution_status['clientes_processados'] = progresso
+
+    if total is not None:
+        execution_status['total_clientes'] = total
+
+    if erro:
+        execution_status['erros'].append({
+            'timestamp': datetime.now().isoformat(),
+            'mensagem': erro
+        })
+
+    # Calcular porcentagem
+    if execution_status['total_clientes'] > 0:
+        execution_status['porcentagem'] = int(
+            (execution_status['clientes_processados'] / execution_status['total_clientes']) * 100
+        )
+
+    execution_status['ultimo_update'] = datetime.now().isoformat()
+    logger.info(f"📊 Status: {execution_status['etapa_atual']} ({execution_status['porcentagem']}%)")
+
+def iniciar_execucao(ponto_venda: str, total_clientes: int):
+    """Marca início da execução"""
+    global execution_status
+    execution_status.update({
+        'ativo': True,
+        'ponto_venda': ponto_venda,
+        'total_clientes': total_clientes,
+        'clientes_processados': 0,
+        'etapa_atual': 'Iniciando automação...',
+        'porcentagem': 0,
+        'inicio': datetime.now().isoformat(),
+        'ultimo_update': datetime.now().isoformat(),
+        'erros': []
+    })
+
+def finalizar_execucao(sucesso: bool = True):
+    """Marca fim da execução"""
+    global execution_status
+    execution_status['ativo'] = False
+    execution_status['etapa_atual'] = 'Concluído!' if sucesso else 'Erro na execução'
+    execution_status['porcentagem'] = 100 if sucesso else execution_status['porcentagem']
+    execution_status['ultimo_update'] = datetime.now().isoformat()
+
+
+# ============================================================================
 # DECORADORES E HELPERS
 # ============================================================================
 
@@ -983,6 +1052,19 @@ def health_check():
         }), 500
 
 
+@automation_canopus_bp.route('/status-execucao', methods=['GET'])
+def status_execucao():
+    """
+    Retorna status atual da execução de downloads
+    Usado para polling em tempo real no frontend
+    """
+    global execution_status
+    return jsonify({
+        'success': True,
+        'status': execution_status.copy()
+    })
+
+
 # ============================================================================
 # ROTAS PARA O FRONTEND DO CLIENTE
 # ============================================================================
@@ -1004,6 +1086,16 @@ def baixar_boletos_ponto_venda():
             'success': False,
             'error': 'Automação Canopus não disponível. Execute: instalar_canopus.bat'
         }), 503
+
+    # Verificar se já há execução ativa
+    global execution_status
+    if execution_status['ativo']:
+        logger.warning("⚠️ Já existe uma execução em andamento")
+        return jsonify({
+            'success': False,
+            'error': 'Já existe uma execução em andamento. Aguarde a conclusão.',
+            'status_atual': execution_status.copy()
+        }), 409  # 409 Conflict
 
     data = request.get_json() or {}
     ponto_venda = data.get('ponto_venda', '24627')
@@ -1081,6 +1173,10 @@ def baixar_boletos_ponto_venda():
             async def processar_todos():
                 logger.info("🔄 Função processar_todos() iniciada")
 
+                # Iniciar rastreamento de execução
+                iniciar_execucao(ponto_venda, len(cpfs))
+                atualizar_status(etapa='Configurando ambiente...', progresso=0)
+
                 # IMPORTANTE: Configurar sys.path dentro da thread
                 import sys
                 from pathlib import Path
@@ -1101,6 +1197,8 @@ def baixar_boletos_ponto_venda():
                 # Agora sim importar
                 from automation.canopus.canopus_automation import CanopusAutomation
 
+                atualizar_status(etapa='Configurando diretórios...')
+
                 # Usar path relativo ou variável de ambiente para Render
                 base_dir = os.getenv('DOWNLOAD_BASE_DIR', str(Path(__file__).resolve().parent.parent.parent / 'automation' / 'canopus' / 'downloads'))
                 pasta_destino = Path(base_dir) / 'Danner'
@@ -1110,6 +1208,7 @@ def baixar_boletos_ponto_venda():
 
                 # Buscar credenciais do banco usando conexão centralizada
                 try:
+                    atualizar_status(etapa='Buscando credenciais no banco...')
                     logger.info(f"🔑 Buscando credenciais do PV {ponto_venda}...")
 
                     with get_db_connection() as conn:
@@ -1152,10 +1251,15 @@ def baixar_boletos_ponto_venda():
 
                 logger.info(f"🌐 Ambiente: {'Render (servidor)' if is_render else 'Local'}")
                 logger.info(f"🌐 Abrindo Chromium (headless={headless_mode})...")
+
+                atualizar_status(etapa='Abrindo navegador Chromium...')
+
                 async with CanopusAutomation(headless=headless_mode) as bot:
                     logger.info("✅ Chromium aberto!")
 
                     # Fazer login
+                    atualizar_status(etapa=f'Fazendo login no sistema (usuário: {usuario})...')
+
                     logger.info("=" * 80)
                     logger.info("🔐 FAZENDO LOGIN NO PONTO 24627")
                     logger.info(f"👤 Usuário: {usuario}")
@@ -1179,9 +1283,17 @@ def baixar_boletos_ponto_venda():
                     logger.info("✅ LOGIN REALIZADO COM SUCESSO!")
                     logger.info("=" * 80)
 
+                    atualizar_status(etapa='Login realizado! Iniciando processamento de clientes...')
+
                     # Processar cada CPF na mesma sessão
                     for idx, cpf in enumerate(cpfs, 1):
                         logger.info(f"📄 Processando {idx}/{len(cpfs)}: CPF {cpf}")
+
+                        # Atualizar status com cliente atual
+                        atualizar_status(
+                            etapa=f'Processando cliente {idx}/{len(cpfs)} - CPF: {cpf}',
+                            progresso=idx - 1
+                        )
 
                         try:
                             from automation.canopus.canopus_config import CanopusConfig
@@ -1224,6 +1336,12 @@ def baixar_boletos_ponto_venda():
                                 logger.info(f"✅ SUCESSO! Boleto {idx}/{len(cpfs)} baixado: {cpf}")
                                 logger.info(f"📁 Arquivo: {resultado.get('dados_boleto', {}).get('arquivo_nome', 'N/A')}")
                                 logger.info("=" * 80)
+
+                                # Atualizar status com sucesso
+                                atualizar_status(
+                                    etapa=f'Boleto baixado com sucesso! ({idx}/{len(cpfs)})',
+                                    progresso=idx
+                                )
 
                                 # Aguardar 3 segundos antes do próximo (para você ver o sucesso)
                                 await asyncio.sleep(3)
@@ -1279,11 +1397,18 @@ def baixar_boletos_ponto_venda():
                     logger.info("🔄 Use o botão 'Importar Boletos' no frontend para importar ao banco")
                     logger.info("=" * 80)
 
+                    # Finalizar execução com sucesso
+                    finalizar_execucao(sucesso=True)
+
             # Rodar o loop assíncrono
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
                 loop.run_until_complete(processar_todos())
+            except Exception as e:
+                logger.error(f"❌ Erro na execução: {e}")
+                finalizar_execucao(sucesso=False)
+                atualizar_status(erro=str(e))
             finally:
                 loop.close()
 
