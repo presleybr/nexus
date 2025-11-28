@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp - Nexus CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Nexus Design System -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/crm-cliente.css">
+    <style>
+        .status-badge {
+            display: inline-block;
+            padding: 0.5rem 1.2rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .status-connected {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .status-disconnected {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .status-connecting {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+        }
+
+        .qr-code-area {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .qr-code-img {
+            max-width: 300px;
+            border: 3px solid var(--cor-primaria);
+            border-radius: 10px;
+            padding: 1rem;
+            background: white;
+        }
+
+        .phone-display {
+            background: var(--cor-background);
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            margin-top: 1rem;
+        }
+
+        .test-area {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 1.5rem;
+        }
+
+        .test-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin: 0.5rem 0;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .test-input:focus {
+            outline: none;
+            border-color: var(--cor-primaria);
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--cor-primaria);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-box {
+            background: #e0f2fe;
+            border-left: 4px solid #0284c7;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .info-box h4 {
+            margin-top: 0;
+            color: #0284c7;
+        }
+
+        .info-box ol {
+            margin: 0.5rem 0 0 1rem;
+            padding-left: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="crm-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="/static/images/nexus_Logotipo.png" alt="Nexus" style="height: 80px; margin-bottom: 15px;">
+            </div>
+
+            <nav>
+                <ul class="sidebar-menu">
+                    <li class="menu-item">
+                        <a href="/crm/dashboard" class="menu-link">
+                            <span class="menu-icon">📊</span>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/cadastro-clientes" class="menu-link">
+                            <span class="menu-icon">👥</span>
+                            Clientes
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/whatsapp" class="menu-link active">
+                            <span class="menu-icon">📱</span>
+                            WhatsApp
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/disparos" class="menu-link">
+                            <span class="menu-icon">🚀</span>
+                            Disparos
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/monitoramento" class="menu-link">
+                            <span class="menu-icon">📈</span>
+                            Monitoramento
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/graficos" class="menu-link">
+                            <span class="menu-icon">📉</span>
+                            Gráficos
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <button class="logout-btn" onclick="logout()">
+                🚪 Sair
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Conexão WhatsApp</h1>
+                <p class="breadcrumb">Conecte seu WhatsApp via QR Code</p>
+            </header>
+
+            <!-- Status Card -->
+            <div class="table-container" style="margin-bottom: 1.5rem;">
+                <h3 style="margin-bottom: 1rem; color: var(--cor-destaque);">📱 Status da Conexão</h3>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <div id="statusBadge" class="status-badge status-disconnected">
+                            ❌ Desconectado
+                        </div>
+                        <div id="phoneDisplay" class="phone-display" style="display: none;">
+                            <strong>📱 Número:</strong> <span id="phoneNumber"></span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button id="btnConectar" class="btn btn-primary" onclick="conectarWhatsApp()">
+                            🔌 Conectar WhatsApp
+                        </button>
+                        <button id="btnDesconectar" class="btn btn-danger" onclick="desconectarWhatsApp()" style="display: none;">
+                            🚪 Desconectar
+                        </button>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1.5rem; background: var(--nexus-bg-glass); backdrop-filter: blur(var(--nexus-blur-md)); border: 1px solid var(--nexus-border); border-left: 4px solid var(--nexus-primary); border-radius: var(--nexus-radius-md); padding: var(--nexus-space-xl); box-shadow: var(--nexus-shadow-sm);">
+                    <h4 style="color: var(--nexus-primary); font-family: var(--nexus-font-display); font-size: var(--nexus-text-lg); font-weight: var(--nexus-font-bold); margin-bottom: var(--nexus-space-md); display: flex; align-items: center; gap: var(--nexus-space-sm);">
+                        <svg style="width: 20px; height: 20px;" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                        Instruções
+                    </h4>
+                    <ol style="color: var(--nexus-text-secondary); font-size: var(--nexus-text-base); line-height: 1.8; margin: 0; padding-left: 1.5rem;">
+                        <li style="margin-bottom: var(--nexus-space-sm);">Clique em <strong style="color: var(--nexus-primary);">"Conectar WhatsApp"</strong> para iniciar a conexão</li>
+                        <li style="margin-bottom: var(--nexus-space-sm);">Aguarde o <strong style="color: var(--nexus-primary);">QR Code</strong> aparecer (5-10 segundos)</li>
+                        <li style="margin-bottom: var(--nexus-space-sm);">Abra <strong style="color: var(--nexus-primary);">WhatsApp no celular</strong> → Configurações → Aparelhos Conectados</li>
+                        <li style="margin-bottom: var(--nexus-space-sm);">Escaneie o <strong style="color: var(--nexus-primary);">QR Code</strong> que aparecerá abaixo</li>
+                        <li>Aguarde a <strong style="color: var(--nexus-success);">confirmação da conexão</strong></li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- QR Code Area -->
+            <div id="qrCard" class="table-container" style="display: none;">
+                <h3 style="margin-bottom: 1rem; color: var(--cor-destaque);">📱 QR Code para Conexão</h3>
+
+                <div class="qr-code-area" id="qrContainer">
+                    <div class="spinner"></div>
+                    <p style="color: #666; margin-top: 1rem;">Aguardando QR Code...</p>
+                    <p style="color: #999; font-size: 0.9rem;">Isso pode levar alguns segundos</p>
+                </div>
+            </div>
+
+            <!-- Test Area -->
+            <div id="testCard" class="table-container" style="display: none;">
+                <h3 style="margin-bottom: 1rem; color: var(--cor-destaque);">🧪 Teste de Envio</h3>
+
+                <div class="test-area">
+                    <h4 style="margin-top: 0;">Enviar Mensagem de Teste</h4>
+                    <p>Digite um número de telefone para enviar uma mensagem de teste.</p>
+
+                    <label style="display: block; margin-top: 1rem; font-weight: 600;">
+                        Telefone (com DDD):
+                    </label>
+                    <input type="text" id="testPhone" class="test-input" placeholder="Ex: 67999887766">
+                    <small style="color: #666; display: block; margin-bottom: 1rem;">
+                        Digite apenas números (DDD + número)
+                    </small>
+
+                    <button class="btn btn-success" onclick="enviarTeste()" style="width: 100%;">
+                        📤 Enviar Mensagem de Teste
+                    </button>
+
+                    <div id="testResult" style="margin-top: 1rem;"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/crm-cliente.js"></script>
+    <script>
+        let qrPollingInterval = null;
+        let statusPollingInterval = null;
+
+        // Verifica status ao carregar a página
+        window.onload = function() {
+            verificarStatus();
+            // Atualiza status a cada 5 segundos
+            statusPollingInterval = setInterval(verificarStatus, 5000);
+        };
+
+        async function verificarStatus() {
+            try {
+                const response = await fetch('/api/whatsapp/status');
+                const data = await response.json();
+
+                console.log('[STATUS WHATSAPP]', data);
+
+                const statusBadge = document.getElementById('statusBadge');
+                const phoneDisplay = document.getElementById('phoneDisplay');
+                const phoneNumber = document.getElementById('phoneNumber');
+                const btnConectar = document.getElementById('btnConectar');
+                const btnDesconectar = document.getElementById('btnDesconectar');
+                const testCard = document.getElementById('testCard');
+
+                if (data.connected) {
+                    statusBadge.className = 'status-badge status-connected';
+                    statusBadge.innerHTML = '✅ Conectado';
+
+                    if (data.phone) {
+                        phoneNumber.textContent = data.phone;
+                        phoneDisplay.style.display = 'block';
+                    }
+
+                    btnConectar.style.display = 'none';
+                    btnDesconectar.style.display = 'inline-block';
+                    testCard.style.display = 'block';
+
+                    // Para o polling do QR Code se estiver rodando
+                    if (qrPollingInterval) {
+                        clearInterval(qrPollingInterval);
+                        qrPollingInterval = null;
+                        document.getElementById('qrCard').style.display = 'none';
+                    }
+                } else {
+                    statusBadge.className = 'status-badge status-disconnected';
+                    statusBadge.innerHTML = '❌ Desconectado';
+
+                    phoneDisplay.style.display = 'none';
+                    btnConectar.style.display = 'inline-block';
+                    btnDesconectar.style.display = 'none';
+                    testCard.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('[ERRO] Ao verificar status:', error);
+            }
+        }
+
+        async function conectarWhatsApp() {
+            try {
+                const btnConectar = document.getElementById('btnConectar');
+                btnConectar.disabled = true;
+                btnConectar.innerHTML = '⏳ Conectando...';
+
+                console.log('[CONECTAR] Iniciando conexão...');
+
+                const response = await fetch('/api/whatsapp/conectar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                console.log('[CONECTAR] Resposta:', data);
+
+                if (data.success) {
+                    // Mostra card do QR Code
+                    document.getElementById('qrCard').style.display = 'block';
+
+                    // Scroll suave até o QR Code
+                    document.getElementById('qrCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                    // Inicia polling do QR Code
+                    qrPollingInterval = setInterval(obterQRCode, 3000);
+                    obterQRCode(); // Primeira chamada imediata
+                } else {
+                    alert('Erro ao conectar: ' + (data.error || 'Erro desconhecido'));
+                    btnConectar.disabled = false;
+                    btnConectar.innerHTML = '🔌 Conectar WhatsApp';
+                }
+            } catch (error) {
+                console.error('[ERRO] Ao conectar:', error);
+                alert('Erro ao conectar. Verifique se o servidor Baileys está rodando.');
+                document.getElementById('btnConectar').disabled = false;
+                document.getElementById('btnConectar').innerHTML = '🔌 Conectar WhatsApp';
+            }
+        }
+
+        async function obterQRCode() {
+            try {
+                console.log('[QR] Solicitando QR Code...');
+
+                const response = await fetch('/api/whatsapp/qr');
+                const data = await response.json();
+
+                console.log('[QR] Resposta:', data);
+
+                const qrContainer = document.getElementById('qrContainer');
+
+                if (data.success && data.qr) {
+                    // Exibe QR Code
+                    qrContainer.innerHTML = `
+                        <img src="${data.qr}" class="qr-code-img" alt="QR Code">
+                        <p style="margin-top: 1rem; color: #0284c7; font-weight: 600; font-size: 1.1rem;">
+                            📱 Escaneie este QR Code com seu WhatsApp
+                        </p>
+                        <p style="color: #666; font-size: 0.9rem;">
+                            WhatsApp > Configurações > Aparelhos Conectados > Conectar Aparelho
+                        </p>
+                    `;
+                } else if (data.connected) {
+                    // Já conectado
+                    clearInterval(qrPollingInterval);
+                    qrPollingInterval = null;
+                    document.getElementById('qrCard').style.display = 'none';
+                    document.getElementById('btnConectar').disabled = false;
+                    document.getElementById('btnConectar').innerHTML = '🔌 Conectar WhatsApp';
+                    verificarStatus();
+                }
+            } catch (error) {
+                console.error('[ERRO] Ao obter QR Code:', error);
+            }
+        }
+
+        async function desconectarWhatsApp() {
+            if (!confirm('Tem certeza que deseja desconectar do WhatsApp?')) {
+                return;
+            }
+
+            try {
+                console.log('[DESCONECTAR] Desconectando...');
+
+                const response = await fetch('/api/whatsapp/desconectar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                console.log('[DESCONECTAR] Resposta:', data);
+
+                if (data.success) {
+                    alert('✅ Desconectado com sucesso!');
+                    verificarStatus();
+                } else {
+                    alert('❌ Erro ao desconectar: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('[ERRO] Ao desconectar:', error);
+                alert('❌ Erro ao desconectar do WhatsApp');
+            }
+        }
+
+        async function enviarTeste() {
+            const testPhone = document.getElementById('testPhone').value;
+            const testResult = document.getElementById('testResult');
+
+            if (!testPhone) {
+                alert('Digite um número de telefone');
+                return;
+            }
+
+            try {
+                testResult.innerHTML = `
+                    <div style="background: #dbeafe; padding: 1rem; border-radius: 8px; border-left: 4px solid #0284c7;">
+                        ⏳ Enviando mensagem de teste...
+                    </div>
+                `;
+
+                console.log('[TESTE] Enviando para:', testPhone);
+
+                const response = await fetch('/api/whatsapp/teste', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telefone: testPhone })
+                });
+
+                const data = await response.json();
+                console.log('[TESTE] Resposta:', data);
+
+                if (data.success) {
+                    testResult.innerHTML = `
+                        <div style="background: #d1fae5; padding: 1rem; border-radius: 8px; border-left: 4px solid #10b981;">
+                            ✅ Mensagem enviada com sucesso!
+                        </div>
+                    `;
+                } else {
+                    testResult.innerHTML = `
+                        <div style="background: #fee2e2; padding: 1rem; border-radius: 8px; border-left: 4px solid #ef4444;">
+                            ❌ Erro: ${data.error || 'Erro desconhecido'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('[ERRO] Ao enviar teste:', error);
+                testResult.innerHTML = `
+                    <div style="background: #fee2e2; padding: 1rem; border-radius: 8px; border-left: 4px solid #ef4444;">
+                        ❌ Erro ao enviar mensagem de teste
+                    </div>
+                `;
+            }
+        }
+
+        // Limpa intervalos ao sair da página
+        window.onbeforeunload = function() {
+            if (qrPollingInterval) clearInterval(qrPollingInterval);
+            if (statusPollingInterval) clearInterval(statusPollingInterval);
+        };
+    </script>
+</body>
+</html>

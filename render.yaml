@@ -1,0 +1,82 @@
+# =============================================================================
+# Render.com Blueprint Configuration
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Backend Web Service (Flask API + Automação)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: nexus-crm-backend
+    env: docker
+    dockerfilePath: ./Dockerfile
+    region: oregon
+    plan: starter  # Mude para 'standard' ou 'pro' se precisar mais recursos
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13
+      - key: FLASK_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nexus-crm-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: PORT
+        value: 5000
+      - key: PLAYWRIGHT_HEADLESS
+        value: true
+      - key: LOG_LEVEL
+        value: INFO
+      # Adicione suas credenciais Canopus como variáveis secretas no painel do Render
+      - key: CANOPUS_URL
+        sync: false  # Definir manualmente no painel
+      - key: CANOPUS_LOGIN
+        sync: false
+      - key: CANOPUS_SENHA
+        sync: false
+      - key: CANOPUS_CODIGO_EMPRESA
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      playwright install chromium
+      playwright install-deps chromium
+    startCommand: python backend/app.py
+
+  # ---------------------------------------------------------------------------
+  # Frontend Static Site
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: nexus-crm-frontend
+    env: static
+    staticPublishPath: ./frontend
+    buildCommand: echo "No build required for static HTML"
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=3600
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://nexus-crm-backend.onrender.com/api/*
+
+# =============================================================================
+# Database Configuration
+# =============================================================================
+databases:
+  - name: nexus-crm-db
+    databaseName: nexus_crm
+    user: postgres
+    plan: starter  # Free tier PostgreSQL
+    region: oregon
+    postgresMajorVersion: 15
+    
+    # Migrations - executadas após criação do banco
+    # Nota: Precisará executar migrations manualmente na primeira vez
+    # Veja instruções no README.md

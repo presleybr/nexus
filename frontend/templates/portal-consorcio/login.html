@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Consórcio - Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Nexus Design System -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-login">
+                    <img src="/static/images/nexus_Logotipo.png" alt="Nexus" class="glow" style="height: 100px;">
+                </div>
+                <p class="login-subtitle">Portal Consórcio</p>
+            </div>
+
+            <div id="alert" class="alert"></div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email" class="form-label">Email</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        class="form-input"
+                        placeholder="Digite seu email"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="senha" class="form-label">Senha</label>
+                    <input
+                        type="password"
+                        id="senha"
+                        name="senha"
+                        class="form-input"
+                        placeholder="Digite sua senha"
+                        required
+                    >
+                </div>
+
+                <button type="submit" class="btn-login" id="btnLogin">
+                    Entrar
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <p><a href="/" class="login-link">← Voltar para página inicial</a></p>
+                <div class="divider">ou</div>
+                <p><a href="/login-cliente" class="login-link">Acesso Cliente CRM</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const btnLogin = document.getElementById('btnLogin');
+        const alertBox = document.getElementById('alert');
+
+        function showAlert(message, type = 'error') {
+            alertBox.textContent = message;
+            alertBox.className = `alert alert-${type} show`;
+            setTimeout(() => {
+                alertBox.classList.remove('show');
+            }, 5000);
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value.trim();
+            const senha = document.getElementById('senha').value;
+
+            if (!email || !senha) {
+                showAlert('Preencha todos os campos');
+                return;
+            }
+
+            // Loading state
+            btnLogin.disabled = true;
+            btnLogin.textContent = 'Carregando...';
+
+            try {
+                const response = await fetch('/portal-consorcio/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, senha })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showAlert('Login realizado com sucesso!', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/portal-consorcio/dashboard';
+                    }, 500);
+                } else {
+                    showAlert(data.error || 'Erro ao fazer login');
+                    btnLogin.disabled = false;
+                    btnLogin.textContent = 'Entrar';
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                showAlert('Erro ao conectar com o servidor');
+                btnLogin.disabled = false;
+                btnLogin.textContent = 'Entrar';
+            }
+        });
+
+        // Focus no primeiro campo ao carregar
+        document.getElementById('email').focus();
+    </script>
+</body>
+</html>

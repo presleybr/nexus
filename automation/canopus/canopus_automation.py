@@ -1,0 +1,1411 @@
+"""
+Automação Canopus usando Playwright Async
+Bot para download automatizado de boletos do sistema Canopus
+"""
+
+import asyncio
+import logging
+from pathlib import Path
+from typing import Optional, Dict, Any, List
+from datetime import datetime
+import random
+
+from playwright.async_api import (
+    async_playwright,
+    Browser,
+    BrowserContext,
+    Page,
+    Download,
+    TimeoutError as PlaywrightTimeoutError
+)
+
+from canopus_config import CanopusConfig
+import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# FUNÇÕES AUXILIARES
+# ============================================================================
+
+def buscar_cliente_banco(cpf: str) -> Optional[Dict[str, Any]]:
+    """
+    Busca dados do cliente no banco de dados baseado no CPF
+
+    Args:
+        cpf: CPF do cliente (com ou sem formatação)
+
+    Returns:
+        Dicionário com nome e outras informações ou None se não encontrado
+    """
+    try:
+        import psycopg
+        from psycopg.rows import dict_row
+
+        # Limpar CPF (remover pontos e hífens)
+        cpf_limpo = ''.join(filter(str.isdigit, cpf))
+
+        # Conectar ao banco
+        conn = psycopg.connect(
+            host='localhost',
+            port=5434,
+            dbname='nexus_crm',
+            user='postgres',
+            password='nexus2025',
+            row_factory=dict_row
+        )
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT nome_completo, cpf, ponto_venda
+                FROM clientes_finais
+                WHERE cpf = %s AND ativo = TRUE
+                LIMIT 1
+            """, (cpf_limpo,))
+
+            resultado = cur.fetchone()
+
+        conn.close()
+
+        if resultado:
+            return {
+                'nome': resultado['nome_completo'],
+                'cpf': resultado['cpf'],
+                'ponto_venda': resultado['ponto_venda']
+            }
+        else:
+            logger.warning(f"Cliente com CPF {cpf} não encontrado no banco")
+            return None
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar cliente no banco: {e}")
+        return None
+
+
+def buscar_cliente_planilha(cpf: str, planilha_path: Path = None) -> Optional[Dict[str, Any]]:
+    """
+    Busca dados do cliente na planilha Excel baseado no CPF
+    DEPRECATED: Use buscar_cliente_banco() para buscar do banco de dados
+
+    Args:
+        cpf: CPF do cliente (com ou sem formatação)
+        planilha_path: Caminho da planilha (usa padrão se não fornecido)
+
+    Returns:
+        Dicionário com nome e outras informações ou None se não encontrado
+    """
+    try:
+        # Caminho padrão da planilha
+        if not planilha_path:
+            planilha_path = Path(r"D:\Nexus\automation\canopus\excel_files\DENER__PLANILHA_GERAL.xlsx")
+
+        if not planilha_path.exists():
+            logger.warning(f"Planilha não encontrada: {planilha_path}")
+            return None
+
+        # Ler planilha (linha 12 contém os cabeçalhos)
+        df = pd.read_excel(planilha_path, header=12)
+
+        # Limpar CPF (remover formatação)
+        cpf_limpo = ''.join(filter(str.isdigit, str(cpf)))
+
+        # Buscar CPF na planilha
+        # A coluna CPF pode ter formatação diferente, então limpar também
+        df['CPF_LIMPO'] = df['CPF'].astype(str).apply(lambda x: ''.join(filter(str.isdigit, x)))
+
+        cliente = df[df['CPF_LIMPO'] == cpf_limpo]
+
+        if cliente.empty:
+            logger.warning(f"Cliente com CPF {cpf} não encontrado na planilha")
+            return None
+
+        # Pegar primeira ocorrência
+        linha = cliente.iloc[0]
+
+        return {
+            'nome': str(linha.get('Concorciado', '')).strip() if pd.notna(linha.get('Concorciado')) else '',
+            'grupo_cota': str(linha.get('G/C', '')).strip() if pd.notna(linha.get('G/C')) else '',
+            'ponto_venda': str(linha.get('P.V', '')).strip() if pd.notna(linha.get('P.V')) else '',
+            'situacao': str(linha.get('SITUAÇÃO', '')).strip() if pd.notna(linha.get('SITUAÇÃO')) else '',
+        }
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar cliente na planilha: {e}")
+        return None
+
+
+def obter_nome_mes(numero_mes: int) -> str:
+    """
+    Converte número do mês para nome em português
+
+    Args:
+        numero_mes: Número do mês (1-12)
+
+    Returns:
+        Nome do mês em maiúsculas
+    """
+    meses = {
+        1: 'JANEIRO',
+        2: 'FEVEREIRO',
+        3: 'MARÇO',
+        4: 'ABRIL',
+        5: 'MAIO',
+        6: 'JUNHO',
+        7: 'JULHO',
+        8: 'AGOSTO',
+        9: 'SETEMBRO',
+        10: 'OUTUBRO',
+        11: 'NOVEMBRO',
+        12: 'DEZEMBRO'
+    }
+    return meses.get(numero_mes, '')
+
+
+# ============================================================================
+# CLASSE PRINCIPAL DE AUTOMAÇÃO
+# ============================================================================
+
+class CanopusAutomation:
+    """Automação do sistema Canopus com Playwright"""
+
+    def __init__(
+        self,
+        config: CanopusConfig = None,
+        headless: bool = None
+    ):
+        """
+        Inicializa a automação
+
+        Args:
+            config: Configuração (usa padrão se não fornecido)
+            headless: Modo headless (sobrescreve config se fornecido)
+        """
+        self.config = config or CanopusConfig
+        self.headless = headless if headless is not None else self.config.PLAYWRIGHT_CONFIG['headless']
+
+        # Estado do navegador
+        self.playwright = None
+        self.browser: Optional[Browser] = None
+        self.context: Optional[BrowserContext] = None
+        self.page: Optional[Page] = None
+
+        # Estado da sessão
+        self.logado = False
+        self.empresa_atual = None
+        self.ponto_venda_atual = None
+        self.usuario_atual = None
+
+        # Estatísticas
+        self.stats = {
+            'downloads_sucesso': 0,
+            'downloads_erro': 0,
+            'cpf_nao_encontrado': 0,
+            'sem_boleto': 0,
+            'inicio_sessao': None,
+            'fim_sessao': None,
+        }
+
+    # ========================================================================
+    # MÉTODOS DE CONTROLE DO NAVEGADOR
+    # ========================================================================
+
+    async def iniciar_navegador(self):
+        """Inicia o navegador Playwright"""
+        logger.info("🌐 Iniciando navegador...")
+
+        try:
+            # Iniciar Playwright
+            self.playwright = await async_playwright().start()
+
+            # Configurações do navegador
+            pw_config = self.config.PLAYWRIGHT_CONFIG
+
+            # Argumentos anti-detecção extras
+            anti_detection_args = [
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
+            ]
+
+            # Lançar navegador
+            if pw_config['browser_type'] == 'firefox':
+                self.browser = await self.playwright.firefox.launch(
+                    headless=self.headless,
+                    slow_mo=pw_config['slow_mo']
+                )
+            elif pw_config['browser_type'] == 'webkit':
+                self.browser = await self.playwright.webkit.launch(
+                    headless=self.headless,
+                    slow_mo=pw_config['slow_mo']
+                )
+            else:  # chromium (padrão)
+                self.browser = await self.playwright.chromium.launch(
+                    headless=self.headless,
+                    args=pw_config['browser_args'] + anti_detection_args,
+                    slow_mo=pw_config['slow_mo']
+                )
+
+            # Criar contexto
+            self.context = await self.browser.new_context(
+                viewport=pw_config['viewport'],
+                user_agent=pw_config['user_agent'],
+                accept_downloads=pw_config['accept_downloads'],
+                locale='pt-BR',
+                timezone_id='America/Sao_Paulo',
+            )
+
+            # Script anti-detecção (executado em todas as páginas)
+            await self.context.add_init_script("""
+                // Remover webdriver flag
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+
+                // Sobrescrever plugins
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5]
+                });
+
+                // Chrome runtime
+                window.chrome = { runtime: {} };
+            """)
+
+            # Criar página
+            self.page = await self.context.new_page()
+
+            # Configurar timeouts
+            self.page.set_default_timeout(self.config.TIMEOUTS['navegacao'])
+
+            logger.info("✅ Navegador iniciado")
+            self.stats['inicio_sessao'] = datetime.now()
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao iniciar navegador: {e}")
+            raise
+
+    async def fechar_navegador(self):
+        """Fecha o navegador"""
+        logger.info("🔒 Fechando navegador...")
+
+        try:
+            if self.page:
+                await self.page.close()
+            if self.context:
+                await self.context.close()
+            if self.browser:
+                await self.browser.close()
+            if self.playwright:
+                await self.playwright.stop()
+
+            self.stats['fim_sessao'] = datetime.now()
+            logger.info("✅ Navegador fechado")
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao fechar navegador: {e}")
+
+    async def screenshot(self, nome: str = None):
+        """Tira screenshot da página atual"""
+        if not self.page:
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Adicionar extensão .png se não tiver
+        if nome:
+            nome_arquivo = f"{nome}.png" if not nome.endswith('.png') else nome
+        else:
+            nome_arquivo = f"screenshot_{timestamp}.png"
+
+        caminho = self.config.LOGS_DIR / nome_arquivo
+
+        await self.page.screenshot(path=str(caminho))
+        logger.info(f"📸 Screenshot: {caminho.name}")
+
+    # ========================================================================
+    # MÉTODOS DE LOGIN E AUTENTICAÇÃO
+    # ========================================================================
+
+    async def login(
+        self,
+        usuario: str,
+        senha: str,
+        codigo_empresa: str = None,
+        ponto_venda: str = None
+    ) -> bool:
+        """
+        Realiza login no sistema Canopus
+
+        Args:
+            usuario: Nome de usuário
+            senha: Senha
+            codigo_empresa: Código da empresa (OPCIONAL - não usado no login)
+            ponto_venda: Código do ponto de venda (OPCIONAL - não usado no login)
+
+        Returns:
+            True se login bem-sucedido, False caso contrário
+        """
+        logger.info(f"🔐 Fazendo login - User: {usuario}")
+
+        try:
+            # Navegar para página de login
+            logger.info(f"Navegando para: {self.config.URLS['login']}")
+            await self.page.goto(self.config.URLS['login'])
+            await self._delay_humanizado()
+
+            # Screenshot antes do login
+            await self.screenshot("antes_login")
+
+            # Preencher usuário
+            logger.info("Preenchendo usuário...")
+            usuario_input = self.config.SELECTORS['login']['usuario_input']
+            await self.page.fill(usuario_input, usuario)
+            await self._delay_humanizado(0.3, 0.7)
+
+            # Preencher senha
+            logger.info("Preenchendo senha...")
+            senha_input = self.config.SELECTORS['login']['senha_input']
+            await self.page.fill(senha_input, senha)
+            await self._delay_humanizado(0.5, 1.0)
+
+            # Screenshot antes de clicar
+            await self.screenshot("antes_clicar_login")
+
+            # Clicar em entrar
+            logger.info("Clicando no botão Login...")
+            botao_entrar = self.config.SELECTORS['login']['botao_entrar']
+            await self.page.click(botao_entrar)
+
+            # Aguardar navegação após login
+            logger.info("Aguardando navegação...")
+            await asyncio.sleep(self.config.DELAYS['apos_login'])
+
+            # Screenshot após login
+            await self.screenshot("apos_login")
+
+            # Verificar se login foi bem-sucedido
+            url_atual = self.page.url
+            logger.info(f"URL após login: {url_atual}")
+
+            if 'login' not in url_atual.lower():
+                logger.info("✅ Login realizado com sucesso!")
+                self.logado = True
+                self.empresa_atual = codigo_empresa
+                self.ponto_venda_atual = ponto_venda
+                self.usuario_atual = usuario
+                return True
+
+            # Verificar mensagem de erro
+            try:
+                erro_selector = self.config.SELECTORS['login']['erro_login']
+                erro_element = await self.page.query_selector(erro_selector)
+
+                if erro_element:
+                    mensagem_erro = await erro_element.text_content()
+                    logger.error(f"❌ Erro no login: {mensagem_erro}")
+
+            except:
+                pass
+
+            logger.error("❌ Login falhou")
+            await self.screenshot("login_falhou")
+            return False
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao fazer login: {e}")
+            await self.screenshot("erro_login")
+            return False
+
+    async def selecionar_empresa(self, codigo_empresa: str) -> bool:
+        """
+        Seleciona empresa (se necessário)
+
+        Args:
+            codigo_empresa: Código da empresa
+
+        Returns:
+            True se selecionado com sucesso
+        """
+        # PLACEHOLDER: Implementar se houver seleção de empresa após login
+        logger.debug(f"Empresa {codigo_empresa} selecionada")
+        self.empresa_atual = codigo_empresa
+        return True
+
+    # ========================================================================
+    # MÉTODOS DE BUSCA DE CLIENTE
+    # ========================================================================
+
+    async def navegar_busca_avancada(self) -> bool:
+        """
+        Navega para a página de busca avançada
+
+        Fluxo:
+        1. Clicar no ícone de Atendimento (pessoa)
+        2. Clicar em "Busca avançada"
+
+        Returns:
+            True se navegou com sucesso
+        """
+        logger.info("🔍 Navegando para busca avançada...")
+
+        try:
+            # 1. Clicar no ícone de Atendimento (pessoa)
+            logger.info("Clicando no ícone de Atendimento...")
+            icone_atendimento = self.config.SELECTORS['busca']['icone_atendimento']
+            await self.page.click(icone_atendimento)
+            await self._delay_humanizado(1.0, 2.0)
+            await self.screenshot("apos_clicar_atendimento")
+
+            # 2. Clicar em "Busca avançada"
+            logger.info("Clicando em 'Busca avançada'...")
+            botao_busca_avancada = self.config.SELECTORS['busca']['botao_busca_avancada']
+            await self.page.click(botao_busca_avancada)
+            await self._delay_humanizado(1.0, 2.0)
+            await self.screenshot("apos_busca_avancada")
+
+            logger.info("✅ Navegado para busca avançada")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao navegar para busca: {e}")
+            await self.screenshot("erro_navegar_busca")
+            return False
+
+    async def buscar_cliente_cpf(self, cpf: str) -> Optional[Dict[str, Any]]:
+        """
+        Busca cliente pelo CPF
+
+        Args:
+            cpf: CPF do cliente (será limpo automaticamente)
+
+        Returns:
+            Dicionário com dados do cliente ou None se não encontrado
+        """
+        cpf_limpo = self.config.limpar_cpf(cpf)
+        cpf_formatado = self.config.formatar_cpf(cpf_limpo)
+
+        logger.info(f"🔍 Buscando cliente: {cpf_formatado}")
+
+        try:
+            # Garantir que estamos na página de busca avançada
+            await self.navegar_busca_avancada()
+
+            # 1. Selecionar "CPF" no dropdown
+            logger.info("Selecionando tipo de busca: CPF")
+            select_tipo = self.config.SELECTORS['busca']['select_tipo_busca']
+            await self.page.select_option(select_tipo, value='F')  # F = CPF
+            await self._delay_humanizado(0.5, 1.0)
+            await self.screenshot("apos_selecionar_cpf")
+
+            # 2. Preencher CPF no campo de busca
+            logger.info(f"Preenchendo CPF: {cpf_formatado}")
+            cpf_input = self.config.SELECTORS['busca']['cpf_input']
+
+            # Limpar campo antes
+            await self.page.fill(cpf_input, '')
+            await self._delay_humanizado(0.2, 0.5)
+
+            # Preencher CPF (pode ser com ou sem formatação)
+            await self.page.fill(cpf_input, cpf_formatado)
+            await self._delay_humanizado(0.5, 1.0)
+            await self.screenshot("apos_preencher_cpf")
+
+            # 3. Clicar em buscar
+            logger.info("Clicando em Buscar...")
+            botao_buscar = self.config.SELECTORS['busca']['botao_buscar']
+            await self.page.click(botao_buscar)
+
+            # Aguardar resultados
+            await asyncio.sleep(self.config.DELAYS['apos_busca'])
+            await self.screenshot("resultado_busca")
+
+            # Verificar se encontrou resultado
+            # Buscar link do cliente (grupo/cota)
+            try:
+                cliente_link_selector = self.config.SELECTORS['busca']['cliente_link']
+
+                # Aguardar o link aparecer
+                await self.page.wait_for_selector(
+                    cliente_link_selector,
+                    timeout=self.config.TIMEOUTS['busca']
+                )
+
+                # Buscar todos os links
+                links = await self.page.query_selector_all(cliente_link_selector)
+                logger.info(f"Encontrados {len(links)} resultado(s)")
+
+                # Clicar no SEGUNDO link (índice 1) - o primeiro sempre está vazio
+                if len(links) >= 2:
+                    logger.info("Clicando no segundo resultado (com grupo/cota)...")
+                    await links[1].click()  # Índice 1 = segundo item
+                    await self._delay_humanizado(2.0, 3.0)
+                    await self.screenshot("apos_clicar_cliente")
+
+                    logger.info(f"✅ Cliente acessado: {cpf_formatado}")
+
+                    return {
+                        'cpf': cpf_limpo,
+                        'cpf_formatado': cpf_formatado,
+                        'encontrado': True,
+                    }
+                elif len(links) == 1:
+                    # Se só tiver 1 link, clicar nele
+                    logger.info("Apenas 1 resultado encontrado, clicando...")
+                    await links[0].click()
+                    await self._delay_humanizado(2.0, 3.0)
+                    await self.screenshot("apos_clicar_cliente")
+
+                    return {
+                        'cpf': cpf_limpo,
+                        'cpf_formatado': cpf_formatado,
+                        'encontrado': True,
+                    }
+                else:
+                    logger.warning("⚠️ Nenhum resultado encontrado")
+                    await self.screenshot("sem_resultados")
+                    return None
+
+            except PlaywrightTimeoutError:
+                # Verificar se há mensagem de "nenhum resultado"
+                try:
+                    sem_resultado = self.config.SELECTORS['busca']['nenhum_resultado']
+                    elemento = await self.page.query_selector(sem_resultado)
+
+                    if elemento:
+                        logger.warning(f"⚠️ Cliente não encontrado: {cpf_formatado}")
+                        self.stats['cpf_nao_encontrado'] += 1
+                        return None
+
+                except:
+                    pass
+
+                logger.warning(f"⚠️ Timeout ao buscar cliente: {cpf_formatado}")
+                return None
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar cliente: {e}")
+            await self.screenshot(f"erro_busca_{cpf_limpo}")
+            return None
+
+    # ========================================================================
+    # MÉTODOS DE EMISSÃO DE BOLETO
+    # ========================================================================
+
+    async def navegar_emissao_cobranca(self) -> bool:
+        """
+        Navega para página de emissão de cobrança
+
+        Clica no link "Emissão de Cobrança" no menu do cliente
+
+        Returns:
+            True se navegou com sucesso
+        """
+        logger.info("📄 Navegando para emissão de cobrança...")
+
+        try:
+            # Clicar no link "Emissão de Cobrança"
+            menu_emissao = self.config.SELECTORS['emissao']['menu_emissao']
+
+            logger.info(f"Clicando em 'Emissão de Cobrança'...")
+            await self.page.click(menu_emissao)
+            await self._delay_humanizado(2.0, 3.0)
+            await self.screenshot("apos_clicar_emissao")
+
+            logger.info("✅ Navegado para emissão de cobrança")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao navegar para emissão: {e}")
+            await self.screenshot("erro_navegar_emissao")
+            return False
+
+    async def selecionar_parcela(self, mes: str, ano: int = None) -> bool:
+        """
+        Seleciona parcela do mês para emissão
+
+        Args:
+            mes: Mês da parcela (ex: 'DEZEMBRO')
+            ano: Ano da parcela (opcional)
+
+        Returns:
+            True se selecionou com sucesso
+        """
+        logger.info(f"📅 Selecionando parcela: {mes} {ano or ''}")
+
+        try:
+            # PLACEHOLDER: Ajustar conforme sistema real
+            select_parcela = self.config.SELECTORS['emissao']['select_parcela']
+
+            # Aguardar select aparecer
+            await self.page.wait_for_selector(select_parcela)
+
+            # Selecionar por texto (ajustar conforme formato do sistema)
+            # Pode ser por label, value, ou índice
+            texto_opcao = f"{mes.upper()}/{ano}" if ano else mes.upper()
+
+            await self.page.select_option(select_parcela, label=texto_opcao)
+            await self._delay_humanizado(0.5, 1.0)
+
+            logger.info(f"✅ Parcela {mes} selecionada")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao selecionar parcela: {e}")
+            return False
+
+    async def emitir_baixar_boleto(
+        self,
+        destino: Path,
+        nome_arquivo: str = None,
+        cpf: str = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Emite e baixa o boleto
+
+        Args:
+            destino: Diretório de destino
+            nome_arquivo: Nome do arquivo (gerado automaticamente se não fornecido)
+            cpf: CPF do cliente (para buscar nome na planilha)
+
+        Returns:
+            Dicionário com informações do boleto ou None se falhar
+        """
+        logger.info("📥 Emitindo e baixando boleto...")
+
+        try:
+            # 1. Aguardar a página de emissão carregar
+            logger.info("Aguardando página de emissão carregar...")
+            await asyncio.sleep(2)
+            await self.screenshot("tela_emissao")
+
+            # BUSCAR INFORMAÇÕES DO CLIENTE NA PLANILHA E EXTRAIR MÊS DO BOLETO
+            nome_cliente = ''
+            mes_boleto = ''
+
+            # Buscar nome do cliente no banco de dados baseado no CPF
+            if cpf:
+                logger.info(f"📋 Buscando dados do cliente no banco para CPF: {cpf}...")
+                dados_cliente = buscar_cliente_banco(cpf)
+
+                if dados_cliente:
+                    nome_cliente = dados_cliente.get('nome', '')
+                    # Remover porcentagem e números (ex: "70%", "- 70%")
+                    if '%' in nome_cliente:
+                        nome_cliente = nome_cliente.split('%')[0].strip()
+                    # Remover números finais (ex: "70", "80")
+                    import re
+                    nome_cliente = re.sub(r'\s*-?\s*\d+\s*$', '', nome_cliente).strip()
+
+                    logger.info(f"👤 Nome do cliente (banco): {nome_cliente}")
+                else:
+                    logger.warning(f"⚠️ Cliente não encontrado no banco de dados")
+
+            # Extrair mês do boleto da página (da tabela) - SEMPRE DA ÚLTIMA LINHA
+            info_boleto = await self.page.evaluate("""
+                () => {
+                    // Extrair mês da data de vencimento da ÚLTIMA linha da tabela
+                    let mesBoleto = '';
+
+                    // Mapeamento de números de mês para nomes
+                    const mesesNomes = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
+                                       'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+
+                    // Procurar na tabela de boletos
+                    const tabela = document.querySelector('table[id*="grdBoleto_Avulso"]');
+                    if (tabela) {
+                        const linhas = tabela.querySelectorAll('tr');
+
+                        // Pegar a ÚLTIMA linha que contém dados (não o cabeçalho)
+                        if (linhas.length >= 2) {
+                            const ultimaLinha = linhas[linhas.length - 1];
+                            const celulas = ultimaLinha.querySelectorAll('td');
+
+                            // Procurar por célula que contenha data no formato DD/MM/AAAA
+                            for (const celula of celulas) {
+                                const texto = celula.textContent.trim();
+
+                                // Regex para encontrar data DD/MM/AAAA ou DD/MM/AA
+                                const regexData = /(\d{1,2})\/(\d{1,2})\/(\d{2,4})/;
+                                const match = texto.match(regexData);
+
+                                if (match) {
+                                    // match[2] contém o mês (MM)
+                                    const mesNumero = parseInt(match[2], 10);
+
+                                    // Converter número do mês para nome (1=JANEIRO, 12=DEZEMBRO)
+                                    if (mesNumero >= 1 && mesNumero <= 12) {
+                                        mesBoleto = mesesNomes[mesNumero - 1];
+                                        console.log(`✅ Data encontrada: ${texto}, Mês extraído: ${mesBoleto}`);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    return {
+                        mes: mesBoleto
+                    };
+                }
+            """)
+
+            mes_boleto = info_boleto.get('mes', '').strip()
+
+            # Se não encontrou mês na página, usar mês atual
+            if not mes_boleto:
+                mes_atual = datetime.now().month
+                mes_boleto = obter_nome_mes(mes_atual)
+                logger.warning(f"⚠️ Mês não encontrado na página, usando mês atual: {mes_boleto}")
+            else:
+                logger.info(f"📅 Mês do boleto (página): {mes_boleto}")
+
+            # Se nome_arquivo não foi fornecido, gerar automaticamente
+            if not nome_arquivo:
+                if nome_cliente and mes_boleto:
+                    # Limpar nome do cliente (remover caracteres especiais)
+                    nome_limpo = ''.join(c if c.isalnum() or c in ' -_' else '' for c in nome_cliente)
+                    nome_limpo = nome_limpo.replace(' ', '_')
+
+                    nome_arquivo = f"{nome_limpo}_{mes_boleto}.pdf"
+                    logger.info(f"📝 Nome do arquivo gerado: {nome_arquivo}")
+                else:
+                    # Fallback para nome padrão (datetime já importado no topo)
+                    nome_arquivo = f"boleto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                    logger.warning(f"⚠️ Usando nome padrão: {nome_arquivo}")
+
+            # 1. AGUARDAR e clicar nos checkboxes dos boletos
+            checkbox_selector = self.config.SELECTORS['emissao']['checkbox_boleto']
+
+            logger.info(f"Aguardando checkboxes aparecerem: {checkbox_selector}")
+
+            try:
+                # Aguardar o primeiro checkbox aparecer (timeout 10s)
+                await self.page.wait_for_selector(checkbox_selector, timeout=10000)
+                logger.info("✅ Checkboxes detectados na página!")
+            except Exception as e:
+                logger.error(f"❌ Timeout aguardando checkboxes: {e}")
+                await self.screenshot("timeout_checkboxes")
+                raise Exception("Checkboxes não apareceram na página")
+
+            # Aguardar mais 1 segundo para garantir que todos carregaram
+            await asyncio.sleep(1)
+
+            logger.info(f"Buscando checkboxes: {checkbox_selector}")
+            checkboxes = await self.page.query_selector_all(checkbox_selector)
+            logger.info(f"Encontrados {len(checkboxes)} checkbox(es)")
+
+            if len(checkboxes) > 0:
+                # SEMPRE selecionar a ÚLTIMA checkbox (última cobrança/parcela)
+                ultimo_indice = len(checkboxes) - 1
+                logger.info(f"✅ Selecionando ÚLTIMA checkbox (índice {ultimo_indice}) - última cobrança/parcela")
+
+                # Garantir que o checkbox está visível antes de clicar
+                await checkboxes[ultimo_indice].scroll_into_view_if_needed()
+                await asyncio.sleep(0.5)
+
+                await checkboxes[ultimo_indice].click()  # Índice -1 = último item
+                logger.info(f"✅ Checkbox da última cobrança clicado! (Total: {len(checkboxes)} parcelas)")
+                await asyncio.sleep(1)
+                await self.screenshot("checkbox_selecionado")
+            else:
+                logger.error("❌ Nenhum checkbox encontrado!")
+                await self.screenshot("sem_checkboxes")
+                raise Exception("Nenhum checkbox de boleto encontrado na página")
+
+            # 2. Configurar interceptação de resposta de rede ANTES de clicar
+            logger.info("Configurando interceptação de PDF...")
+
+            pdf_bytes_interceptado = None
+            pdf_url_interceptado = None
+
+            # Ampliar escopo de interceptação para pegar TODAS as requisições
+            todas_respostas_pdf = []
+
+            async def interceptar_pdf(response):
+                nonlocal pdf_bytes_interceptado, pdf_url_interceptado, todas_respostas_pdf
+
+                # Verificar se é uma resposta de PDF
+                try:
+                    content_type = response.headers.get('content-type', '').lower()
+                    url = response.url
+
+                    # Log TODAS as respostas potenciais para debug
+                    if ('pdf' in content_type or
+                        'octet-stream' in content_type or
+                        'frmConCmImpressao' in url or
+                        url.endswith('.pdf') or
+                        '.pdf?' in url):
+
+                        logger.info(f"📥 Interceptando resposta: {url[:70]}...")
+                        logger.info(f"   Content-Type: {content_type}")
+
+                        body = await response.body()
+                        tamanho = len(body)
+                        logger.info(f"📦 Corpo recebido: {tamanho} bytes")
+
+                        # Armazenar TODAS as respostas para análise posterior
+                        todas_respostas_pdf.append({
+                            'url': url,
+                            'content_type': content_type,
+                            'body': body,
+                            'tamanho': tamanho
+                        })
+
+                        # Verificar se é um PDF REAL (começa com %PDF)
+                        is_real_pdf = body.startswith(b'%PDF')
+                        if is_real_pdf:
+                            logger.info(f"✅ PDF REAL detectado! (começa com %PDF)")
+                        else:
+                            # NÃO é PDF real - logar conteúdo
+                            preview = body[:300].decode('latin-1', errors='ignore')
+                            logger.warning(f"⚠️ NÃO é PDF real! Preview: {preview}")
+
+                        # Só capturar se for um PDF REAL com header correto
+                        if is_real_pdf and (pdf_bytes_interceptado is None or tamanho > len(pdf_bytes_interceptado)):
+                            pdf_bytes_interceptado = body
+                            pdf_url_interceptado = url
+                            logger.info(f"🎯 PDF CAPTURADO: {tamanho} bytes de {url[:50]}...")
+
+                except Exception as e:
+                    logger.debug(f"Erro ao interceptar resposta: {e}")
+
+            # Preparar nome do arquivo
+            if not nome_arquivo:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                nome_arquivo = f"boleto_{timestamp}.pdf"
+
+            caminho_final = destino / nome_arquivo
+
+            # Registrar handler de resposta no CONTEXTO (para capturar em todas as abas)
+            self.context.on('response', interceptar_pdf)
+
+            try:
+                # 3. Aguardar e clicar no botão Emitir
+                botao_emitir = self.config.SELECTORS['emissao']['botao_emitir']
+                logger.info(f"Aguardando botão 'Emitir Cobrança': {botao_emitir}")
+
+                try:
+                    # Aguardar botão aparecer (timeout 5s)
+                    await self.page.wait_for_selector(botao_emitir, timeout=5000)
+                    logger.info("✅ Botão detectado!")
+                except Exception as e:
+                    logger.error(f"❌ Timeout aguardando botão: {e}")
+                    await self.screenshot("timeout_botao")
+                    raise Exception(f"Botão não encontrado: {botao_emitir}")
+
+                # Garantir que está visível
+                botao = await self.page.query_selector(botao_emitir)
+                await botao.scroll_into_view_if_needed()
+                await asyncio.sleep(0.5)
+
+                is_visible = await botao.is_visible()
+                logger.info(f"Botão visível: {is_visible}")
+
+                # Configurar listener de download ANTES de clicar
+                download_capturado = None
+
+                async def capturar_download(download):
+                    nonlocal download_capturado
+                    download_capturado = download
+                    logger.info(f"📥 Download detectado: {download.suggested_filename}")
+
+                self.page.on('download', capturar_download)
+
+                # 4. ESTRATÉGIA: Capturar aba popup e usar diretamente
+                logger.info("Clicando em 'Emitir Cobrança'...")
+                await self.screenshot("antes_emitir")
+
+                # Capturar a nova aba que será aberta
+                nova_aba_pdf = None
+
+                async def capturar_nova_aba(page):
+                    nonlocal nova_aba_pdf
+                    nova_aba_pdf = page
+                    logger.info(f"📄 Nova aba detectada: {page.url}")
+
+                    # Capturar logs do console JavaScript
+                    page.on('console', lambda msg: logger.info(f"[CONSOLE] {msg.text}"))
+
+                    # IMPORTANTE: Injetar script para PREVENIR fechamento automático da aba
+                    # Sobrescrever window.close() para evitar que o site feche a aba
+                    try:
+                        await page.add_init_script("""
+                            window.close = function() {
+                                console.log('[BLOQUEADO] Tentativa de fechar aba bloqueada!');
+                            };
+                        """)
+                        logger.info("🔒 Script de prevenção de fechamento injetado")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro ao injetar script: {e}")
+
+                self.context.on('page', capturar_nova_aba)
+
+                # Clicar no botão
+                await self.page.click(botao_emitir)
+                logger.info("✅ Clique executado")
+
+                # Aguardar nova aba ser capturada (até 3 segundos)
+                contador = 0
+                while not nova_aba_pdf and contador < 30:  # 3 segundos
+                    await asyncio.sleep(0.1)
+                    contador += 1
+
+                # Remover listener
+                self.context.remove_listener('page', capturar_nova_aba)
+
+                if not nova_aba_pdf:
+                    logger.error("❌ Nova aba com PDF não abriu")
+                    raise Exception("Nova aba com PDF não abriu")
+
+                logger.info(f"✅ Nova aba capturada: {nova_aba_pdf.url[:80] if nova_aba_pdf.url else 'carregando...'}")
+
+                # ESTRATÉGIA: Aguardar o interceptador capturar o PDF real
+                # O site faz uma segunda request com o PDF depois do HTML
+                nova_aba_controlada = nova_aba_pdf
+
+                try:
+                    pdf_bytes = None
+
+                    # Aguardar até 10 segundos pelo interceptador pegar o PDF real
+                    logger.info("⏳ Aguardando interceptador capturar PDF real (até 10s)...")
+                    for tentativa in range(100):  # 100 x 100ms = 10 segundos
+                        if pdf_bytes_interceptado and len(pdf_bytes_interceptado) > 10000:
+                            pdf_bytes = pdf_bytes_interceptado
+                            logger.info(f"✅ PDF INTERCEPTADO: {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
+                            logger.info(f"   URL: {pdf_url_interceptado[:80] if pdf_url_interceptado else 'N/A'}")
+                            break
+                        await asyncio.sleep(0.1)
+
+                    # Se não foi interceptado, tentar JavaScript (se a aba ainda estiver aberta)
+                    if not pdf_bytes:
+                        # Verificar se temos alguma URL interceptada (mesmo que não seja o PDF completo)
+                        if todas_respostas_pdf and len(todas_respostas_pdf) > 0:
+                            # Pegar a URL da última response interceptada
+                            ultima_url = todas_respostas_pdf[-1]['url']
+                            logger.info(f"🔗 Abrindo PDF em nova aba controlada: {ultima_url[:80]}...")
+
+                            # Abrir a URL em uma NOVA aba que CONTROLAMOS (não vai fechar sozinha)
+                            nova_aba_nossa = await self.context.new_page()
+
+                            try:
+                                await nova_aba_nossa.goto(ultima_url, timeout=15000, wait_until='networkidle')
+                                logger.info("✅ PDF carregado em nossa aba")
+
+                                # Aguardar mais um pouco para garantir que o PDF carregou
+                                await asyncio.sleep(2)
+
+                                # Tentar extrair via JavaScript desta aba
+                                nova_aba_controlada = nova_aba_nossa
+
+                            except Exception as e:
+                                logger.error(f"❌ Erro ao navegar para URL do PDF: {e}")
+                                await nova_aba_nossa.close()
+                                raise
+
+                        logger.warning("⚠️ Tentando extrair via JavaScript...")
+
+                        try:
+                            nova_aba_controlada.set_default_timeout(15000)  # 15 segundos
+                            pdf_data = await nova_aba_controlada.evaluate("""
+                                async () => {
+                                    console.log('[JS] Iniciando extração do PDF...');
+
+                                    // Procurar embed tag
+                                    const embed = document.querySelector('embed[type="application/pdf"]');
+
+                                    if (!embed) {
+                                        console.log('[JS] ❌ Embed não encontrado no DOM');
+                                        return {success: false, error: 'Embed não encontrado'};
+                                    }
+
+                                    console.log('[JS] ✅ Embed encontrado, aguardando URL carregar...');
+
+                                    // AGUARDAR ATIVAMENTE até o embed ter URL válida (não about:blank)
+                                    // Tenta por até 20 segundos (mais tempo)
+                                    let pdfUrl = null;
+                                    for (let i = 0; i < 67; i++) {  // 67 x 300ms = 20 segundos
+                                        const src = embed.src;
+                                        if (src && src !== 'about:blank' && src.includes('frmConCmImpressao')) {
+                                            pdfUrl = src;
+                                            console.log(`[JS] ✅ PDF URL encontrada na tentativa ${i+1}: ${pdfUrl.substring(0, 80)}`);
+                                            break;
+                                        }
+                                        if (i % 10 === 0) {  // Log a cada 3 segundos
+                                            console.log(`[JS] Tentativa ${i+1}/67: src ainda é "${src}"`);
+                                        }
+                                        await new Promise(r => setTimeout(r, 300));
+                                    }
+
+                                    // Se ainda não tem URL válida, usar window.location
+                                    if (!pdfUrl || pdfUrl === 'about:blank') {
+                                        pdfUrl = window.location.href;
+                                        console.log('[JS] ⚠️ Usando window.location:', pdfUrl);
+                                    }
+
+                                    console.log('[JS] PDF URL final:', pdfUrl);
+
+                                    // Fazer fetch do PDF
+                                    try {
+                                        console.log('[JS] Fazendo fetch do PDF...');
+                                        const response = await fetch(pdfUrl);
+                                        console.log('[JS] Response recebida, status:', response.status);
+
+                                        const blob = await response.blob();
+                                        console.log('[JS] Blob criado, tamanho:', blob.size, 'bytes');
+
+                                        const buffer = await blob.arrayBuffer();
+                                        const bytes = Array.from(new Uint8Array(buffer));
+                                        console.log('[JS] ✅ PDF convertido para array:', bytes.length, 'bytes');
+
+                                        return {
+                                            success: true,
+                                            bytes: bytes,
+                                            size: bytes.length,
+                                            url: pdfUrl
+                                        };
+                                    } catch (e) {
+                                        console.log('[JS] ❌ Erro no fetch:', e.toString());
+                                        return {success: false, error: 'Erro no fetch: ' + e.toString()};
+                                    }
+                                }
+                            """)
+
+                            if pdf_data and pdf_data.get('success'):
+                                pdf_bytes = bytes(pdf_data['bytes'])
+                                logger.info(f"✅ PDF extraído do embed: {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
+                                logger.info(f"   URL do PDF: {pdf_data.get('url', 'N/A')[:80]}")
+                            else:
+                                erro = pdf_data.get('error', 'Desconhecido') if pdf_data else 'Sem resposta'
+                                logger.warning(f"⚠️ Falha ao extrair PDF do embed: {erro}")
+
+                        except Exception as e_extract:
+                            logger.warning(f"⚠️ Erro ao extrair PDF via JavaScript: {e_extract}")
+
+                    # Se não conseguiu extrair, usar page.pdf() como fallback
+                    if not pdf_bytes or len(pdf_bytes) < 10000:
+                        logger.warning("⚠️ PDF não extraído, usando page.pdf() como fallback...")
+                        pdf_bytes = await nova_aba_controlada.pdf(
+                            format='A4',
+                            print_background=True,
+                            prefer_css_page_size=True,
+                            margin={'top': '0mm', 'right': '0mm', 'bottom': '0mm', 'left': '0mm'}
+                        )
+                        logger.info(f"📄 PDF gerado via page.pdf(): {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
+
+                    # Salvar PDF
+                    with open(caminho_final, 'wb') as f:
+                        f.write(pdf_bytes)
+
+                    logger.info(f"💾 PDF salvo: {nome_arquivo}")
+
+                    # AGUARDAR 2 SEGUNDOS para você VER que o PDF foi salvo
+                    logger.info("✅ PDF salvo com sucesso! Aguardando 2 segundos...")
+                    await asyncio.sleep(2)
+
+                    # Fechar abas (pode ter 2: popup original + nossa aba)
+                    try:
+                        await nova_aba_controlada.close()
+                        logger.info("🔒 Aba do PDF fechada")
+                    except:
+                        pass
+
+                    # Fechar popup original se ainda estiver aberta
+                    try:
+                        if nova_aba_pdf and nova_aba_pdf != nova_aba_controlada:
+                            await nova_aba_pdf.close()
+                            logger.info("🔒 Aba popup original fechada")
+                    except:
+                        pass
+
+                    # IMPORTANTE: Voltar para a aba principal após fechar as abas
+                    await self.page.bring_to_front()
+                    logger.info("✅ Voltou para aba principal - Pronto para próximo CPF")
+
+                    # Remover listener
+                    try:
+                        self.page.remove_listener('download', capturar_download)
+                        self.context.remove_listener('response', interceptar_pdf)
+                    except:
+                        pass
+
+                    self.stats['downloads_sucesso'] += 1
+
+                    return {
+                        'arquivo_nome': nome_arquivo,
+                        'arquivo_caminho': str(caminho_final),
+                        'arquivo_tamanho': len(pdf_bytes),
+                        'pdf_url': url_pdf_capturada,
+                        'data_download': datetime.now(),
+                        'sucesso': True,
+                    }
+
+                except Exception as e_pdf:
+                    logger.error(f"❌ Erro ao gerar PDF da aba controlada: {e_pdf}")
+                    # Fechar todas as abas
+                    try:
+                        await nova_aba_controlada.close()
+                    except:
+                        pass
+                    try:
+                        if nova_aba_pdf and nova_aba_pdf != nova_aba_controlada:
+                            await nova_aba_pdf.close()
+                    except:
+                        pass
+                    # Voltar para aba principal mesmo com erro
+                    try:
+                        await self.page.bring_to_front()
+                        logger.info("✅ Voltou para aba principal (após erro)")
+                    except:
+                        pass
+                    raise
+
+            except PlaywrightTimeoutError as e:
+                logger.error(f"❌ Timeout ao baixar boleto: {e}")
+                self.stats['downloads_erro'] += 1
+                await self.screenshot("timeout_boleto")
+                return None
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao baixar boleto: {e}")
+            self.stats['downloads_erro'] += 1
+            await self.screenshot("erro_boleto")
+            return None
+
+    async def _extrair_dados_boleto(self) -> Dict[str, Any]:
+        """Extrai dados do boleto da página"""
+        dados = {
+            'numero_boleto': None,
+            'valor': None,
+            'vencimento': None,
+        }
+
+        try:
+            # Número do boleto
+            # PLACEHOLDER: Ajustar seletor
+            num_selector = self.config.SELECTORS['emissao']['numero_boleto']
+            num_element = await self.page.query_selector(num_selector)
+            if num_element:
+                dados['numero_boleto'] = (await num_element.text_content()).strip()
+
+            # Valor
+            # PLACEHOLDER: Ajustar seletor
+            valor_selector = self.config.SELECTORS['emissao']['valor_boleto']
+            valor_element = await self.page.query_selector(valor_selector)
+            if valor_element:
+                dados['valor'] = (await valor_element.text_content()).strip()
+
+            # Vencimento
+            # PLACEHOLDER: Ajustar seletor
+            venc_selector = self.config.SELECTORS['emissao']['data_vencimento']
+            venc_element = await self.page.query_selector(venc_selector)
+            if venc_element:
+                dados['vencimento'] = (await venc_element.text_content()).strip()
+
+        except Exception as e:
+            logger.debug(f"Erro ao extrair dados do boleto: {e}")
+
+        return dados
+
+    # ========================================================================
+    # MÉTODO PRINCIPAL - PROCESSAMENTO COMPLETO
+    # ========================================================================
+
+    async def processar_cliente_completo(
+        self,
+        cpf: str,
+        mes: str,
+        ano: int,
+        destino: Path,
+        nome_arquivo: str = None
+    ) -> Dict[str, Any]:
+        """
+        Processa um cliente completo: busca + emissão + download
+
+        Args:
+            cpf: CPF do cliente
+            mes: Mês do boleto
+            ano: Ano do boleto
+            destino: Diretório de destino
+            nome_arquivo: Nome do arquivo (opcional)
+
+        Returns:
+            Dicionário com resultado do processamento
+        """
+        cpf_limpo = self.config.limpar_cpf(cpf)
+        inicio = datetime.now()
+
+        resultado = {
+            'cpf': cpf_limpo,
+            'cpf_formatado': self.config.formatar_cpf(cpf_limpo),
+            'mes': mes,
+            'ano': ano,
+            'status': None,
+            'mensagem': None,
+            'dados_cliente': None,
+            'dados_boleto': None,
+            'tempo_execucao_segundos': 0,
+        }
+
+        # Log de início claro
+        logger.info("")
+        logger.info("╔" + "═" * 78 + "╗")
+        logger.info(f"║ 🎯 INICIANDO PROCESSAMENTO - CPF: {self.config.formatar_cpf(cpf_limpo)}")
+        logger.info("╚" + "═" * 78 + "╝")
+
+        try:
+            # 1. Buscar cliente
+            cliente = await self.buscar_cliente_cpf(cpf)
+
+            if not cliente:
+                resultado['status'] = self.config.Status.CPF_NAO_ENCONTRADO
+                resultado['mensagem'] = 'Cliente não encontrado no sistema'
+                return resultado
+
+            resultado['dados_cliente'] = cliente
+
+            # 2. Navegar para emissão
+            if not await self.navegar_emissao_cobranca():
+                resultado['status'] = self.config.Status.ERRO_NAVEGACAO
+                resultado['mensagem'] = 'Erro ao navegar para emissão'
+                return resultado
+
+            # 3. Selecionar parcela (DESABILITADO - sistema seleciona automaticamente)
+            # if not await self.selecionar_parcela(mes, ano):
+            #     resultado['status'] = self.config.Status.SEM_BOLETO
+            #     resultado['mensagem'] = 'Erro ao selecionar parcela'
+            #     return resultado
+
+            # 4. Emitir e baixar boleto
+            boleto = await self.emitir_baixar_boleto(destino, nome_arquivo, cpf=cpf)
+
+            if not boleto:
+                resultado['status'] = self.config.Status.SEM_BOLETO
+                resultado['mensagem'] = 'Boleto não disponível ou erro ao baixar'
+                return resultado
+
+            # Sucesso!
+            resultado['status'] = self.config.Status.SUCESSO
+            resultado['mensagem'] = 'Boleto baixado com sucesso'
+            resultado['dados_boleto'] = boleto
+
+            # Log de sucesso visual
+            logger.info("")
+            logger.info("╔" + "═" * 78 + "╗")
+            logger.info(f"║ ✅ BOLETO BAIXADO COM SUCESSO!")
+            logger.info(f"║ 📁 Arquivo: {boleto.get('arquivo_nome', 'N/A')}")
+            logger.info(f"║ 📊 Tamanho: {boleto.get('arquivo_tamanho', 0) / 1024:.1f} KB")
+            logger.info("╚" + "═" * 78 + "╝")
+            logger.info("")
+
+        except PlaywrightTimeoutError as e:
+            resultado['status'] = self.config.Status.TIMEOUT
+            resultado['mensagem'] = f'Timeout: {str(e)}'
+            await self.screenshot(f"timeout_{cpf_limpo}")
+
+        except Exception as e:
+            resultado['status'] = self.config.Status.ERRO
+            resultado['mensagem'] = f'Erro: {str(e)}'
+            await self.screenshot(f"erro_{cpf_limpo}")
+
+        finally:
+            # Calcular tempo de execução
+            fim = datetime.now()
+            resultado['tempo_execucao_segundos'] = (fim - inicio).total_seconds()
+
+        return resultado
+
+    # ========================================================================
+    # MÉTODOS AUXILIARES
+    # ========================================================================
+
+    async def _delay_humanizado(self, minimo: float = None, maximo: float = None):
+        """
+        Adiciona delay aleatório para parecer mais humano
+
+        Args:
+            minimo: Delay mínimo em segundos
+            maximo: Delay máximo em segundos
+        """
+        min_delay = minimo or self.config.DELAYS['minimo_humanizado']
+        max_delay = maximo or self.config.DELAYS['maximo_humanizado']
+
+        delay = random.uniform(min_delay, max_delay)
+        await asyncio.sleep(delay)
+
+    def log_estatisticas(self):
+        """Loga estatísticas da sessão"""
+        logger.info("\n" + "=" * 80)
+        logger.info("ESTATÍSTICAS DA SESSÃO")
+        logger.info("=" * 80)
+        logger.info(f"✅ Downloads sucesso: {self.stats['downloads_sucesso']}")
+        logger.info(f"❌ Downloads erro: {self.stats['downloads_erro']}")
+        logger.info(f"⚠️ CPF não encontrado: {self.stats['cpf_nao_encontrado']}")
+        logger.info(f"📄 Sem boleto: {self.stats['sem_boleto']}")
+
+        if self.stats['inicio_sessao'] and self.stats['fim_sessao']:
+            duracao = self.stats['fim_sessao'] - self.stats['inicio_sessao']
+            logger.info(f"⏱️ Duração da sessão: {duracao}")
+
+        logger.info("=" * 80 + "\n")
+
+    # ========================================================================
+    # CONTEXT MANAGER
+    # ========================================================================
+
+    async def __aenter__(self):
+        """Async context manager - entrada"""
+        await self.iniciar_navegador()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager - saída"""
+        self.log_estatisticas()
+        await self.fechar_navegador()
+
+
+# ============================================================================
+# EXEMPLO DE USO
+# ============================================================================
+
+async def exemplo_uso():
+    """Exemplo de como usar a automação"""
+    print("=" * 80)
+    print("EXEMPLO DE USO - AUTOMAÇÃO CANOPUS")
+    print("=" * 80)
+
+    # Usar context manager
+    async with CanopusAutomation(headless=False) as bot:
+        # Fazer login
+        login_ok = await bot.login(
+            codigo_empresa='0101',
+            ponto_venda='17.308',
+            usuario='SEU_USUARIO',  # AJUSTAR
+            senha='SUA_SENHA'  # AJUSTAR
+        )
+
+        if not login_ok:
+            print("❌ Falha no login")
+            return
+
+        # Processar um cliente
+        resultado = await bot.processar_cliente_completo(
+            cpf='12345678901',  # AJUSTAR
+            mes='DEZEMBRO',
+            ano=2024,
+            destino=CanopusConfig.DOWNLOADS_DIR,
+            nome_arquivo='teste_boleto.pdf'
+        )
+
+        print(f"\nResultado: {resultado['status']}")
+        print(f"Mensagem: {resultado['mensagem']}")
+
+
+if __name__ == "__main__":
+    print("\n⚠️ LEMBRE-SE:")
+    print("1. Ajustar seletores CSS em config.py conforme sistema real")
+    print("2. Configurar credenciais de teste")
+    print("3. Executar com headless=False para debug inicial\n")
+
+    # Descomentar para executar exemplo
+    # asyncio.run(exemplo_uso())
+
+    print("✅ Módulo carregado. Use asyncio.run() para executar.")

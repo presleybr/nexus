@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disparos - Nexus CRM</title>
+    <!-- VERSÃO ATUALIZADA: 2025-11-28 00:25 - DEBUG NÚMEROS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Nexus Design System -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/crm-cliente.css">
+
+    <style>
+        /* Estilos específicos da página de Disparos */
+        .card-automacao {
+            margin-bottom: 2rem;
+            border-left: 4px solid var(--cor-destaque, #39FF14);
+            background: var(--cor-fundo-card, #1a1a1a);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card-automacao:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(57, 255, 20, 0.1);
+        }
+
+        .card-automacao .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .card-automacao .card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .card-automacao .card-icon {
+            font-size: 1.5rem;
+        }
+
+        /* Grid para cards grandes (3 colunas) */
+        .cards-principais-grid {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 1.5rem !important;
+            margin-bottom: 2rem !important;
+        }
+
+        .cards-principais-grid .card-automacao {
+            margin-bottom: 0 !important;
+            height: 100% !important;
+        }
+
+        @media (max-width: 1200px) {
+            .cards-principais-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .config-item label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--cor-texto-primario, #fff);
+            font-size: 0.95rem;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        #diaDoMes {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--cor-borda, #333);
+            border-radius: 8px;
+            background: var(--cor-fundo-hover, #2a2a2a);
+            color: var(--cor-texto-primario, #fff);
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        #diaDoMes:hover {
+            border-color: var(--cor-destaque, #39FF14);
+        }
+
+        #diaDoMes:focus {
+            outline: none;
+            border-color: var(--cor-destaque, #39FF14);
+        }
+
+        .badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #10b98120;
+            color: #10b981;
+            border: 1px solid #10b981;
+        }
+
+        .badge-error {
+            background: #ef444420;
+            color: #ef4444;
+            border: 1px solid #ef4444;
+        }
+
+        .proximo-disparo {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: var(--cor-fundo-hover, #2a2a2a);
+            border-radius: 8px;
+            border-left: 3px solid var(--cor-destaque, #39FF14);
+        }
+
+        .proximo-disparo strong {
+            color: var(--cor-destaque, #39FF14);
+        }
+
+        .test-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--cor-borda, #333);
+        }
+
+        /* Ajustes para botões na página */
+        .btn, .btn-primary, .btn-secondary {
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        /* Grid compacto para cards de ação */
+        .cards-grid {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+            gap: 1.5rem !important;
+            margin-top: 2rem !important;
+        }
+
+        /* Cards de ações - mais compactos */
+        .cards-grid .card {
+            padding: 1.5rem !important;
+            min-height: 200px !important;
+            max-height: 240px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+        }
+
+        .cards-grid .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .cards-grid .card p {
+            flex-grow: 1;
+            margin: 0.75rem 0 1rem 0;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .cards-grid .card .btn-primary,
+        .cards-grid .card .btn-secondary {
+            width: 100%;
+            margin-top: auto;
+            padding: 0.75rem;
+            margin-bottom: 0;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .card-icon {
+            font-size: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Botões minimalistas para números de notificação */
+        .numero-btn {
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            border: 1px solid #333;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .numero-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--cor-destaque, #39FF14);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(57, 255, 20, 0.15);
+        }
+
+        .numero-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 4px rgba(57, 255, 20, 0.1);
+        }
+
+        .numero-btn-editar:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+        }
+
+        .numero-btn-deletar:hover {
+            border-color: #ef4444;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="crm-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="/static/images/nexus_Logotipo.png" alt="Nexus" style="height: 80px; margin-bottom: 15px;">
+            </div>
+            <nav>
+                <ul class="sidebar-menu">
+                    <li class="menu-item">
+                        <a href="/crm/dashboard" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/cadastro-clientes" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Clientes
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/whatsapp" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                            </svg>
+                            WhatsApp
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/disparos" class="menu-link active">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            Disparos
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/automacao-canopus" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                            </svg>
+                            Automação Canopus
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/monitoramento" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            Monitoramento
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/graficos" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="12" y1="20" x2="12" y2="10"></line>
+                                <line x1="18" y1="20" x2="18" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="16"></line>
+                            </svg>
+                            Gráficos
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <button class="logout-btn" onclick="logout()">
+                <svg style="width: 18px; height: 18px; vertical-align: middle; margin-right: 8px;" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Sair
+            </button>
+        </aside>
+
+        <main class="main-content">
+            <header class="content-header"><h1>Disparos Automáticos</h1><p class="breadcrumb">Envio de boletos via WhatsApp</p></header>
+
+            <div class="cards-principais-grid">
+                <!-- Seção de Agendamento Mensal -->
+                <div class="card card-automacao">
+                <div class="card-header">
+                    <span class="card-title">📅 Agendamento Mensal Automático</span>
+                    <span class="card-icon">⏰</span>
+                </div>
+                <p style="color: var(--cor-texto-secundario, #888); margin: 0 0 1rem 0; line-height: 1.6; font-size: 0.9rem;">
+                    Configure o disparo automático mensal entre <strong style="color: #39FF14;">08:00-18:00</strong> (MS)
+                </p>
+
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label>Status da Automação</label>
+                        <div class="toggle-container">
+                            <button id="toggleAutomacao" onclick="toggleAutomacao()">
+                                <span id="statusText">Carregando...</span>
+                            </button>
+                            <span id="statusBadge" class="badge"></span>
+                        </div>
+                    </div>
+
+                    <div class="config-item">
+                        <label>Dia do Mês para Disparo</label>
+                        <select id="diaDoMes" onchange="salvarDiaDoMes()">
+                            <!-- Options serão preenchidas via JavaScript -->
+                        </select>
+                        <small style="display: block; margin-top: 0.5rem; color: var(--cor-texto-secundario, #888);">
+                            ⏰ Horário: 08:00 - 18:00 (MS)
+                        </small>
+                    </div>
+                </div>
+
+                <div id="proximoDisparo" class="proximo-disparo" style="display: none;">
+                    <strong>📌 Próximo disparo:</strong> <span id="dataProximoDisparo"></span>
+                </div>
+
+                <div class="test-section">
+                    <button class="btn-secondary" onclick="testarAutomacaoAgora()">
+                        🧪 Testar Agora
+                    </button>
+                    <small style="display: block; margin-top: 0.75rem; color: var(--cor-texto-secundario, #888);">
+                        <strong>Modo Teste:</strong> Envia boletos REAIS para TODOS os clientes com boletos pendentes
+                    </small>
+
+                    <button class="btn-primary" onclick="ativarDisparoAutomatico()" style="margin-top: 1rem;">
+                        🚀 Ativar Disparo Completo
+                    </button>
+                    <small style="display: block; margin-top: 0.75rem; color: var(--cor-texto-secundario, #888);">
+                        <strong>Disparo Completo:</strong> Ativa o envio automático de boletos com mensagens personalizadas em sequência
+                    </small>
+                </div>
+            </div>
+
+                <!-- Seção de Números de Notificação -->
+                <div class="card card-automacao">
+                <div class="card-header">
+                    <span class="card-title">📱 Números que Recebem Notificações</span>
+                    <span class="card-icon">💬</span>
+                </div>
+                <p style="color: var(--cor-texto-secundario, #888); margin: 0 0 1rem 0; line-height: 1.6; font-size: 0.9rem;">
+                    Gerencie os números que receberão notificações sobre disparos
+                </p>
+
+                <div id="listaNumeros" style="margin-top: 1.5rem;">
+                    <div style="color: var(--cor-texto-secundario, #888);">Carregando números...</div>
+                </div>
+
+                <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--cor-borda, #333);">
+                    <h4 style="color: var(--cor-destaque, #39FF14); margin-bottom: 1rem;">➕ Adicionar Novo Número</h4>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label>Nome/Descrição</label>
+                            <input type="text" id="novoNumeroNome" placeholder="Ex: João - Gerente" style="width: 100%; padding: 0.75rem; border: 2px solid var(--cor-borda, #333); border-radius: 8px; background: var(--cor-fundo-hover, #2a2a2a); color: var(--cor-texto-primario, #fff); font-size: 0.95rem;">
+                        </div>
+                        <div class="config-item">
+                            <label>Número WhatsApp</label>
+                            <input type="text" id="novoNumeroWhatsapp" placeholder="Ex: 5567999999999" style="width: 100%; padding: 0.75rem; border: 2px solid var(--cor-borda, #333); border-radius: 8px; background: var(--cor-fundo-hover, #2a2a2a); color: var(--cor-texto-primario, #fff); font-size: 0.95rem;">
+                            <small style="display: block; margin-top: 0.5rem; color: var(--cor-texto-secundario, #888);">
+                                Formato: 55 + DDD + número (sem espaços)
+                            </small>
+                        </div>
+                    </div>
+                    <button class="btn-primary" onclick="adicionarNumero()" style="margin-top: 1rem;">
+                        ➕ Adicionar Número
+                    </button>
+                </div>
+            </div>
+
+            </div><!-- Fecha cards-principais-grid -->
+
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Automação Completa</span><span class="card-icon">🤖</span></div>
+                    <p style="color: var(--cor-texto-secundario);">Gera e envia boletos para todos os clientes</p>
+                    <button class="btn-primary" onclick="executarAutomacaoCompleta()">Iniciar Automação</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Gerar Boletos</span><span class="card-icon">📄</span></div>
+                    <p style="color: var(--cor-texto-secundario);">Gera boletos sem enviar via WhatsApp</p>
+                    <button class="btn-primary" onclick="apenasGerarBoletos()">Gerar Boletos</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Boleto Modelo</span><span class="card-icon">📋</span></div>
+                    <p style="color: var(--cor-texto-secundario);">Envia modelo-boleto.pdf para todos os clientes</p>
+                    <button class="btn-secondary" onclick="enviarBoletoModelo()">Enviar Modelo</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <h3 style="margin-bottom: 1rem; color: var(--cor-destaque);">📊 Histórico de Automações</h3>
+                <div id="historico" class="loading">Carregando...</div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let configuracaoAutomacao = null;
+
+        // Carrega configurações ao iniciar
+        async function carregarConfiguracoes() {
+            try {
+                const response = await fetch('/api/crm/configuracoes-automacao');
+                const data = await response.json();
+
+                if (data.success && data.configuracao) {
+                    configuracaoAutomacao = data.configuracao;
+                    atualizarInterfaceAutomacao();
+                }
+            } catch (error) {
+                console.error('Erro ao carregar configurações:', error);
+            }
+        }
+
+        function atualizarInterfaceAutomacao() {
+            if (!configuracaoAutomacao) return;
+
+            const habilitado = configuracaoAutomacao.disparo_automatico_habilitado;
+            const diaDoMes = configuracaoAutomacao.dia_do_mes || 1;
+
+            // Atualiza botão de toggle
+            const btn = document.getElementById('toggleAutomacao');
+            const statusText = document.getElementById('statusText');
+            const statusBadge = document.getElementById('statusBadge');
+
+            if (habilitado) {
+                btn.className = 'btn-primary';
+                statusText.textContent = 'Desativar';
+                statusBadge.textContent = 'Ativado';
+                statusBadge.className = 'badge badge-success';
+            } else {
+                btn.className = 'btn-danger';
+                statusText.textContent = 'Ativar';
+                statusBadge.textContent = 'Desativado';
+                statusBadge.className = 'badge badge-error';
+            }
+
+            // Preenche select de dias
+            const select = document.getElementById('diaDoMes');
+            if (select.options.length === 0) {
+                for (let i = 1; i <= 31; i++) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = `Dia ${i}`;
+                    select.appendChild(option);
+                }
+            }
+            select.value = diaDoMes;
+
+            // Calcula próximo disparo
+            if (habilitado) {
+                const hoje = new Date();
+                const mesAtual = hoje.getMonth();
+                const anoAtual = hoje.getFullYear();
+                let proximaData;
+
+                if (hoje.getDate() < diaDoMes) {
+                    // Ainda não passou o dia neste mês
+                    proximaData = new Date(anoAtual, mesAtual, diaDoMes);
+                } else {
+                    // Já passou, será no próximo mês
+                    proximaData = new Date(anoAtual, mesAtual + 1, diaDoMes);
+                }
+
+                document.getElementById('dataProximoDisparo').textContent =
+                    proximaData.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) +
+                    ' entre 08:00 e 18:00';
+                document.getElementById('proximoDisparo').style.display = 'block';
+            } else {
+                document.getElementById('proximoDisparo').style.display = 'none';
+            }
+        }
+
+        async function toggleAutomacao() {
+            if (!configuracaoAutomacao) return;
+
+            const novoStatus = !configuracaoAutomacao.disparo_automatico_habilitado;
+
+            const confirmacao = novoStatus
+                ? 'Tem certeza que deseja ATIVAR os disparos automáticos mensais?'
+                : 'Tem certeza que deseja DESATIVAR os disparos automáticos?';
+
+            if (!confirm(confirmacao)) return;
+
+            try {
+                const response = await fetch('/api/crm/configuracoes-automacao', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        disparo_automatico_habilitado: novoStatus
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    configuracaoAutomacao.disparo_automatico_habilitado = novoStatus;
+                    atualizarInterfaceAutomacao();
+                    alert(novoStatus ? 'Automação ATIVADA com sucesso!' : 'Automação DESATIVADA com sucesso!');
+                } else {
+                    alert('Erro ao atualizar: ' + (data.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao atualizar configuração');
+            }
+        }
+
+        async function salvarDiaDoMes() {
+            const diaDoMes = parseInt(document.getElementById('diaDoMes').value);
+
+            try {
+                const response = await fetch('/api/crm/configuracoes-automacao', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        dia_do_mes: diaDoMes
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    configuracaoAutomacao.dia_do_mes = diaDoMes;
+                    atualizarInterfaceAutomacao();
+                    alert('Dia do mês atualizado com sucesso!');
+                } else {
+                    alert('Erro ao atualizar: ' + (data.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao atualizar dia do mês');
+            }
+        }
+
+        async function testarAutomacaoAgora() {
+            if (!confirm('Isso enviará boletos REAIS para TODOS os clientes com boletos pendentes. Continuar?')) return;
+
+            const btn = event.target;
+            btn.disabled = true;
+            const textoOriginal = btn.textContent;
+            btn.textContent = 'Enviando boletos...';
+
+            try {
+                const response = await fetch('/api/crm/scheduler/executar-agora', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                // IMPORTANTE: Mostra detalhes completos no console
+                console.log('=== RESULTADO DO DISPARO ===');
+                console.log('Dados completos:', data);
+
+                if (data.success) {
+                    let mensagem = data.message;
+
+                    if (data.stats) {
+                        mensagem += `\n\nDetalhes:\n`;
+                        mensagem += `✅ Total: ${data.stats.total}\n`;
+                        mensagem += `✅ Enviados: ${data.stats.enviados}\n`;
+                        mensagem += `❌ Erros: ${data.stats.erros}\n`;
+                    }
+
+                    alert(mensagem);
+                    carregarHistorico();
+                } else {
+                    alert('Erro: ' + (data.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao executar disparo de automação');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = textoOriginal;
+            }
+        }
+
+        async function ativarDisparoAutomatico() {
+            if (!confirm('⚠️ ATENÇÃO!\n\nIsso ativará o disparo COMPLETO e automático de boletos!\n\nO sistema irá:\n✅ Enviar mensagens personalizadas\n✅ Enviar boletos em PDF\n✅ Processar TODOS os clientes com boletos pendentes\n✅ Seguir intervalo de segurança entre envios\n\nDeseja CONTINUAR?')) return;
+
+            const btn = event.target;
+            btn.disabled = true;
+            const textoOriginal = btn.textContent;
+            btn.textContent = '🚀 Disparando...';
+
+            try {
+                const response = await fetch('/api/crm/scheduler/ativar-disparo-completo', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                console.log('=== RESULTADO DO DISPARO COMPLETO ===');
+                console.log('Dados completos:', data);
+
+                if (data.success) {
+                    let mensagem = `✅ DISPARO COMPLETO ATIVADO!\n\n`;
+
+                    if (data.stats) {
+                        mensagem += `📊 Estatísticas:\n`;
+                        mensagem += `• Total processado: ${data.stats.total}\n`;
+                        mensagem += `• Enviados com sucesso: ${data.stats.enviados}\n`;
+                        mensagem += `• Erros: ${data.stats.erros}\n`;
+
+                        if (data.tempo_execucao) {
+                            mensagem += `• Tempo total: ${(data.tempo_execucao / 60).toFixed(1)} minutos\n`;
+                        }
+                    }
+
+                    alert(mensagem);
+                    carregarHistorico();
+                } else {
+                    alert('❌ Erro: ' + (data.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro ao ativar disparo automático');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = textoOriginal;
+            }
+        }
+
+        async function executarAutomacaoCompleta() {
+            if (!confirm('Isso irá gerar e enviar boletos para todos os clientes. Continuar?')) return;
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Processando...';
+
+            try {
+                const response = await fetch('/api/automation/executar-completa', {method: 'POST'});
+                const data = await response.json();
+
+                alert(`Automação concluída!\n\nClientes processados: ${data.clientes_processados}\nBoletos gerados: ${data.boletos_gerados}\nBoletos enviados: ${data.boletos_enviados}\nTempo total: ${data.tempo_total_segundos}s`);
+                carregarHistorico();
+            } catch (error) {
+                alert('Erro ao executar automação');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Iniciar Automação';
+            }
+        }
+
+        async function apenasGerarBoletos() {
+            if (!confirm('Gerar boletos para todos os clientes?')) return;
+
+            const response = await fetch('/api/automation/gerar-boletos', {method: 'POST'});
+            const data = await response.json();
+
+            alert(`${data.total_gerados} boletos gerados com sucesso!`);
+            carregarHistorico();
+        }
+
+        async function enviarBoletoModelo() {
+            // Solicitar mensagem personalizada (opcional)
+            const mensagem = prompt('Digite uma mensagem personalizada (ou deixe em branco para usar a padrão):');
+
+            if (mensagem === null) return; // Cancelou
+
+            if (!confirm('Isso enviará o boleto modelo (modelo-boleto.pdf) para TODOS os clientes ativos via WhatsApp. Continuar?')) return;
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Enviando...';
+
+            try {
+                const response = await fetch('/api/crm/boletos-modelo/enviar-massa', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        mensagem: mensagem || null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    let detalhes = `Boleto modelo enviado com sucesso!\n\n`;
+                    detalhes += `Total de clientes: ${data.total_clientes}\n`;
+                    detalhes += `Enviados com sucesso: ${data.total_enviados}\n`;
+                    detalhes += `Erros: ${data.total_erros}\n\n`;
+
+                    if (data.total_erros > 0) {
+                        detalhes += `Clientes com erro:\n`;
+                        data.resultados.filter(r => r.status === 'erro').forEach(r => {
+                            detalhes += `- ${r.nome}: ${r.erro}\n`;
+                        });
+                    }
+
+                    alert(detalhes);
+                } else {
+                    alert(`Erro ao enviar: ${data.erro || 'Erro desconhecido'}`);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao enviar boleto modelo');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Enviar Modelo';
+            }
+        }
+
+        async function carregarHistorico() {
+            const response = await fetch('/api/automation/historico');
+            const data = await response.json();
+
+            if (!data.historico || data.historico.length === 0) {
+                document.getElementById('historico').innerHTML = '<p>Nenhuma automação executada ainda</p>';
+                return;
+            }
+
+            let html = '<table class="table-nexus"><thead><tr><th>Data</th><th>Tipo</th><th>Processados</th><th>Boletos</th><th>Valor Total</th><th>Sucessos</th><th>Erros</th><th>Tempo</th></tr></thead><tbody>';
+
+            data.historico.forEach(h => {
+                const data_exec = new Date(h.data_execucao).toLocaleString('pt-BR');
+                const valorFormatado = (h.valor_total_boletos || 0).toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+
+                html += `<tr>
+                    <td>${data_exec}</td>
+                    <td>${h.tipo_automacao}</td>
+                    <td>${h.total_processados}</td>
+                    <td>
+                        <span class="badge badge-success">${h.total_boletos_processados || 0} boletos</span>
+                        ${h.boletos_enviados ? `<br><small style="color: #39FF14;">${h.boletos_enviados} enviados</small>` : ''}
+                    </td>
+                    <td><strong style="color: #39FF14;">R$ ${valorFormatado}</strong></td>
+                    <td><span class="badge badge-success">${h.total_sucessos}</span></td>
+                    <td><span class="badge badge-error">${h.total_erros}</span></td>
+                    <td>${h.tempo_execucao_segundos}s</td>
+                </tr>`;
+
+                // Se tiver últimos boletos, mostra em linha expandida
+                if (h.ultimos_boletos && h.ultimos_boletos.length > 0) {
+                    html += `<tr style="background: rgba(57, 255, 20, 0.05);">
+                        <td colspan="8" style="padding-left: 2rem;">
+                            <details>
+                                <summary style="cursor: pointer; color: #39FF14; font-weight: 600;">
+                                    📄 Ver últimos ${h.ultimos_boletos.length} boletos processados
+                                </summary>
+                                <div style="margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px;">
+                                    ${h.ultimos_boletos.map(b => `
+                                        <div style="margin-bottom: 0.5rem; padding: 0.5rem; border-left: 3px solid ${b.status_envio === 'enviado' ? '#39FF14' : '#888'};">
+                                            <strong>${b.cliente_nome}</strong> -
+                                            R$ ${(b.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})} -
+                                            Venc: ${new Date(b.vencimento).toLocaleDateString('pt-BR')} -
+                                            <span class="badge ${b.status_envio === 'enviado' ? 'badge-success' : 'badge-error'}">${b.status_envio}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </details>
+                        </td>
+                    </tr>`;
+                }
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('historico').innerHTML = html;
+        }
+
+        // ===== GERENCIAMENTO DE NÚMEROS DE NOTIFICAÇÃO =====
+        let numerosNotificacao = [];
+
+        async function carregarNumeros() {
+            try {
+                console.log('=== CARREGANDO NÚMEROS DE NOTIFICAÇÃO ===');
+                const response = await fetch('/api/crm/numeros-notificacao', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+
+                const data = await response.json();
+                console.log('Dados recebidos:', data);
+
+                // Se não autenticado, mostrar mensagem
+                if (data.erro && data.erro.includes('autenticado')) {
+                    document.getElementById('listaNumeros').innerHTML = '<p style="color: #fbbf24;">⚠️ Faça login novamente para carregar os números</p>';
+                    return;
+                }
+
+                if (data.success && data.numeros) {
+                    numerosNotificacao = data.numeros;
+                    console.log('✅ Números carregados com sucesso:', numerosNotificacao.length, 'número(s)');
+                    renderizarListaNumeros();
+                } else {
+                    console.error('❌ Erro nos dados:', data);
+                    document.getElementById('listaNumeros').innerHTML = '<p style="color: #ef4444;">Erro: ' + (data.erro || 'Erro desconhecido') + '</p>';
+                }
+            } catch (error) {
+                console.error('❌ Exceção ao carregar números:', error);
+                document.getElementById('listaNumeros').innerHTML = '<p style="color: #ef4444;">Erro ao carregar: ' + error.message + '</p>';
+            }
+        }
+
+        function renderizarListaNumeros() {
+            const container = document.getElementById('listaNumeros');
+
+            if (numerosNotificacao.length === 0) {
+                container.innerHTML = '<p style="color: var(--cor-texto-secundario, #888);">Nenhum número cadastrado. Adicione um número abaixo.</p>';
+                return;
+            }
+
+            let html = '<div style="display: grid; gap: 1rem;">';
+
+            numerosNotificacao.forEach(numero => {
+                html += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: var(--cor-fundo-hover, #2a2a2a); border-radius: 8px; border-left: 3px solid var(--cor-destaque, #39FF14);">
+                        <div>
+                            <strong style="color: #fff; font-size: 1rem;">${numero.nome || 'Sem nome'}</strong><br>
+                            <span style="color: var(--cor-texto-secundario, #888); font-size: 0.9rem;">📱 ${numero.whatsapp}</span>
+                            ${numero.ativo ? '<span style="margin-left: 1rem; padding: 0.25rem 0.5rem; background: rgba(57, 255, 20, 0.1); color: #39FF14; border: 1px solid rgba(57, 255, 20, 0.3); border-radius: 4px; font-size: 0.8rem;">✓ Ativo</span>' : '<span style="margin-left: 1rem; padding: 0.25rem 0.5rem; background: rgba(255, 255, 255, 0.05); color: #888; border: 1px solid #333; border-radius: 4px; font-size: 0.8rem;">✗ Inativo</span>'}
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button onclick="editarNumero(${numero.id})" class="numero-btn numero-btn-editar">
+                                ✏️ Editar
+                            </button>
+                            <button onclick="deletarNumero(${numero.id}, '${numero.nome}')" class="numero-btn numero-btn-deletar">
+                                🗑️ Deletar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        async function adicionarNumero() {
+            const nome = document.getElementById('novoNumeroNome').value.trim();
+            const whatsapp = document.getElementById('novoNumeroWhatsapp').value.trim();
+
+            if (!nome) {
+                alert('Por favor, informe um nome/descrição para o número!');
+                return;
+            }
+
+            if (!whatsapp) {
+                alert('Por favor, informe o número de WhatsApp!');
+                return;
+            }
+
+            // Validação básica do formato
+            if (whatsapp.length < 12 || whatsapp.length > 15) {
+                alert('Número de WhatsApp inválido! Use o formato: 5567999999999 (55 + DDD + número)');
+                return;
+            }
+
+            if (!whatsapp.startsWith('55')) {
+                alert('Número deve começar com 55 (código do Brasil)');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/crm/numeros-notificacao', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        nome: nome,
+                        whatsapp: whatsapp
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ Número adicionado com sucesso!');
+                    document.getElementById('novoNumeroNome').value = '';
+                    document.getElementById('novoNumeroWhatsapp').value = '';
+                    carregarNumeros();
+                } else {
+                    alert('❌ Erro ao adicionar número: ' + (data.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro ao adicionar número');
+            }
+        }
+
+        async function editarNumero(id) {
+            const numero = numerosNotificacao.find(n => n.id === id);
+            if (!numero) return;
+
+            const novoNome = prompt('Nome/Descrição:', numero.nome);
+            if (novoNome === null) return;
+
+            const novoWhatsapp = prompt('Número WhatsApp:', numero.whatsapp);
+            if (novoWhatsapp === null) return;
+
+            if (!novoNome.trim() || !novoWhatsapp.trim()) {
+                alert('Nome e WhatsApp são obrigatórios!');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/crm/numeros-notificacao/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        nome: novoNome.trim(),
+                        whatsapp: novoWhatsapp.trim()
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ Número atualizado com sucesso!');
+                    carregarNumeros();
+                } else {
+                    alert('❌ Erro ao atualizar: ' + (data.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro ao atualizar número');
+            }
+        }
+
+        async function deletarNumero(id, nome) {
+            if (!confirm(`Tem certeza que deseja deletar o número "${nome}"?\n\nEsta ação não pode ser desfeita!`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/crm/numeros-notificacao/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ Número deletado com sucesso!');
+                    carregarNumeros();
+                } else {
+                    alert('❌ Erro ao deletar: ' + (data.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro ao deletar número');
+            }
+        }
+
+        // Inicialização
+        carregarConfiguracoes();
+        carregarHistorico();
+        carregarNumeros();
+
+        function logout() {
+            fetch('/api/auth/logout', {method: 'POST'}).then(() => window.location.href = '/');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,928 @@
+/* ============================================
+   NEXUS CRM - DASHBOARD CLIENTE
+   Identidade Visual Verde Neon Tech
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+/* ========== RESET & BASE ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --sidebar-width: 260px;
+  --navbar-height: 70px;
+}
+
+body {
+  font-family: var(--nexus-font-primary);
+  background: var(--nexus-bg-primary);
+  color: var(--nexus-text-primary);
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Background animado */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 20% 50%, rgba(57, 255, 20, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(10, 77, 10, 0.05) 0%, transparent 50%);
+  z-index: -1;
+  animation: bgPulse 15s ease-in-out infinite;
+}
+
+/* ========== LAYOUT PRINCIPAL ========== */
+.crm-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ========== SIDEBAR ========== */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--nexus-bg-card);
+  backdrop-filter: blur(var(--nexus-blur-md));
+  -webkit-backdrop-filter: blur(var(--nexus-blur-md));
+  padding: var(--nexus-space-xl) var(--nexus-space-md);
+  position: fixed;
+  height: 100vh;
+  overflow-y: auto;
+  border-right: 1px solid var(--nexus-border);
+  box-shadow: var(--nexus-shadow-lg);
+  z-index: var(--nexus-z-fixed);
+}
+
+.sidebar-logo {
+  text-align: center;
+  margin-bottom: var(--nexus-space-2xl);
+  padding-bottom: var(--nexus-space-lg);
+  border-bottom: 1px solid var(--nexus-border);
+}
+
+.sidebar-logo h2 {
+  font-family: var(--nexus-font-display);
+  background: var(--nexus-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: var(--nexus-text-2xl);
+  font-weight: var(--nexus-font-bold);
+  margin-bottom: var(--nexus-space-xs);
+}
+
+.sidebar-logo p {
+  color: var(--nexus-text-muted);
+  font-size: var(--nexus-text-sm);
+}
+
+/* Menu Sidebar */
+.sidebar-menu {
+  list-style: none;
+}
+
+.menu-item {
+  margin-bottom: var(--nexus-space-sm);
+}
+
+.menu-link {
+  display: flex;
+  align-items: center;
+  padding: var(--nexus-space-md) var(--nexus-space-lg);
+  color: var(--nexus-text-secondary);
+  text-decoration: none;
+  border-radius: var(--nexus-radius-md);
+  transition: var(--nexus-transition-all);
+  border-left: 3px solid transparent;
+  font-size: var(--nexus-text-base);
+}
+
+.menu-link:hover {
+  background: rgba(57, 255, 20, 0.1);
+  color: var(--nexus-primary);
+  border-left-color: var(--nexus-primary);
+  padding-left: calc(var(--nexus-space-lg) + 4px);
+}
+
+.menu-link.active {
+  background: rgba(57, 255, 20, 0.15);
+  color: var(--nexus-primary);
+  border-left-color: var(--nexus-primary);
+  box-shadow: var(--nexus-shadow-neon-sm);
+}
+
+.menu-icon {
+  margin-right: var(--nexus-space-md);
+  font-size: var(--nexus-text-base);
+  min-width: 18px;
+  width: 18px;
+  height: 18px;
+  text-align: center;
+}
+
+/* Logout Button */
+.logout-btn {
+  margin-top: var(--nexus-space-2xl);
+  width: 100%;
+  padding: var(--nexus-space-md);
+  background: rgba(255, 23, 68, 0.1);
+  border: 1px solid var(--nexus-error);
+  color: var(--nexus-error);
+  border-radius: var(--nexus-radius-md);
+  font-family: var(--nexus-font-primary);
+  font-weight: var(--nexus-font-semibold);
+  cursor: pointer;
+  transition: var(--nexus-transition-all);
+}
+
+.logout-btn:hover {
+  background: var(--nexus-error);
+  color: var(--nexus-bg-primary);
+  box-shadow: 0 0 20px var(--nexus-error-glow);
+}
+
+/* ========== BOTÕES NEXUS (ESTILO PADRÃO CRM) ========== */
+.nexus-btn, .btn, .btn-primary, .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--nexus-font-primary);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  gap: 0.5rem;
+}
+
+/* Botão Primary (Verde - Padrão do Cadastrar Cliente) */
+.nexus-btn-primary, .btn-primary {
+  background: linear-gradient(135deg, #2ed573, #20bf6b) !important;
+  color: #000 !important;
+  box-shadow: 0 4px 12px rgba(46, 213, 115, 0.4);
+}
+
+.nexus-btn-primary:hover:not(:disabled), .btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #20bf6b, #26de81) !important;
+  box-shadow: 0 6px 20px rgba(46, 213, 115, 0.5);
+  transform: translateY(-2px);
+}
+
+.nexus-btn-primary:active:not(:disabled), .btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(46, 213, 115, 0.3);
+}
+
+/* Botão Secondary (Cinza) */
+.nexus-btn-secondary, .btn-secondary {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--nexus-text-primary) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.nexus-btn-secondary:hover:not(:disabled), .btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.nexus-btn-secondary:active:not(:disabled), .btn-secondary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Botão Danger (Vermelho) */
+.nexus-btn-danger, .btn-danger {
+  background: linear-gradient(135deg, #ff1744, #d50000) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(255, 23, 68, 0.4);
+}
+
+.nexus-btn-danger:hover:not(:disabled), .btn-danger:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d50000, #b71c1c) !important;
+  box-shadow: 0 6px 20px rgba(255, 23, 68, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Tamanhos de Botão */
+.nexus-btn-sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+.nexus-btn-lg {
+  padding: 1rem 2rem;
+  font-size: 1.0625rem;
+}
+
+/* Estado Disabled */
+.nexus-btn:disabled, .btn:disabled,
+.btn-primary:disabled, .btn-secondary:disabled, .btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Botão de Ação (Manter compatibilidade com código antigo) */
+.btn-action {
+  padding: var(--nexus-space-sm) var(--nexus-space-md);
+  border: 1px solid var(--nexus-border);
+  background: transparent;
+  color: var(--nexus-text-secondary);
+  border-radius: var(--nexus-radius-sm);
+  cursor: pointer;
+  transition: var(--nexus-transition-all);
+  font-size: var(--nexus-text-sm);
+}
+
+.btn-action:hover {
+  border-color: var(--nexus-primary);
+  color: var(--nexus-primary);
+  background: rgba(57, 255, 20, 0.1);
+}
+
+.btn-action.delete:hover {
+  border-color: var(--nexus-error);
+  color: var(--nexus-error);
+  background: rgba(255, 23, 68, 0.1);
+}
+
+/* ========== MAIN CONTENT ========== */
+.main-content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  padding: var(--nexus-space-2xl);
+  min-height: 100vh;
+}
+
+/* Header do conteúdo */
+.content-header {
+  background: var(--nexus-bg-glass);
+  backdrop-filter: blur(var(--nexus-blur-md));
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-xl);
+  padding: var(--nexus-space-xl);
+  margin-bottom: var(--nexus-space-2xl);
+  box-shadow: var(--nexus-shadow-md);
+}
+
+.content-header h1 {
+  font-family: var(--nexus-font-display);
+  font-size: var(--nexus-text-4xl);
+  font-weight: var(--nexus-font-bold);
+  background: var(--nexus-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--nexus-space-sm);
+}
+
+.content-header p {
+  color: var(--nexus-text-secondary);
+  font-size: var(--nexus-text-lg);
+}
+
+.breadcrumb {
+  color: var(--nexus-text-muted);
+  font-size: var(--nexus-text-base);
+}
+
+/* ========== CARDS GRID ========== */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--nexus-space-xl);
+  margin-bottom: var(--nexus-space-2xl);
+}
+
+/* Cards do Dashboard */
+.card {
+  background: var(--nexus-bg-glass);
+  backdrop-filter: blur(var(--nexus-blur-md));
+  -webkit-backdrop-filter: blur(var(--nexus-blur-md));
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-xl);
+  padding: var(--nexus-space-xl);
+  box-shadow: var(--nexus-shadow-md);
+  transition: all var(--nexus-transition-normal);
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.card:hover {
+  border-color: var(--nexus-border-hover);
+  box-shadow: var(--nexus-shadow-lg), var(--nexus-shadow-neon-sm);
+  transform: translateY(-4px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--nexus-space-lg);
+  padding-bottom: var(--nexus-space-md);
+  border-bottom: 1px solid var(--nexus-border);
+}
+
+.card-title {
+  font-size: var(--nexus-text-base);
+  font-weight: var(--nexus-font-semibold);
+  color: var(--nexus-text-primary);
+}
+
+.card-icon {
+  font-size: var(--nexus-text-2xl);
+  filter: drop-shadow(0 0 8px rgba(57, 255, 20, 0.3));
+}
+
+.card-value {
+  font-size: var(--nexus-text-5xl);
+  font-weight: var(--nexus-font-bold);
+  font-family: var(--nexus-font-display);
+  background: var(--nexus-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--nexus-space-md);
+  line-height: 1.2;
+}
+
+.card-footer {
+  color: var(--nexus-text-secondary);
+  font-size: var(--nexus-text-sm);
+  margin-top: var(--nexus-space-sm);
+}
+
+/* ========== DASHBOARD CARDS ========== */
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--nexus-space-xl);
+  margin-bottom: var(--nexus-space-2xl);
+}
+
+.stat-card,
+.dashboard-card {
+  background: var(--nexus-bg-glass);
+  backdrop-filter: blur(var(--nexus-blur-md));
+  -webkit-backdrop-filter: blur(var(--nexus-blur-md));
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-xl);
+  padding: var(--nexus-space-xl);
+  transition: var(--nexus-transition-all);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before,
+.dashboard-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--nexus-gradient-radial);
+  opacity: 0;
+  transition: opacity var(--nexus-transition-base);
+}
+
+.stat-card:hover,
+.dashboard-card:hover {
+  border-color: var(--nexus-primary);
+  box-shadow: var(--nexus-shadow-lg), var(--nexus-shadow-neon-sm);
+  transform: translateY(-4px);
+}
+
+.stat-card:hover::before,
+.dashboard-card:hover::before {
+  opacity: 0.1;
+}
+
+.stat-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--nexus-space-md);
+}
+
+.stat-card-title {
+  color: var(--nexus-text-secondary);
+  font-size: var(--nexus-text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: var(--nexus-font-medium);
+}
+
+.stat-card-icon {
+  font-size: var(--nexus-text-3xl);
+  filter: drop-shadow(0 0 10px var(--nexus-primary-glow));
+}
+
+.stat-card-value {
+  font-size: var(--nexus-text-4xl);
+  font-weight: var(--nexus-font-bold);
+  color: var(--nexus-primary);
+  margin-bottom: var(--nexus-space-xs);
+  font-family: var(--nexus-font-display);
+}
+
+.stat-card-change {
+  font-size: var(--nexus-text-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--nexus-space-xs);
+}
+
+.stat-card-change.positive {
+  color: var(--nexus-success);
+}
+
+.stat-card-change.negative {
+  color: var(--nexus-error);
+}
+
+/* ========== TABELAS ========== */
+.table-container {
+  background: var(--nexus-bg-glass);
+  backdrop-filter: blur(var(--nexus-blur-md));
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-xl);
+  padding: var(--nexus-space-xl);
+  margin-bottom: var(--nexus-space-xl);
+  overflow: hidden;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--nexus-space-lg);
+}
+
+.table-header h2 {
+  font-family: var(--nexus-font-display);
+  font-size: var(--nexus-text-2xl);
+  color: var(--nexus-primary);
+}
+
+.table-nexus,
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: transparent;
+}
+
+.table-nexus thead,
+table thead {
+  background: var(--nexus-bg-secondary);
+  border-bottom: 2px solid var(--nexus-primary);
+}
+
+.table-nexus th,
+table th {
+  color: var(--nexus-primary);
+  padding: var(--nexus-space-md) var(--nexus-space-lg);
+  text-align: left;
+  text-transform: uppercase;
+  font-size: var(--nexus-text-sm);
+  letter-spacing: 1px;
+  font-weight: var(--nexus-font-semibold);
+}
+
+.table-nexus td,
+table td {
+  padding: var(--nexus-space-md) var(--nexus-space-lg);
+  border-bottom: 1px solid var(--nexus-border);
+  color: var(--nexus-text-secondary);
+  font-size: var(--nexus-text-base);
+}
+
+.table-nexus tr:hover,
+table tbody tr:hover {
+  background: rgba(57, 255, 20, 0.05);
+}
+
+.table-nexus tr:last-child td,
+table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Actions na tabela */
+.table-actions {
+  display: flex;
+  gap: var(--nexus-space-sm);
+}
+
+.btn-action {
+  padding: var(--nexus-space-sm) var(--nexus-space-md);
+  border: 1px solid var(--nexus-border);
+  background: transparent;
+  color: var(--nexus-text-secondary);
+  border-radius: var(--nexus-radius-sm);
+  cursor: pointer;
+  transition: var(--nexus-transition-all);
+  font-size: var(--nexus-text-sm);
+}
+
+.btn-action:hover {
+  border-color: var(--nexus-primary);
+  color: var(--nexus-primary);
+  background: rgba(57, 255, 20, 0.1);
+}
+
+.btn-action.delete:hover {
+  border-color: var(--nexus-error);
+  color: var(--nexus-error);
+  background: rgba(255, 23, 68, 0.1);
+}
+
+/* ========== FORMULÁRIOS ========== */
+.form-container {
+  background: var(--nexus-bg-glass);
+  backdrop-filter: blur(var(--nexus-blur-md));
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-xl);
+  padding: var(--nexus-space-2xl);
+  margin-bottom: var(--nexus-space-xl);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--nexus-space-lg);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nexus-space-sm);
+}
+
+.form-group label {
+  color: var(--nexus-text-secondary);
+  font-size: var(--nexus-text-sm);
+  font-weight: var(--nexus-font-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: var(--nexus-space-md) var(--nexus-space-lg);
+  background: var(--nexus-bg-card);
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-md);
+  color: var(--nexus-text-primary);
+  font-family: var(--nexus-font-primary);
+  font-size: var(--nexus-text-base);
+  transition: var(--nexus-transition-all);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--nexus-primary);
+  box-shadow: 0 0 0 3px var(--nexus-primary-glow);
+  background: var(--nexus-bg-tertiary);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--nexus-space-md);
+  margin-top: var(--nexus-space-xl);
+}
+
+/* ========== STATUS BADGES ========== */
+.status-badge {
+  display: inline-block;
+  padding: var(--nexus-space-xs) var(--nexus-space-md);
+  border-radius: var(--nexus-radius-full);
+  font-size: var(--nexus-text-sm);
+  font-weight: var(--nexus-font-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.ativo,
+.status-badge.pago {
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid var(--nexus-success);
+  color: var(--nexus-success);
+}
+
+.status-badge.pendente,
+.status-badge.em-aberto {
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid var(--nexus-warning);
+  color: var(--nexus-warning);
+}
+
+.status-badge.inativo,
+.status-badge.vencido {
+  background: rgba(255, 23, 68, 0.1);
+  border: 1px solid var(--nexus-error);
+  color: var(--nexus-error);
+}
+
+.status-badge.novo {
+  background: rgba(57, 255, 20, 0.1);
+  border: 1px solid var(--nexus-primary);
+  color: var(--nexus-primary);
+}
+
+/* ========== MODAIS ========== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(var(--nexus-blur-sm));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--nexus-z-modal);
+  animation: fadeIn 0.3s ease;
+}
+
+.modal {
+  background: var(--nexus-bg-card);
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-xl);
+  padding: var(--nexus-space-2xl);
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--nexus-shadow-xl), var(--nexus-shadow-neon);
+  animation: scaleIn 0.3s ease;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--nexus-space-xl);
+  padding-bottom: var(--nexus-space-md);
+  border-bottom: 1px solid var(--nexus-border);
+}
+
+.modal-header h2 {
+  font-family: var(--nexus-font-display);
+  font-size: var(--nexus-text-2xl);
+  color: var(--nexus-primary);
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--nexus-text-secondary);
+  font-size: var(--nexus-text-2xl);
+  cursor: pointer;
+  transition: var(--nexus-transition-base);
+}
+
+.modal-close:hover {
+  color: var(--nexus-primary);
+  transform: rotate(90deg);
+}
+
+/* ========== ALERTS ========== */
+.alert {
+  padding: var(--nexus-space-md) var(--nexus-space-lg);
+  border-radius: var(--nexus-radius-md);
+  border-left: 4px solid;
+  margin-bottom: var(--nexus-space-lg);
+  font-size: var(--nexus-text-base);
+  animation: fadeInDown 0.5s ease;
+}
+
+.alert-success {
+  background: rgba(0, 255, 136, 0.1);
+  border-left-color: var(--nexus-success);
+  color: var(--nexus-success);
+}
+
+.alert-warning {
+  background: rgba(255, 215, 0, 0.1);
+  border-left-color: var(--nexus-warning);
+  color: var(--nexus-warning);
+}
+
+.alert-error {
+  background: rgba(255, 23, 68, 0.1);
+  border-left-color: var(--nexus-error);
+  color: var(--nexus-error);
+}
+
+.alert-info {
+  background: rgba(57, 255, 20, 0.1);
+  border-left-color: var(--nexus-primary);
+  color: var(--nexus-primary);
+}
+
+/* ========== CHARTS (caso use gráficos) ========== */
+.chart-container {
+  background: var(--nexus-bg-glass);
+  backdrop-filter: blur(var(--nexus-blur-md));
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-xl);
+  padding: var(--nexus-space-xl);
+  margin-bottom: var(--nexus-space-xl);
+}
+
+.chart-container h3 {
+  color: var(--nexus-primary);
+  margin-bottom: var(--nexus-space-lg);
+  font-family: var(--nexus-font-display);
+}
+
+/* ========== EMPTY STATE ========== */
+.empty-state {
+  text-align: center;
+  padding: var(--nexus-space-4xl);
+  color: var(--nexus-text-muted);
+}
+
+.empty-state-icon {
+  font-size: var(--nexus-text-6xl);
+  margin-bottom: var(--nexus-space-lg);
+  opacity: 0.3;
+}
+
+.empty-state h3 {
+  font-size: var(--nexus-text-xl);
+  margin-bottom: var(--nexus-space-sm);
+  color: var(--nexus-text-secondary);
+}
+
+.empty-state p {
+  font-size: var(--nexus-text-base);
+  margin-bottom: var(--nexus-space-xl);
+}
+
+/* ========== LOADING STATE ========== */
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--nexus-space-3xl);
+}
+
+.spinner {
+  border: 4px solid var(--nexus-border);
+  border-top: 4px solid var(--nexus-primary);
+  border-radius: var(--nexus-radius-full);
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+}
+
+/* ========== PAGINATION ========== */
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: var(--nexus-space-sm);
+  margin-top: var(--nexus-space-xl);
+}
+
+.pagination-btn {
+  padding: var(--nexus-space-sm) var(--nexus-space-md);
+  background: var(--nexus-bg-card);
+  border: 1px solid var(--nexus-border);
+  color: var(--nexus-text-secondary);
+  border-radius: var(--nexus-radius-md);
+  cursor: pointer;
+  transition: var(--nexus-transition-all);
+  min-width: 40px;
+}
+
+.pagination-btn:hover {
+  border-color: var(--nexus-primary);
+  color: var(--nexus-primary);
+  background: rgba(57, 255, 20, 0.1);
+}
+
+.pagination-btn.active {
+  background: var(--nexus-gradient-primary);
+  color: var(--nexus-bg-primary);
+  border-color: var(--nexus-primary);
+  box-shadow: var(--nexus-shadow-neon-sm);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ========== RESPONSIVIDADE ========== */
+@media (max-width: 1024px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform var(--nexus-transition-base);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+
+  .dashboard-stats {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: var(--nexus-space-lg);
+  }
+
+  .content-header h1 {
+    font-size: var(--nexus-text-3xl);
+  }
+
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
+  .stat-card-value {
+    font-size: var(--nexus-text-3xl);
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --sidebar-width: 240px;
+  }
+
+  .main-content {
+    padding: var(--nexus-space-md);
+  }
+
+  .content-header {
+    padding: var(--nexus-space-lg);
+  }
+
+  .modal {
+    width: 95%;
+    padding: var(--nexus-space-lg);
+  }
+}
+
+/* ========== SCROLLBAR CUSTOMIZADA ========== */
+.sidebar::-webkit-scrollbar,
+.main-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track,
+.main-content::-webkit-scrollbar-track {
+  background: var(--nexus-bg-secondary);
+}
+
+.sidebar::-webkit-scrollbar-thumb,
+.main-content::-webkit-scrollbar-thumb {
+  background: var(--nexus-primary);
+  border-radius: var(--nexus-radius-full);
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover,
+.main-content::-webkit-scrollbar-thumb:hover {
+  background: var(--nexus-primary-light);
+}

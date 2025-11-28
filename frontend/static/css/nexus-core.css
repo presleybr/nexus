@@ -1,0 +1,248 @@
+/* ============================================
+   NEXUS CORE CSS - Sistema de Design
+   Variáveis e estilos base compartilhados
+   ============================================ */
+
+/* Importar variáveis do Nexus */
+@import url('variables.css');
+
+/* ========== RESET & BASE ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--nexus-font-sans, 'Inter', sans-serif);
+  background: var(--nexus-bg-primary, #0a0a0a);
+  color: var(--nexus-text-primary, #ffffff);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ========== TIPOGRAFIA ========== */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--nexus-font-display, 'Space Grotesk', sans-serif);
+  font-weight: var(--nexus-font-bold, 700);
+  line-height: 1.2;
+  color: var(--nexus-text-primary, #ffffff);
+}
+
+p {
+  color: var(--nexus-text-secondary, rgba(255, 255, 255, 0.8));
+}
+
+/* ========== CONTAINERS ========== */
+.container {
+  max-width: var(--nexus-max-width-7xl, 1280px);
+  margin: 0 auto;
+  padding: 0 var(--nexus-space-xl, 2rem);
+}
+
+/* ========== BOTÕES ========== */
+.btn {
+  display: inline-block;
+  padding: var(--nexus-space-md, 1rem) var(--nexus-space-xl, 2rem);
+  border-radius: var(--nexus-radius-md, 8px);
+  font-weight: var(--nexus-font-semibold, 600);
+  text-decoration: none;
+  transition: var(--nexus-transition-all, all 0.3s ease);
+  cursor: pointer;
+  border: none;
+  text-align: center;
+}
+
+.btn-primary {
+  background: var(--nexus-gradient-primary, linear-gradient(135deg, #39FF14 0%, #0a4d0a 100%));
+  color: var(--nexus-bg-primary, #0a0a0a);
+  box-shadow: var(--nexus-shadow-neon, 0 0 20px rgba(57, 255, 20, 0.3));
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--nexus-shadow-neon-strong, 0 0 30px rgba(57, 255, 20, 0.5));
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--nexus-green, #39FF14);
+  color: var(--nexus-green, #39FF14);
+}
+
+.btn-secondary:hover {
+  background: rgba(57, 255, 20, 0.1);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--nexus-border-color, rgba(57, 255, 20, 0.2));
+  color: var(--nexus-text-primary, #ffffff);
+}
+
+.btn-outline:hover {
+  border-color: var(--nexus-green, #39FF14);
+  color: var(--nexus-green, #39FF14);
+}
+
+/* ========== CARDS ========== */
+.card {
+  background: var(--nexus-card-bg, rgba(0, 0, 0, 0.6));
+  border: 1px solid var(--nexus-border-color, rgba(57, 255, 20, 0.2));
+  border-radius: var(--nexus-radius-lg, 12px);
+  padding: var(--nexus-space-xl, 2rem);
+  backdrop-filter: blur(var(--nexus-blur-md, 10px));
+  -webkit-backdrop-filter: blur(var(--nexus-blur-md, 10px));
+}
+
+.card:hover {
+  border-color: var(--nexus-green, #39FF14);
+  box-shadow: var(--nexus-shadow-neon, 0 0 20px rgba(57, 255, 20, 0.3));
+}
+
+/* ========== INPUTS ========== */
+input, textarea, select {
+  width: 100%;
+  padding: var(--nexus-space-md, 1rem);
+  background: var(--nexus-card-bg, rgba(0, 0, 0, 0.6));
+  border: 1px solid var(--nexus-border-color, rgba(57, 255, 20, 0.2));
+  border-radius: var(--nexus-radius-md, 8px);
+  color: var(--nexus-text-primary, #ffffff);
+  font-family: inherit;
+  font-size: var(--nexus-text-base, 1rem);
+  transition: var(--nexus-transition-all, all 0.3s ease);
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--nexus-green, #39FF14);
+  box-shadow: 0 0 15px rgba(57, 255, 20, 0.3);
+}
+
+/* ========== UTILITIES ========== */
+.text-center {
+  text-align: center;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.mt-0 { margin-top: 0; }
+.mt-1 { margin-top: var(--nexus-space-sm, 0.5rem); }
+.mt-2 { margin-top: var(--nexus-space-md, 1rem); }
+.mt-3 { margin-top: var(--nexus-space-lg, 1.5rem); }
+.mt-4 { margin-top: var(--nexus-space-xl, 2rem); }
+
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: var(--nexus-space-sm, 0.5rem); }
+.mb-2 { margin-bottom: var(--nexus-space-md, 1rem); }
+.mb-3 { margin-bottom: var(--nexus-space-lg, 1.5rem); }
+.mb-4 { margin-bottom: var(--nexus-space-xl, 2rem); }
+
+.p-0 { padding: 0; }
+.p-1 { padding: var(--nexus-space-sm, 0.5rem); }
+.p-2 { padding: var(--nexus-space-md, 1rem); }
+.p-3 { padding: var(--nexus-space-lg, 1.5rem); }
+.p-4 { padding: var(--nexus-space-xl, 2rem); }
+
+/* ========== LOADING ========== */
+.loading {
+  text-align: center;
+  padding: var(--nexus-space-2xl, 3rem);
+  color: var(--nexus-text-secondary, rgba(255, 255, 255, 0.8));
+}
+
+.spinner {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(57, 255, 20, 0.2);
+  border-top-color: var(--nexus-green, #39FF14);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========== ALERTS ========== */
+.alert {
+  padding: var(--nexus-space-md, 1rem);
+  border-radius: var(--nexus-radius-md, 8px);
+  margin-bottom: var(--nexus-space-lg, 1.5rem);
+  font-size: var(--nexus-text-sm, 0.875rem);
+}
+
+.alert-success {
+  background: rgba(57, 255, 20, 0.1);
+  border: 1px solid rgba(57, 255, 20, 0.3);
+  color: var(--nexus-green, #39FF14);
+}
+
+.alert-error {
+  background: rgba(255, 50, 50, 0.1);
+  border: 1px solid rgba(255, 50, 50, 0.3);
+  color: #ff5050;
+}
+
+.alert-warning {
+  background: rgba(255, 200, 0, 0.1);
+  border: 1px solid rgba(255, 200, 0, 0.3);
+  color: #ffc800;
+}
+
+.alert-info {
+  background: rgba(57, 152, 255, 0.1);
+  border: 1px solid rgba(57, 152, 255, 0.3);
+  color: #3998ff;
+}
+
+/* ========== BACKGROUND EFFECTS ========== */
+.bg-animated {
+  position: relative;
+  overflow: hidden;
+}
+
+.bg-animated::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 20% 50%, rgba(57, 255, 20, 0.05) 0%, transparent 50%),
+              radial-gradient(circle at 80% 80%, rgba(57, 255, 20, 0.05) 0%, transparent 50%);
+  z-index: -1;
+  animation: bgPulse 15s ease-in-out infinite;
+}
+
+@keyframes bgPulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 var(--nexus-space-md, 1rem);
+  }
+
+  .btn {
+    padding: var(--nexus-space-sm, 0.75rem) var(--nexus-space-lg, 1.5rem);
+    font-size: var(--nexus-text-sm, 0.875rem);
+  }
+}

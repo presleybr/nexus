@@ -1,0 +1,609 @@
+<!-- Widget de Downloads Automáticos - Canopus -->
+<div class="widget-automacao-canopus">
+    <div class="widget-header">
+        <div class="widget-title">
+            <span class="icon">📥</span>
+            <span>Download Automático de Boletos</span>
+        </div>
+        <div class="status-indicator" id="canopus-status">
+            <span class="status-dot"></span>
+            <span class="status-text">Pronto</span>
+        </div>
+    </div>
+
+    <div class="widget-content">
+        <!-- Formulário de configuração -->
+        <div class="config-section">
+            <div class="form-group">
+                <label for="ponto-venda-select">Ponto de Venda</label>
+                <select id="ponto-venda-select" class="form-control">
+                    <option value="">Selecione...</option>
+                    <option value="17.308">17.308 - CredMS</option>
+                    <option value="17.309">17.309 - Semicrédito</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="ano-select">Ano</label>
+                <select id="ano-select" class="form-control">
+                    <option value="2024">2024</option>
+                    <option value="2025" selected>2025</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="limite-input">Limite (opcional)</label>
+                <input type="number" id="limite-input" class="form-control" placeholder="Todos" min="1">
+                <small class="form-text">Deixe vazio para processar todos</small>
+            </div>
+        </div>
+
+        <!-- Botão de ação -->
+        <div class="action-section">
+            <button id="btn-iniciar-downloads" class="btn btn-primary btn-lg">
+                <span class="btn-icon">🚀</span>
+                <span class="btn-text">Iniciar Downloads</span>
+            </button>
+
+            <button id="btn-cancelar-downloads" class="btn btn-danger btn-lg" style="display: none;">
+                <span class="btn-icon">⏹</span>
+                <span class="btn-text">Cancelar</span>
+            </button>
+        </div>
+
+        <!-- Progresso -->
+        <div class="progress-section" id="progress-section" style="display: none;">
+            <div class="progress-header">
+                <span class="progress-title">Processando...</span>
+                <span class="progress-stats" id="progress-stats">0 / 0</span>
+            </div>
+
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+            </div>
+
+            <div class="progress-details" id="progress-details">
+                <div class="detail-item">
+                    <span class="label">Sucesso:</span>
+                    <span class="value success" id="stats-sucesso">0</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Erros:</span>
+                    <span class="value error" id="stats-erro">0</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Não encontrados:</span>
+                    <span class="value warning" id="stats-nao-encontrado">0</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Sem boleto:</span>
+                    <span class="value warning" id="stats-sem-boleto">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log de execução -->
+        <div class="log-section" id="log-section" style="display: none;">
+            <div class="log-header">
+                <span class="log-title">Log de Execução</span>
+                <button class="btn-clear-log" id="btn-clear-log">Limpar</button>
+            </div>
+            <div class="log-content" id="log-content"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.widget-automacao-canopus {
+    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+    border-left: 4px solid #39FF14;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.widget-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.widget-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.widget-title .icon {
+    font-size: 2rem;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 10px #10b981;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.processando .status-dot {
+    background: #f59e0b;
+    box-shadow: 0 0 10px #f59e0b;
+}
+
+.status-indicator.erro .status-dot {
+    background: #ef4444;
+    box-shadow: 0 0 10px #ef4444;
+}
+
+.status-text {
+    font-size: 0.9rem;
+    color: #fff;
+    font-weight: 600;
+}
+
+.widget-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.config-section {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    font-size: 0.9rem;
+    color: #888;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-control {
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #39FF14;
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
+}
+
+.form-text {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+
+.action-section {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.btn {
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #39FF14 0%, #2ad100 100%);
+    color: #000;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(57, 255, 20, 0.4);
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: #fff;
+}
+
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+
+.btn-icon {
+    font-size: 1.2rem;
+}
+
+.progress-section {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.progress-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.progress-stats {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #39FF14;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #39FF14 0%, #2ad100 100%);
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+}
+
+.progress-details {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-item .label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+}
+
+.detail-item .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.detail-item .value.success {
+    color: #10b981;
+}
+
+.detail-item .value.error {
+    color: #ef4444;
+}
+
+.detail-item .value.warning {
+    color: #f59e0b;
+}
+
+.log-section {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.log-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+}
+
+.btn-clear-log {
+    padding: 0.25rem 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #888;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-clear-log:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.log-content {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: #aaa;
+    line-height: 1.6;
+}
+
+.log-entry {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-entry.success {
+    color: #10b981;
+}
+
+.log-entry.error {
+    color: #ef4444;
+}
+
+.log-entry.warning {
+    color: #f59e0b;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Responsivo */
+@media (max-width: 1024px) {
+    .config-section {
+        grid-template-columns: 1fr;
+    }
+
+    .progress-details {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+</style>
+
+<script>
+// Script de controle do widget Canopus
+(function() {
+    'use strict';
+
+    // Estado
+    let automacaoId = null;
+    let intervaloPolling = null;
+
+    // Elementos
+    const btnIniciar = document.getElementById('btn-iniciar-downloads');
+    const btnCancelar = document.getElementById('btn-cancelar-downloads');
+    const pontoVendaSelect = document.getElementById('ponto-venda-select');
+    const anoSelect = document.getElementById('ano-select');
+    const limiteInput = document.getElementById('limite-input');
+    const statusIndicator = document.getElementById('canopus-status');
+    const progressSection = document.getElementById('progress-section');
+    const logSection = document.getElementById('log-section');
+    const logContent = document.getElementById('log-content');
+    const btnClearLog = document.getElementById('btn-clear-log');
+
+    // Event Listeners
+    btnIniciar.addEventListener('click', iniciarDownloads);
+    btnCancelar.addEventListener('click', cancelarDownloads);
+    btnClearLog.addEventListener('click', limparLog);
+
+    // Função para iniciar downloads
+    async function iniciarDownloads() {
+        const pontoVenda = pontoVendaSelect.value;
+        const ano = parseInt(anoSelect.value);
+        const limite = limiteInput.value ? parseInt(limiteInput.value) : null;
+
+        if (!pontoVenda) {
+            alert('Por favor, selecione um ponto de venda');
+            return;
+        }
+
+        // Atualizar UI
+        btnIniciar.style.display = 'none';
+        btnCancelar.style.display = 'flex';
+        progressSection.style.display = 'block';
+        logSection.style.display = 'block';
+        pontoVendaSelect.disabled = true;
+        anoSelect.disabled = true;
+        limiteInput.disabled = true;
+
+        atualizarStatus('processando', 'Processando...');
+        adicionarLog('Iniciando downloads em massa...', 'info');
+
+        try {
+            const response = await fetch('/api/automation/processar-downloads-ponto-venda', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ponto_venda: pontoVenda,
+                    ano: ano,
+                    limite: limite
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                automacaoId = result.data.automacao_id;
+                adicionarLog(`Automação iniciada - ID: ${automacaoId}`, 'success');
+                adicionarLog(`Total de clientes: ${result.data.total_clientes}`, 'info');
+
+                // Atualizar estatísticas finais
+                atualizarEstatisticas(result.data);
+
+                // Iniciar polling de status
+                iniciarPolling(automacaoId);
+            } else {
+                throw new Error(result.error || 'Erro desconhecido');
+            }
+
+        } catch (error) {
+            console.error('Erro ao iniciar downloads:', error);
+            adicionarLog(`ERRO: ${error.message}`, 'error');
+            atualizarStatus('erro', 'Erro');
+            finalizarProcessamento();
+        }
+    }
+
+    // Função para cancelar downloads
+    function cancelarDownloads() {
+        if (confirm('Deseja realmente cancelar o processamento?')) {
+            pararPolling();
+            adicionarLog('Processamento cancelado pelo usuário', 'warning');
+            atualizarStatus('pronto', 'Pronto');
+            finalizarProcessamento();
+        }
+    }
+
+    // Função para atualizar status
+    function atualizarStatus(tipo, texto) {
+        statusIndicator.className = `status-indicator ${tipo}`;
+        statusIndicator.querySelector('.status-text').textContent = texto;
+    }
+
+    // Função para atualizar estatísticas
+    function atualizarEstatisticas(data) {
+        document.getElementById('stats-sucesso').textContent = data.sucessos || 0;
+        document.getElementById('stats-erro').textContent = data.erros || 0;
+        document.getElementById('stats-nao-encontrado').textContent = data.cpf_nao_encontrado || 0;
+        document.getElementById('stats-sem-boleto').textContent = data.sem_boleto || 0;
+
+        const total = data.total_clientes || 0;
+        const processados = (data.sucessos || 0) + (data.erros || 0);
+        const percentual = total > 0 ? (processados / total) * 100 : 0;
+
+        document.getElementById('progress-stats').textContent = `${processados} / ${total}`;
+        document.getElementById('progress-bar').style.width = `${percentual}%`;
+
+        // Se concluído
+        if (processados >= total && total > 0) {
+            pararPolling();
+            atualizarStatus('pronto', 'Concluído');
+            adicionarLog(`Processamento concluído! ${data.sucessos} sucessos, ${data.erros} erros`, 'success');
+            finalizarProcessamento();
+        }
+    }
+
+    // Função para adicionar entrada no log
+    function adicionarLog(mensagem, tipo = 'info') {
+        const timestamp = new Date().toLocaleTimeString('pt-BR');
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${tipo}`;
+        entry.textContent = `[${timestamp}] ${mensagem}`;
+        logContent.appendChild(entry);
+        logContent.scrollTop = logContent.scrollHeight;
+    }
+
+    // Função para limpar log
+    function limparLog() {
+        logContent.innerHTML = '';
+    }
+
+    // Função para iniciar polling
+    function iniciarPolling(id) {
+        intervaloPolling = setInterval(async () => {
+            try {
+                const response = await fetch(`/api/automation/execucoes/${id}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const execucao = result.data.execucao;
+
+                    // Atualizar estatísticas
+                    atualizarEstatisticas({
+                        total_clientes: execucao.total_clientes,
+                        sucessos: execucao.processados_sucesso,
+                        erros: execucao.processados_erro,
+                        cpf_nao_encontrado: execucao.cpf_nao_encontrado || 0,
+                        sem_boleto: execucao.sem_boleto || 0
+                    });
+
+                    // Verificar se finalizou
+                    if (execucao.status === 'concluida' || execucao.status === 'erro') {
+                        pararPolling();
+                        finalizarProcessamento();
+                    }
+                }
+            } catch (error) {
+                console.error('Erro no polling:', error);
+            }
+        }, 3000); // Polling a cada 3 segundos
+    }
+
+    // Função para parar polling
+    function pararPolling() {
+        if (intervaloPolling) {
+            clearInterval(intervaloPolling);
+            intervaloPolling = null;
+        }
+    }
+
+    // Função para finalizar processamento
+    function finalizarProcessamento() {
+        btnIniciar.style.display = 'flex';
+        btnCancelar.style.display = 'none';
+        pontoVendaSelect.disabled = false;
+        anoSelect.disabled = false;
+        limiteInput.disabled = false;
+    }
+
+})();
+</script>

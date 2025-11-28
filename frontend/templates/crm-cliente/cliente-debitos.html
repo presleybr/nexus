@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Débitos do Cliente - Nexus CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Nexus Design System -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/crm-cliente.css">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 2rem;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 2px solid rgba(57, 255, 20, 0.2);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            margin: 0 0 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .header .cliente-info {
+            font-size: 1.1rem;
+            color: #39FF14;
+            font-weight: 600;
+        }
+
+        .header .breadcrumb {
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid #39FF14;
+        }
+
+        .stat-card .label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .stat-card.pendente .value {
+            color: #f59e0b;
+        }
+
+        .stat-card.pago .value {
+            color: #10b981;
+        }
+
+        .stat-card.vencido .value {
+            color: #ef4444;
+        }
+
+        .debitos-table {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .debitos-table h2 {
+            margin: 0 0 1.5rem 0;
+            color: #39FF14;
+            font-size: 1.3rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 1rem;
+            background: rgba(57, 255, 20, 0.1);
+            color: #39FF14;
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #2a2a2a;
+            color: #fff;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: rgba(57, 255, 20, 0.05);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-pendente {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border: 1px solid #f59e0b;
+        }
+
+        .status-pago {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 1px solid #10b981;
+        }
+
+        .status-vencido {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid #ef4444;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #888;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #888;
+        }
+
+        .empty-state .icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn-voltar {
+            background: transparent;
+            border: 2px solid #39FF14;
+            color: #39FF14;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 2rem;
+        }
+
+        .btn-voltar:hover {
+            background: rgba(57, 255, 20, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                📊 Débitos do Cliente
+            </h1>
+            <div class="cliente-info" id="clienteNome">Carregando...</div>
+            <div class="breadcrumb">
+                <a href="/crm/cadastro-clientes" style="color: #39FF14; text-decoration: none;">← Voltar para Clientes</a>
+            </div>
+        </div>
+
+        <!-- Estatísticas -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="label">Total de Débitos</div>
+                <div class="value" id="totalDebitos">-</div>
+            </div>
+
+            <div class="stat-card pendente">
+                <div class="label">Pendentes</div>
+                <div class="value" id="totalPendentes">-</div>
+            </div>
+
+            <div class="stat-card vencido">
+                <div class="label">Vencidos</div>
+                <div class="value" id="totalVencidos">-</div>
+            </div>
+
+            <div class="stat-card pago">
+                <div class="label">Pagos</div>
+                <div class="value" id="totalPagos">-</div>
+            </div>
+        </div>
+
+        <!-- Tabela de Débitos -->
+        <div class="debitos-table">
+            <h2>Histórico de Boletos</h2>
+            <div id="tabelaDebitos" class="loading">
+                Carregando débitos...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Pegar parâmetros da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const clienteId = urlParams.get('id');
+        const clienteNome = urlParams.get('nome');
+
+        // Exibir nome do cliente
+        if (clienteNome) {
+            document.getElementById('clienteNome').textContent = clienteNome;
+        }
+
+        // Carregar débitos
+        async function carregarDebitos() {
+            if (!clienteId) {
+                document.getElementById('tabelaDebitos').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Cliente não identificado</p></div>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/crm/cliente-debitos/${clienteId}`);
+
+                if (!response.ok) throw new Error('Erro ao carregar débitos');
+
+                const data = await response.json();
+
+                // Atualizar estatísticas
+                document.getElementById('totalDebitos').textContent = data.total || 0;
+                document.getElementById('totalPendentes').textContent = data.pendentes || 0;
+                document.getElementById('totalVencidos').textContent = data.vencidos || 0;
+                document.getElementById('totalPagos').textContent = data.pagos || 0;
+
+                // Mostrar quantos PDFs reais foram encontrados
+                if (data.pdfs_reais_encontrados > 0) {
+                    const headerElement = document.querySelector('.header');
+                    const alertaExistente = document.getElementById('alerta-pdfs-reais');
+
+                    if (!alertaExistente) {
+                        const alerta = document.createElement('div');
+                        alerta.id = 'alerta-pdfs-reais';
+                        alerta.style.cssText = 'background: linear-gradient(135deg, rgba(57, 255, 20, 0.1) 0%, rgba(57, 255, 20, 0.05) 100%); border-left: 4px solid #39FF14; padding: 1rem 1.5rem; border-radius: 8px; margin-top: 1rem; display: flex; align-items: center; gap: 1rem;';
+                        alerta.innerHTML = `
+                            <svg width="24" height="24" fill="none" stroke="#39FF14" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div>
+                                <strong style="color: #39FF14; font-size: 1rem;">PDFs Reais Encontrados!</strong>
+                                <p style="margin: 0.3rem 0 0 0; color: #ccc; font-size: 0.9rem;">
+                                    ${data.pdfs_reais_encontrados} boleto(s) em PDF encontrado(s) na pasta de downloads
+                                </p>
+                            </div>
+                        `;
+                        headerElement.appendChild(alerta);
+                    }
+                }
+
+                // Renderizar tabela
+                if (!data.debitos || data.debitos.length === 0) {
+                    document.getElementById('tabelaDebitos').innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📭</div>
+                            <p style="font-size: 1.1rem; margin-bottom: 1rem;">Nenhum débito encontrado para este cliente</p>
+                            <div style="background: rgba(57, 255, 20, 0.05); padding: 1.5rem; border-radius: 8px; border: 1px solid rgba(57, 255, 20, 0.2); max-width: 600px; margin: 0 auto; text-align: left;">
+                                <p style="margin: 0 0 0.8rem 0; color: #ccc;"><strong style="color: #39FF14;">Possíveis motivos:</strong></p>
+                                <ul style="margin: 0; padding-left: 1.5rem; color: #888; line-height: 1.8;">
+                                    <li>Cliente ainda não teve boletos baixados pela automação</li>
+                                    <li>Cliente não está associado ao ponto de venda configurado</li>
+                                    <li>Nenhum PDF foi encontrado na pasta de downloads</li>
+                                    <li>Cliente não possui débitos pendentes no sistema Canopus</li>
+                                </ul>
+                                <p style="margin: 1rem 0 0 0; color: #666; font-size: 0.9rem; font-style: italic;">
+                                    💡 Execute a automação de download de boletos para baixar os PDFs deste cliente
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Mês/Ano</th>
+                                <th>Vencimento</th>
+                                <th>Valor</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                data.debitos.forEach(boleto => {
+                    // Verificar se é PDF real da pasta
+                    const isPdfReal = boleto.tipo_fonte === 'pasta_real';
+
+                    const vencimento = boleto.data_vencimento ?
+                        new Date(boleto.data_vencimento).toLocaleDateString('pt-BR') : '-';
+
+                    const valor = (boleto.valor_original || boleto.valor) ?
+                        parseFloat(boleto.valor_original || boleto.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-';
+
+                    let statusClass = 'status-pendente';
+                    let statusText = boleto.status;
+
+                    if (boleto.status === 'pago') {
+                        statusClass = 'status-pago';
+                        statusText = 'Pago';
+                    } else if (boleto.data_vencimento && new Date(boleto.data_vencimento) < new Date() && boleto.status !== 'pago') {
+                        statusClass = 'status-vencido';
+                        statusText = 'Vencido';
+                    } else {
+                        statusText = 'Pendente';
+                    }
+
+                    // Badge especial para PDFs reais
+                    const badgePdfReal = isPdfReal ?
+                        '<span style="background: linear-gradient(135deg, #39FF14 0%, #2dd10f 100%); color: #000; padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; margin-left: 0.5rem;">PDF REAL</span>' : '';
+
+                    const mesReferencia = boleto.mes_referencia || '-';
+                    const anoReferencia = boleto.ano_referencia || '-';
+
+                    html += `
+                        <tr style="${isPdfReal ? 'background: rgba(57, 255, 20, 0.03);' : ''}">
+                            <td>
+                                ${boleto.numero_boleto || boleto.id || 'N/A'}
+                                ${badgePdfReal}
+                            </td>
+                            <td>${mesReferencia}${anoReferencia !== '-' ? '/' + anoReferencia : ''}</td>
+                            <td>${vencimento}</td>
+                            <td><strong>${valor}</strong></td>
+                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                            <td>
+                                ${boleto.pdf_path || boleto.pdf_url ?
+                                    `<a href="${boleto.pdf_url || boleto.pdf_path}" target="_blank"
+                                       style="color: #39FF14; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem;">
+                                       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                           <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                           <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                       </svg>
+                                       Visualizar PDF
+                                    </a>` : '-'}
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                        </tbody>
+                    </table>
+                `;
+
+                document.getElementById('tabelaDebitos').innerHTML = html;
+
+            } catch (error) {
+                console.error('Erro:', error);
+                document.getElementById('tabelaDebitos').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">❌</div>
+                        <p>Erro ao carregar débitos: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Carregar ao abrir a página
+        carregarDebitos();
+    </script>
+</body>
+</html>

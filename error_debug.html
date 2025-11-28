@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang=en>
+  <head>
+    <title>TypeError: cannot use a string pattern on a bytes-like object
+ // Werkzeug Debugger</title>
+    <link rel="stylesheet" href="?__debugger__=yes&amp;cmd=resource&amp;f=style.css">
+    <link rel="shortcut icon"
+        href="?__debugger__=yes&amp;cmd=resource&amp;f=console.png">
+    <script src="?__debugger__=yes&amp;cmd=resource&amp;f=debugger.js"></script>
+    <script>
+      var CONSOLE_MODE = false,
+          EVALEX = true,
+          EVALEX_TRUSTED = false,
+          SECRET = "qHPxMel9g4XU8MWbYTmg";
+    </script>
+  </head>
+  <body style="background-color: #fff">
+    <div class="debugger">
+<h1>TypeError</h1>
+<div class="detail">
+  <p class="errormsg">TypeError: cannot use a string pattern on a bytes-like object
+</p>
+</div>
+<h2 class="traceback">Traceback <em>(most recent call last)</em></h2>
+<div class="traceback">
+  <h3></h3>
+  <ul><li><div class="frame" id="frame-2103528404640">
+  <h4>File <cite class="filename">"D:\Nexus\venv\Lib\site-packages\flask\app.py"</cite>,
+      line <em class="line">1478</em>,
+      in <code class="function">__call__</code></h4>
+  <div class="source "><pre class="line before"><span class="ws">    </span>def __call__(self, environ: dict, start_response: t.Callable) -&gt; t.Any:</pre>
+<pre class="line before"><span class="ws">        </span>&#34;&#34;&#34;The WSGI server calls the Flask application object as the</pre>
+<pre class="line before"><span class="ws">        </span>WSGI application. This calls :meth:`wsgi_app`, which can be</pre>
+<pre class="line before"><span class="ws">        </span>wrapped to apply middleware.</pre>
+<pre class="line before"><span class="ws">        </span>&#34;&#34;&#34;</pre>
+<pre class="line current"><span class="ws">        </span>return self.wsgi_app(environ, start_response)
+<span class="ws">        </span>       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^</pre></div>
+</div>
+
+<li><div class="frame" id="frame-2103528404480">
+  <h4>File <cite class="filename">"D:\Nexus\venv\Lib\site-packages\flask\app.py"</cite>,
+      line <em class="line">1458</em>,
+      in <code class="function">wsgi_app</code></h4>
+  <div class="source "><pre class="line before"><span class="ws">            </span>try:</pre>
+<pre class="line before"><span class="ws">                </span>ctx.push()</pre>
+<pre class="line before"><span class="ws">                </span>response = self.full_dispatch_request()</pre>
+<pre class="line before"><span class="ws">            </span>except Exception as e:</pre>
+<pre class="line before"><span class="ws">                </span>error = e</pre>
+<pre class="line current"><span class="ws">                </span>response = self.handle_exception(e)
+<span class="ws">                </span>           ^^^^^^^^^^^^^^^^^^^^^^^^</pre>
+<pre class="line after"><span class="ws">            </span>except:  # noqa: B001</pre>
+<pre class="line after"><span class="ws">                </span>error = sys.exc_info()[1]</pre>
+<pre class="line after"><span class="ws">                </span>raise</pre>
+<pre class="line after"><span class="ws">            </span>return response(environ, start_response)</pre>
+<pre class="line after"><span class="ws">        </span>finally:</pre></div>
+</div>
+
+<li><div class="frame" id="frame-2103528408704">
+  <h4>File <cite class="filename">"D:\Nexus\venv\Lib\site-packages\flask_cors\extension.py"</cite>,
+      line <em class="line">176</em>,
+      in <code class="function">wrapped_function</code></h4>
+  <div class="source "><pre class="line before"><span class="ws">        </span># Wrap exception handlers with cross_origin</pre>
+<pre class="line before"><span class="ws">        </span># These error handlers will still respect the behavior of the route</pre>
+<pre class="line before"><span class="ws">        </span>if options.get(&#39;intercept_exceptions&#39;, True):</pre>
+<pre class="line before"><span class="ws">            </span>def _after_request_decorator(f):</pre>
+<pre class="line before"><span class="ws">                </span>def wrapped_function(*args, **kwargs):</pre>
+<pre class="line current"><span class="ws">                    </span>return cors_after_request(app.make_response(f(*args, **kwargs)))
+<span class="ws">                    </span>                                            ^^^^^^^^^^^^^^^^^^</pre>
+<pre class="line after"><span class="ws">                </span>return wrapped_function</pre>
+<pre class="line after"><span class="ws"></span> </pre>
+<pre class="line after"><span class="ws">            </span>if hasattr(app, &#39;handle_exception&#39;):</pre>
+<pre class="line after"><span class="ws">                </span>app.handle_exception = _after_request_decorator(</pre>
+<pre class="line after"><span class="ws">                    </span>app.handle_exception)</pre></div>
+</div>
+
+<li><div class="frame" id="frame-2103528409024">
+  <h4>File <cite class="filename">"D:\Nexus\venv\Lib\site-packages\flask\app.py"</cite>,
+      line <em class="line">1455</em>,
+      in <code class="function">wsgi_app</code></h4>
+  <div class="source "><pre class="line before"><span class="ws">        </span>ctx = self.request_context(environ)</pre>
+<pre class="line before"><span class="ws">        </span>error: BaseException | None = None</pre>
+<pre class="line before"><span class="ws">        </span>try:</pre>
+<pre class="line before"><span class="ws">            </span>try:</pre>
+<pre class="line before"><span class="ws">                </span>ctx.push()</pre>
+<pre class="line current"><span class="ws">                </span>response = self.full_dispatch_request()
+<span class="ws">                </span>           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^</pre>
+<pre class="line after"><span class="ws">            </span>except Exception as e:</pre>
+<pre class="line after"><span class="ws">                </span>error = e</pre>
+<pre class="line after"><span class="ws">                </span>response = self.handle_exception(e)</pre>
+<pre class="line after"><span class="ws">            </span>except:  # noqa: B001</pre>
+<pre class="line after"><span class="ws">                </span>error = sys.exc_info()[1]</pre></div>
+</div>
+
+<li><div class="frame" id="frame-2103528408544">
+  <h4>File <cite class="filename">"D:\Nexus\venv\Lib\site-packages\flask\app.py"</cite>,
+      line <em class="line">870</em>,
+      in <code class="function">full_dispatch_request</code></h4>
+  <div class="source "><pre class="line before"><span class="ws">            </span>rv = self.preprocess_request()</pre>
+<pre class="line before"><span class="ws">            </span>if rv is None:</pre>
+<pre class="line before"><span class="ws">                </span>rv = self.dispatch_request()</pre>
+<pre class="line before"><span class="ws">        </span>except Exception as e:</pre>
+<pre class="line before"><span class="ws">            </span>rv = self.handle_user_exception(e)</pre>
+<pre class="line current"><span class="ws">        </span>return self.finalize_request(rv)
+<span class="ws">        </span>       ^^^^^^^^^^^^^^^^^^^^^^^^^</pre>
+<pre class="line after"><span class="ws"></span> </pre>
+<pre class="line after"><span class="ws">    </span>def finalize_request(</pre>
+<pre class="line after"><span class="ws">        </span>self,</pre>
+<pre class="line after"><span class="ws">        </span>rv: ft.ResponseReturnValue | HTTPException,</pre>
+<pre class="line after"><span class="ws">        </span>from_error_handler: bool = False,</pre></div>
+</div>
+
+<li><div class="frame" id="frame-2103528409184">
+  <h4>File <cite class="filename">"D:\Nexus\venv\Lib\site-packages\flask\app.py"</cite>,
+      line <em class="line">891</em>,
+      in <code class="function">finalize_request</code></h4>
+  <div class="source "><pre class="line before"><span class="ws"></span> </pre>
+<pre class="line before"><span class="ws">        </span>:internal:</pre>
+<pre class="line before"><span class="ws">        </span>&#34;&#34;&#34;</pre>
+<pre class="line before"><span class="ws">        </span>response = self.make_response(rv)</pre>
+<pre class="line before"><span class="ws">        </span>try:</pre>
+<pre class="line current"><span class="ws">            </span>response = self.process_response(response)
+<span class="ws">            </span>           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^</pre>
+<pre class="line after"><span class="ws">            </span>request_finished.send(</pre>
+<pre class="line after"><span class="ws">                </span>self, _async_wrapper=self.ensure_sync, response=response</pre>
+<pre class="line after"><span class="ws">            </span>)</pre>
+<pre class="line after"><span class="ws">        </span>except Exception:</pre>
+<pre class="line after"><span class="ws">            </span>if not from_error_handler:</pre></div>
+</div>
+
+<li><div class="frame" id="frame-2103528409344">
+  <h4>File <cite class="filename">"D:\Nexus\venv\Lib\site-packages\flask\app.py"</cite>,
+      line <em class="line">1270</em>,
+      in <code class="function">process_response</code></h4>
+  <div class="source "><pre class="line before"><span class="ws">            </span>if name in self.after_request_funcs:</pre>
+<pre class="line before"><span class="ws">                </span>for func in reversed(self.after_request_funcs[name]):</pre>
+<pre class="line before"><span class="ws">                    </span>response = self.ensure_sync(func)(response)</pre>
+<pre class="line before"><span class="ws"></span> </pre>
+<pre class="line before"><span class="ws">        </span>if not self.session_interface.is_null_session(ctx.session):</pre>
+<pre class="line current"><span class="ws">            </span>self.session_interface.save_session(self, ctx.session, response)
+<span class="ws">            </span>^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^</pre>
+<pre class="line after"><span class="ws"></span> </pre>
+<pre class="line after"><span class="ws">        </span>return response</pre>
+<pre class="line after"><span class="ws"></span> </pre>
+<pre class="line after"><span class="ws">    </span>def do_teardown_request(</pre>
+<pre class="line after"><span class="ws">        </span>self, exc: BaseException | None = _sentinel  # type: ignore</pre></div>
+</div>
+
+<li><div class="frame" id="frame-2103528409504">
+  <h4>File <cite class="filename">"D:\Nexus\venv\Lib\site-packages\flask_session\sessions.py"</cite>,
+      line <em class="line">362</em>,
+      in <code class="function">save_session</code></h4>
+  <div class="source "><pre class="line before"><span class="ws">                       </span>total_seconds(app.permanent_session_lifetime))</pre>
+<pre class="line before"><span class="ws">        </span>if self.use_signer:</pre>
+<pre class="line before"><span class="ws">            </span>session_id = self._get_signer(app).sign(want_bytes(session.sid))</pre>
+<pre class="line before"><span class="ws">        </span>else:</pre>
+<pre class="line before"><span class="ws">            </span>session_id = session.sid</pre>
+<pre class="line current"><span class="ws">        </span>response.set_cookie(app.config[&#34;SESSION_COOKIE_NAME&#34;], session_id,
+<span class="ws">        </span>^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^</pre>
+<pre class="line after"><span class="ws">                            </span>expires=expires, httponly=httponly,</pre>
+<pre class="line after"><span class="ws">                            </span>domain=domain, path=path, secure=secure,</pre>
+<pre class="line after"><span class="ws">                            </span>**conditional_cookie_kwargs)</pre>
+<pre class="line after"><span class="ws"></span> </pre>
+<pre class="line after"><span class="ws"></span> </pre></div>
+</div>
+
+<li><div class="frame" id="frame-2103528409664">
+  <h4>File <cite class="filename">"D:\Nexus\venv\Lib\site-packages\werkzeug\sansio\response.py"</cite>,
+      line <em class="line">224</em>,
+      in <code class="function">set_cookie</code></h4>
+  <div class="source "><pre class="line before"><span class="ws">        </span>:param samesite: Limit the scope of the cookie to only be</pre>
+<pre class="line before"><span class="ws">            </span>attached to requests that are &#34;same-site&#34;.</pre>
+<pre class="line before"><span class="ws">        </span>&#34;&#34;&#34;</pre>
+<pre class="line before"><span class="ws">        </span>self.headers.add(</pre>
+<pre class="line before"><span class="ws">            </span>&#34;Set-Cookie&#34;,</pre>
+<pre class="line current"><span class="ws">            </span>dump_cookie(
+<span class="ws">            </span>^</pre>
+<pre class="line after"><span class="ws">                </span>key,</pre>
+<pre class="line after"><span class="ws">                </span>value=value,</pre>
+<pre class="line after"><span class="ws">                </span>max_age=max_age,</pre>
+<pre class="line after"><span class="ws">                </span>expires=expires,</pre>
+<pre class="line after"><span class="ws">                </span>path=path,</pre></div>
+</div>
+
+<li><div class="frame" id="frame-2103528409824">
+  <h4>File <cite class="filename">"D:\Nexus\venv\Lib\site-packages\werkzeug\http.py"</cite>,
+      line <em class="line">1303</em>,
+      in <code class="function">dump_cookie</code></h4>
+  <div class="source "><pre class="line before"><span class="ws">        </span>if samesite not in {&#34;Strict&#34;, &#34;Lax&#34;, &#34;None&#34;}:</pre>
+<pre class="line before"><span class="ws">            </span>raise ValueError(&#34;SameSite must be &#39;Strict&#39;, &#39;Lax&#39;, or &#39;None&#39;.&#34;)</pre>
+<pre class="line before"><span class="ws"></span> </pre>
+<pre class="line before"><span class="ws">    </span># Quote value if it contains characters not allowed by RFC 6265. Slash-escape with</pre>
+<pre class="line before"><span class="ws">    </span># three octal digits, which matches http.cookies, although the RFC suggests base64.</pre>
+<pre class="line current"><span class="ws">    </span>if not _cookie_no_quote_re.fullmatch(value):
+<span class="ws">    </span>       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^</pre>
+<pre class="line after"><span class="ws">        </span># Work with bytes here, since a UTF-8 character could be multiple bytes.</pre>
+<pre class="line after"><span class="ws">        </span>value = _cookie_slash_re.sub(</pre>
+<pre class="line after"><span class="ws">            </span>lambda m: _cookie_slash_map[m.group()], value.encode()</pre>
+<pre class="line after"><span class="ws">        </span>).decode(&#34;ascii&#34;)</pre>
+<pre class="line after"><span class="ws">        </span>value = f&#39;&#34;{value}&#34;&#39;</pre></div>
+</div>
+</ul>
+  <blockquote>TypeError: cannot use a string pattern on a bytes-like object
+</blockquote>
+</div>
+
+<div class="plain">
+    <p>
+      This is the Copy/Paste friendly version of the traceback.
+    </p>
+    <textarea cols="50" rows="10" name="code" readonly>Traceback (most recent call last):
+  File &#34;D:\Nexus\venv\Lib\site-packages\flask\app.py&#34;, line 1478, in __call__
+    return self.wsgi_app(environ, start_response)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;D:\Nexus\venv\Lib\site-packages\flask\app.py&#34;, line 1458, in wsgi_app
+    response = self.handle_exception(e)
+  File &#34;D:\Nexus\venv\Lib\site-packages\flask_cors\extension.py&#34;, line 176, in wrapped_function
+    return cors_after_request(app.make_response(f(*args, **kwargs)))
+                                                ~^^^^^^^^^^^^^^^^^
+  File &#34;D:\Nexus\venv\Lib\site-packages\flask\app.py&#34;, line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+  File &#34;D:\Nexus\venv\Lib\site-packages\flask\app.py&#34;, line 870, in full_dispatch_request
+    return self.finalize_request(rv)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^
+  File &#34;D:\Nexus\venv\Lib\site-packages\flask\app.py&#34;, line 891, in finalize_request
+    response = self.process_response(response)
+  File &#34;D:\Nexus\venv\Lib\site-packages\flask\app.py&#34;, line 1270, in process_response
+    self.session_interface.save_session(self, ctx.session, response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;D:\Nexus\venv\Lib\site-packages\flask_session\sessions.py&#34;, line 362, in save_session
+    response.set_cookie(app.config[&#34;SESSION_COOKIE_NAME&#34;], session_id,
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;D:\Nexus\venv\Lib\site-packages\werkzeug\sansio\response.py&#34;, line 224, in set_cookie
+    dump_cookie(
+    ^
+  File &#34;D:\Nexus\venv\Lib\site-packages\werkzeug\http.py&#34;, line 1303, in dump_cookie
+    if not _cookie_no_quote_re.fullmatch(value):
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+TypeError: cannot use a string pattern on a bytes-like object
+</textarea>
+</div>
+<div class="explanation">
+  The debugger caught an exception in your WSGI application.  You can now
+  look at the traceback which led to the error.  <span class="nojavascript">
+  If you enable JavaScript you can also use additional features such as code
+  execution (if the evalex feature is enabled), automatic pasting of the
+  exceptions and much more.</span>
+</div>
+      <div class="footer">
+        Brought to you by <strong class="arthur">DON'T PANIC</strong>, your
+        friendly Werkzeug powered traceback interpreter.
+      </div>
+    </div>
+
+    <div class="pin-prompt">
+      <div class="inner">
+        <h3>Console Locked</h3>
+        <p>
+          The console is locked and needs to be unlocked by entering the PIN.
+          You can find the PIN printed out on the standard output of your
+          shell that runs the server.
+        <form>
+          <p>PIN:
+            <input type=text name=pin size=14>
+            <input type=submit name=btn value="Confirm Pin">
+        </form>
+      </div>
+    </div>
+  </body>
+</html>
+
+<!--
+
+Traceback (most recent call last):
+  File "D:\Nexus\venv\Lib\site-packages\flask\app.py", line 1478, in __call__
+    return self.wsgi_app(environ, start_response)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Nexus\venv\Lib\site-packages\flask\app.py", line 1458, in wsgi_app
+    response = self.handle_exception(e)
+  File "D:\Nexus\venv\Lib\site-packages\flask_cors\extension.py", line 176, in wrapped_function
+    return cors_after_request(app.make_response(f(*args, **kwargs)))
+                                                ~^^^^^^^^^^^^^^^^^
+  File "D:\Nexus\venv\Lib\site-packages\flask\app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+  File "D:\Nexus\venv\Lib\site-packages\flask\app.py", line 870, in full_dispatch_request
+    return self.finalize_request(rv)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "D:\Nexus\venv\Lib\site-packages\flask\app.py", line 891, in finalize_request
+    response = self.process_response(response)
+  File "D:\Nexus\venv\Lib\site-packages\flask\app.py", line 1270, in process_response
+    self.session_interface.save_session(self, ctx.session, response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Nexus\venv\Lib\site-packages\flask_session\sessions.py", line 362, in save_session
+    response.set_cookie(app.config["SESSION_COOKIE_NAME"], session_id,
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Nexus\venv\Lib\site-packages\werkzeug\sansio\response.py", line 224, in set_cookie
+    dump_cookie(
+    ^
+  File "D:\Nexus\venv\Lib\site-packages\werkzeug\http.py", line 1303, in dump_cookie
+    if not _cookie_no_quote_re.fullmatch(value):
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+TypeError: cannot use a string pattern on a bytes-like object
+
+
+-->

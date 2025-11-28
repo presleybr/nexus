@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro de Clientes - Nexus CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Nexus Design System -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/crm-cliente.css">
+    <style>
+        /* Modal Styles */
+        .nexus-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nexus-modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .nexus-modal-content {
+            position: relative;
+            background: linear-gradient(135deg, #1a1f2e 0%, #151820 100%);
+            border: 1px solid rgba(46, 213, 115, 0.15);
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(46, 213, 115, 0.1);
+            max-height: 90vh;
+            overflow-y: auto;
+            z-index: 1;
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        .nexus-modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(46, 213, 115, 0.05);
+        }
+
+        .nexus-modal-header h3 {
+            color: #fff;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .nexus-modal-body {
+            padding: 1.5rem;
+        }
+
+        .nexus-modal-body label {
+            color: rgba(255, 255, 255, 0.9) !important;
+        }
+
+        .nexus-modal-body small {
+            color: rgba(255, 255, 255, 0.6) !important;
+        }
+
+        .nexus-modal-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            color: rgba(255, 255, 255, 0.6);
+            transition: all 0.2s;
+            border-radius: 6px;
+        }
+
+        .nexus-modal-close:hover {
+            background: rgba(46, 213, 115, 0.15);
+            color: #2ed573;
+        }
+
+        .nexus-modal-close svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Nexus Input Styles */
+        .nexus-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+        }
+
+        .nexus-input:focus {
+            outline: none;
+            border-color: #2ed573;
+            box-shadow: 0 0 0 3px rgba(46, 213, 115, 0.2);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .nexus-input:disabled,
+        .nexus-input[readonly] {
+            background: rgba(255, 255, 255, 0.03);
+            color: rgba(255, 255, 255, 0.5);
+            cursor: not-allowed;
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .nexus-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Nexus Button Styles */
+        .nexus-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .nexus-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .nexus-btn-primary {
+            background: linear-gradient(135deg, #2ed573, #20bf6b);
+            color: #000;
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(46, 213, 115, 0.4);
+        }
+
+        .nexus-btn-primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #20bf6b, #26de81);
+            box-shadow: 0 6px 20px rgba(46, 213, 115, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .nexus-btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.9);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .nexus-btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .nexus-btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+        }
+
+        .nexus-btn-success:hover:not(:disabled) {
+            background: linear-gradient(135deg, #059669, #047857);
+            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .nexus-btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+        }
+
+        .nexus-btn-danger:hover:not(:disabled) {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            box-shadow: 0 4px 8px rgba(239, 68, 68, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .nexus-btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .nexus-btn-lg {
+            padding: 1rem 2rem;
+            font-size: 1.05rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="crm-container">
+        <!-- Sidebar (mesma do dashboard) -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="/static/images/nexus_Logotipo.png" alt="Nexus" style="height: 80px; margin-bottom: 15px;">
+            </div>
+            <nav>
+                <ul class="sidebar-menu">
+                    <li class="menu-item">
+                        <a href="/crm/dashboard" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/cadastro-clientes" class="menu-link active">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Clientes
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/whatsapp" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                            </svg>
+                            WhatsApp
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/disparos" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            Disparos
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/automacao-canopus" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                            </svg>
+                            Automação Canopus
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/monitoramento" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            Monitoramento
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/graficos" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="12" y1="20" x2="12" y2="10"></line>
+                                <line x1="18" y1="20" x2="18" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="16"></line>
+                            </svg>
+                            Gráficos
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <button class="logout-btn" onclick="logout()">
+                <svg style="width: 18px; height: 18px; vertical-align: middle; margin-right: 8px;" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Sair
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Gestão de Clientes</h1>
+                <p class="breadcrumb">Cadastro e gerenciamento de clientes finais</p>
+            </header>
+
+            <!-- Formulário de Cadastro -->
+            <div class="table-container" style="margin-bottom: 2rem;">
+                <h3 style="margin-bottom: 1rem; color: var(--cor-destaque);">➕ Novo Cliente</h3>
+                <form id="formCliente" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                    <input type="text" id="nome" placeholder="Nome Completo*" class="form-input" required>
+                    <input type="text" id="cpf" placeholder="CPF*" class="form-input" required>
+                    <input type="text" id="telefone" placeholder="Telefone" class="form-input">
+                    <input type="text" id="whatsapp" placeholder="WhatsApp*" class="form-input" required>
+                    <input type="email" id="email" placeholder="Email" class="form-input">
+                    <button type="submit" class="btn btn-primary">Cadastrar Cliente</button>
+                </form>
+            </div>
+
+            <!-- Lista de Clientes -->
+            <div class="table-container">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h3 style="margin: 0; color: var(--cor-destaque);">📋 Lista de Clientes</h3>
+
+                    <!-- Campo de Busca -->
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex: 1; max-width: 500px;">
+                        <input
+                            type="text"
+                            id="searchInput"
+                            placeholder="🔍 Buscar por nome, CPF, email ou telefone..."
+                            class="nexus-input"
+                            style="flex: 1;"
+                        >
+                        <button
+                            onclick="limparBusca()"
+                            class="nexus-btn nexus-btn-secondary nexus-btn-sm"
+                            title="Limpar busca"
+                        >
+                            <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="listaClientes" class="loading">Carregando...</div>
+
+                <!-- Controles de Paginação -->
+                <div id="paginacao" style="display: none; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <div style="color: rgba(255, 255, 255, 0.7); font-size: 0.9rem;">
+                            Mostrando <span id="infoInicio">0</span> - <span id="infoFim">0</span> de <span id="infoTotal">0</span> clientes
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button
+                                id="btnPrimeira"
+                                onclick="irParaPagina(0)"
+                                class="nexus-btn nexus-btn-secondary nexus-btn-sm"
+                                title="Primeira página"
+                            >
+                                <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <polyline points="11 17 6 12 11 7"></polyline>
+                                    <polyline points="18 17 13 12 18 7"></polyline>
+                                </svg>
+                            </button>
+                            <button
+                                id="btnAnterior"
+                                onclick="paginaAnterior()"
+                                class="nexus-btn nexus-btn-secondary nexus-btn-sm"
+                            >
+                                <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                                Anterior
+                            </button>
+                            <span id="infoPagina" style="padding: 0.5rem 1rem; color: rgba(255, 255, 255, 0.9); font-weight: 600;">
+                                Página 1
+                            </span>
+                            <button
+                                id="btnProxima"
+                                onclick="proximaPagina()"
+                                class="nexus-btn nexus-btn-secondary nexus-btn-sm"
+                            >
+                                Próxima
+                                <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                            <button
+                                id="btnUltima"
+                                onclick="irParaUltimaPagina()"
+                                class="nexus-btn nexus-btn-secondary nexus-btn-sm"
+                                title="Última página"
+                            >
+                                <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <polyline points="13 17 18 12 13 7"></polyline>
+                                    <polyline points="6 17 11 12 6 7"></polyline>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de Edição -->
+    <div id="modalEdicao" class="nexus-modal" style="display: none;">
+        <div class="nexus-modal-overlay" onclick="fecharModalEdicao()"></div>
+        <div class="nexus-modal-content" style="max-width: 600px;">
+            <div class="nexus-modal-header">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 0.75rem;">
+                    <svg style="width: 24px; height: 24px; color: #2ed573;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    Editar Cliente
+                </h3>
+                <button class="nexus-modal-close" onclick="fecharModalEdicao()">
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="nexus-modal-body">
+                <form id="formEdicao" style="display: grid; gap: 1.25rem;">
+                    <input type="hidden" id="editId">
+
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--nexus-text-primary); font-size: 0.9rem;">
+                            Nome Completo *
+                        </label>
+                        <input type="text" id="editNome" class="nexus-input" required style="width: 100%;">
+                    </div>
+
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--nexus-text-primary); font-size: 0.9rem;">
+                            CPF *
+                        </label>
+                        <input type="text" id="editCpf" class="nexus-input" required readonly style="width: 100%; background: var(--nexus-bg-secondary);">
+                        <small style="color: var(--nexus-text-secondary); font-size: 0.8rem;">O CPF não pode ser alterado</small>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--nexus-text-primary); font-size: 0.9rem;">
+                                Telefone
+                            </label>
+                            <input type="text" id="editTelefone" class="nexus-input" style="width: 100%;">
+                        </div>
+
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--nexus-text-primary); font-size: 0.9rem;">
+                                WhatsApp
+                            </label>
+                            <input type="text" id="editWhatsapp" class="nexus-input" style="width: 100%;">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--nexus-text-primary); font-size: 0.9rem;">
+                            Email
+                        </label>
+                        <input type="email" id="editEmail" class="nexus-input" style="width: 100%;">
+                    </div>
+
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--nexus-text-primary); font-size: 0.9rem;">
+                            Observações
+                        </label>
+                        <textarea id="editObservacoes" class="nexus-input" rows="3" style="width: 100%; resize: vertical;"></textarea>
+                    </div>
+
+                    <!-- Link para Débitos -->
+                    <div style="margin-top: 1rem; padding: 1rem; background: linear-gradient(135deg, rgba(57,255,20,0.05) 0%, rgba(57,255,20,0.1) 100%); border-left: 3px solid #39FF14; border-radius: 8px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                            <div>
+                                <span style="font-weight: 600; color: var(--nexus-text-primary); display: block; margin-bottom: 0.25rem;">
+                                    📊 Débitos do Cliente
+                                </span>
+                                <span style="font-size: 0.85rem; color: var(--nexus-text-secondary);">
+                                    Visualize todos os boletos e débitos pendentes
+                                </span>
+                            </div>
+                            <button type="button" id="btnVerDebitos" onclick="verDebitosCliente()" style="padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #39FF14 0%, #2dd10f 100%); color: #000; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; font-size: 0.9rem; white-space: nowrap;">
+                                Ver Débitos →
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
+                        <button type="button" class="nexus-btn nexus-btn-secondary" onclick="fecharModalEdicao()">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="nexus-btn nexus-btn-primary">
+                            <svg style="width: 18px; height: 18px; margin-right: 6px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Salvar Alterações
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Script simplificado para cadastro
+        document.getElementById('formCliente').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const dados = {
+                nome: document.getElementById('nome').value,
+                cpf: document.getElementById('cpf').value,
+                telefone: document.getElementById('telefone').value,
+                whatsapp: document.getElementById('whatsapp').value,
+                email: document.getElementById('email').value
+            };
+
+            try {
+                const response = await fetch('/api/crm/clientes', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(dados)
+                });
+
+                if (response.ok) {
+                    mostrarNotificacao('Cliente cadastrado com sucesso!', 'success');
+                    e.target.reset();
+                    carregarClientes();
+                } else {
+                    const erro = await response.json();
+                    mostrarNotificacao('Erro: ' + (erro.erro || 'Erro ao cadastrar cliente'), 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao cadastrar:', error);
+                mostrarNotificacao('Erro ao cadastrar cliente', 'error');
+            }
+        });
+
+        // Estado da paginação
+        let paginaAtual = 0;
+        const itensPorPagina = 10;
+        let totalClientes = 0;
+        let filtroAtual = '';
+
+        async function carregarClientes(offset = 0, filtro = '') {
+            try {
+                // Construir URL com parâmetros
+                const params = new URLSearchParams({
+                    limit: itensPorPagina,
+                    offset: offset
+                });
+
+                if (filtro) {
+                    params.append('filtro', filtro);
+                }
+
+                const response = await fetch(`/api/crm/clientes?${params}`);
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/login-cliente';
+                        return;
+                    }
+                    throw new Error('Erro ao carregar clientes');
+                }
+
+                const data = await response.json();
+                totalClientes = data.total || 0;
+
+                // Atualizar info de paginação
+                atualizarInfoPaginacao(offset);
+
+                if (!data.clientes || data.clientes.length === 0) {
+                    document.getElementById('listaClientes').innerHTML = `
+                        <p style="color: var(--cor-texto-secundario); text-align: center; padding: 2rem;">
+                            ${filtro ? 'Nenhum cliente encontrado com esse filtro' : 'Nenhum cliente cadastrado ainda'}
+                        </p>
+                    `;
+                    document.getElementById('paginacao').style.display = 'none';
+                    return;
+                }
+
+                // Mostrar controles de paginação se houver clientes
+                if (totalClientes > itensPorPagina) {
+                    document.getElementById('paginacao').style.display = 'block';
+                } else {
+                    document.getElementById('paginacao').style.display = 'none';
+                }
+
+                let html = `
+                    <table class="table-nexus">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>CPF</th>
+                                <th>WhatsApp</th>
+                                <th>Email</th>
+                                <th>Contrato</th>
+                                <th>Boletos</th>
+                                <th style="width: 120px; text-align: center;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                data.clientes.forEach(c => {
+                    const clienteId = c.id || c.cliente_final_id;
+                    console.log('Cliente:', c.nome || c.nome_completo, 'ID:', clienteId);
+
+                    html += `
+                        <tr>
+                            <td>${c.nome || c.nome_completo || '-'}</td>
+                            <td>${c.cpf || '-'}</td>
+                            <td>${c.whatsapp || '-'}</td>
+                            <td>${c.email || '-'}</td>
+                            <td>${c.numero_contrato || '-'}</td>
+                            <td>${c.total_boletos || 0}</td>
+                            <td style="text-align: center;">
+                                <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                                    <button
+                                        class="nexus-btn nexus-btn-sm nexus-btn-primary"
+                                        onclick="console.log('Botão editar clicado, ID:', ${clienteId}); abrirModalEdicao(${clienteId})"
+                                        title="Editar cliente"
+                                        style="padding: 0.4rem 0.8rem;">
+                                        <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                        </svg>
+                                    </button>
+                                    <button
+                                        class="nexus-btn nexus-btn-sm nexus-btn-danger"
+                                        onclick="confirmarExclusao(${clienteId}, '${(c.nome || c.nome_completo || '').replace(/'/g, "\\'")}')"
+                                        title="Excluir cliente"
+                                        style="padding: 0.4rem 0.8rem;">
+                                        <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                document.getElementById('listaClientes').innerHTML = html;
+            } catch (error) {
+                console.error('Erro ao carregar clientes:', error);
+                document.getElementById('listaClientes').innerHTML = '<p style="color: var(--cor-erro);">Erro ao carregar lista de clientes</p>';
+            }
+        }
+
+        // Sistema de Notificações (definir primeiro)
+        function mostrarNotificacao(mensagem, tipo = 'info') {
+            // Remover notificações anteriores
+            const notifAnterior = document.querySelector('.nexus-notification');
+            if (notifAnterior) notifAnterior.remove();
+
+            // Cores por tipo
+            const cores = {
+                success: 'var(--nexus-success)',
+                error: 'var(--nexus-danger)',
+                warning: 'var(--nexus-warning)',
+                info: 'var(--nexus-info)'
+            };
+
+            // Ícones por tipo
+            const icones = {
+                success: '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>',
+                error: '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>',
+                warning: '<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>',
+                info: '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>'
+            };
+
+            // Criar notificação
+            const notificacao = document.createElement('div');
+            notificacao.className = 'nexus-notification';
+            notificacao.style.cssText = `
+                position: fixed;
+                top: 2rem;
+                right: 2rem;
+                background: white;
+                border-left: 4px solid ${cores[tipo]};
+                border-radius: var(--nexus-radius-md);
+                padding: 1rem 1.5rem;
+                box-shadow: var(--nexus-shadow-lg);
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                z-index: 10000;
+                animation: slideInRight 0.3s ease-out;
+                max-width: 400px;
+            `;
+
+            notificacao.innerHTML = `
+                <svg style="width: 24px; height: 24px; color: ${cores[tipo]}; flex-shrink: 0;" fill="currentColor" viewBox="0 0 20 20">
+                    ${icones[tipo]}
+                </svg>
+                <span style="color: #1a1f2e; font-weight: 500;">${mensagem}</span>
+                <button onclick="this.parentElement.remove()" style="background: none; border: none; cursor: pointer; padding: 0; margin-left: auto;">
+                    <svg style="width: 20px; height: 20px; color: #6b7280;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            `;
+
+            document.body.appendChild(notificacao);
+
+            // Auto-remover após 5 segundos
+            setTimeout(() => {
+                notificacao.style.animation = 'slideOutRight 0.3s ease-out';
+                setTimeout(() => notificacao.remove(), 300);
+            }, 5000);
+        }
+
+        // Adicionar animações CSS
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideInRight {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+
+            @keyframes slideOutRight {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Funções de Paginação
+        function atualizarInfoPaginacao(offset) {
+            const inicio = offset + 1;
+            const fim = Math.min(offset + itensPorPagina, totalClientes);
+            const paginaNum = Math.floor(offset / itensPorPagina) + 1;
+            const totalPaginas = Math.ceil(totalClientes / itensPorPagina);
+
+            document.getElementById('infoInicio').textContent = inicio;
+            document.getElementById('infoFim').textContent = fim;
+            document.getElementById('infoTotal').textContent = totalClientes;
+            document.getElementById('infoPagina').textContent = `Página ${paginaNum} de ${totalPaginas}`;
+
+            // Desabilitar botões conforme necessário
+            document.getElementById('btnPrimeira').disabled = offset === 0;
+            document.getElementById('btnAnterior').disabled = offset === 0;
+            document.getElementById('btnProxima').disabled = fim >= totalClientes;
+            document.getElementById('btnUltima').disabled = fim >= totalClientes;
+        }
+
+        function proximaPagina() {
+            const novoOffset = paginaAtual + itensPorPagina;
+            if (novoOffset < totalClientes) {
+                paginaAtual = novoOffset;
+                carregarClientes(paginaAtual, filtroAtual);
+            }
+        }
+
+        function paginaAnterior() {
+            const novoOffset = paginaAtual - itensPorPagina;
+            if (novoOffset >= 0) {
+                paginaAtual = novoOffset;
+                carregarClientes(paginaAtual, filtroAtual);
+            }
+        }
+
+        function irParaPagina(offset) {
+            paginaAtual = offset;
+            carregarClientes(paginaAtual, filtroAtual);
+        }
+
+        function irParaUltimaPagina() {
+            const ultimaPagina = Math.floor((totalClientes - 1) / itensPorPagina);
+            paginaAtual = ultimaPagina * itensPorPagina;
+            carregarClientes(paginaAtual, filtroAtual);
+        }
+
+        // Funções de Busca
+        function limparBusca() {
+            document.getElementById('searchInput').value = '';
+            filtroAtual = '';
+            paginaAtual = 0;
+            carregarClientes(0, '');
+        }
+
+        // Event listener para busca em tempo real (com debounce)
+        let searchTimeout;
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                filtroAtual = e.target.value.trim();
+                paginaAtual = 0;
+                carregarClientes(0, filtroAtual);
+            }, 500); // Aguarda 500ms após usuário parar de digitar
+        });
+
+        // Carregar clientes ao iniciar
+        carregarClientes();
+
+        // Funções de Edição
+        async function abrirModalEdicao(clienteId) {
+            console.log('Abrindo modal para cliente:', clienteId);
+
+            try {
+                // Buscar dados do cliente
+                const response = await fetch(`/api/crm/clientes/${clienteId}`);
+                console.log('Response status:', response.status);
+
+                if (!response.ok) throw new Error('Erro ao buscar cliente');
+
+                const cliente = await response.json();
+                console.log('Cliente recebido:', cliente);
+
+                // Preencher formulário
+                document.getElementById('editId').value = clienteId;
+                document.getElementById('editNome').value = cliente.nome || cliente.nome_completo || '';
+                document.getElementById('editCpf').value = cliente.cpf || '';
+                document.getElementById('editTelefone').value = cliente.telefone || cliente.telefone_celular || '';
+                document.getElementById('editWhatsapp').value = cliente.whatsapp || '';
+                document.getElementById('editEmail').value = cliente.email || '';
+                document.getElementById('editObservacoes').value = cliente.observacoes || '';
+
+                // Mostrar modal
+                console.log('Mostrando modal...');
+                document.getElementById('modalEdicao').style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            } catch (error) {
+                console.error('Erro ao abrir modal:', error);
+                alert('Erro ao carregar dados do cliente: ' + error.message);
+            }
+        }
+
+        function verDebitosCliente() {
+            const clienteId = document.getElementById('editId').value;
+            const clienteNome = document.getElementById('editNome').value;
+
+            if (!clienteId) {
+                alert('Nenhum cliente selecionado');
+                return;
+            }
+
+            // Abrir em nova aba a página de débitos do cliente
+            window.open(`/crm/cliente-debitos?id=${clienteId}&nome=${encodeURIComponent(clienteNome)}`, '_blank');
+        }
+
+        function fecharModalEdicao() {
+            document.getElementById('modalEdicao').style.display = 'none';
+            document.body.style.overflow = '';
+            document.getElementById('formEdicao').reset();
+        }
+
+        // Submeter edição
+        document.getElementById('formEdicao').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const clienteId = document.getElementById('editId').value;
+            const dados = {
+                nome: document.getElementById('editNome').value,
+                telefone: document.getElementById('editTelefone').value,
+                whatsapp: document.getElementById('editWhatsapp').value,
+                email: document.getElementById('editEmail').value,
+                observacoes: document.getElementById('editObservacoes').value
+            };
+
+            try {
+                const response = await fetch(`/api/crm/clientes/${clienteId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(dados)
+                });
+
+                if (response.ok) {
+                    mostrarNotificacao('Cliente atualizado com sucesso!', 'success');
+                    fecharModalEdicao();
+                    carregarClientes();
+                } else {
+                    const erro = await response.json();
+                    mostrarNotificacao('Erro: ' + (erro.erro || 'Erro ao atualizar cliente'), 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao atualizar:', error);
+                mostrarNotificacao('Erro ao atualizar cliente', 'error');
+            }
+        });
+
+        // Funções de Exclusão
+        function confirmarExclusao(clienteId, nomeCliente) {
+            console.log('Confirmando exclusão:', clienteId, nomeCliente);
+            if (confirm(`Tem certeza que deseja excluir o cliente "${nomeCliente}"?\n\nEsta ação não pode ser desfeita.`)) {
+                excluirCliente(clienteId);
+            }
+        }
+
+        async function excluirCliente(clienteId) {
+            console.log('Excluindo cliente:', clienteId);
+            try {
+                const response = await fetch(`/api/crm/clientes/${clienteId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    mostrarNotificacao('Cliente excluído com sucesso!', 'success');
+                    carregarClientes();
+                } else {
+                    const erro = await response.json();
+                    mostrarNotificacao('Erro: ' + (erro.erro || 'Erro ao excluir cliente'), 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao excluir:', error);
+                mostrarNotificacao('Erro ao excluir cliente', 'error');
+            }
+        }
+
+        function logout() {
+            fetch('/api/auth/logout', {method: 'POST'}).then(() => window.location.href = '/');
+        }
+    </script>
+</body>
+</html>

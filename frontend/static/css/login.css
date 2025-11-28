@@ -1,0 +1,314 @@
+/* ============================================
+   NEXUS CRM - LOGIN PAGE
+   Glassmorphism + Verde Neon Tech
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+/* ========== CONTAINER PRINCIPAL ========== */
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nexus-bg-primary);
+  position: relative;
+  overflow: hidden;
+  padding: var(--nexus-space-xl);
+}
+
+/* Background animado */
+.login-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(57, 255, 20, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 70% 60%, rgba(10, 77, 10, 0.1) 0%, transparent 50%);
+  z-index: 0;
+  animation: bgPulse 15s ease-in-out infinite;
+}
+
+/* Grid tech background */
+.login-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    linear-gradient(rgba(57, 255, 20, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(57, 255, 20, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  z-index: 0;
+  opacity: 0.3;
+}
+
+/* ========== CARD LOGIN ========== */
+.login-card {
+  background: var(--nexus-bg-glass);
+  backdrop-filter: blur(var(--nexus-blur-xl));
+  -webkit-backdrop-filter: blur(var(--nexus-blur-xl));
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-2xl);
+  padding: var(--nexus-space-3xl);
+  box-shadow: var(--nexus-shadow-xl), var(--nexus-shadow-neon-sm);
+  max-width: 450px;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+  animation: fadeInUp 0.8s ease-out, float 6s ease-in-out infinite;
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--nexus-gradient-glass);
+  border-radius: var(--nexus-radius-2xl);
+  z-index: -1;
+  opacity: 0.5;
+}
+
+/* ========== LOGO & HEADER ========== */
+.login-header {
+  text-align: center;
+  margin-bottom: var(--nexus-space-2xl);
+}
+
+.logo-login {
+  font-family: var(--nexus-font-display);
+  font-size: var(--nexus-text-3xl);
+  font-weight: var(--nexus-font-bold);
+  background: var(--nexus-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--nexus-space-sm);
+  display: block;
+}
+
+.logo-login img {
+  height: 70px;
+  filter: drop-shadow(0 0 15px var(--nexus-primary-glow));
+  margin-bottom: var(--nexus-space-md);
+  animation: glow 3s ease-in-out infinite;
+}
+
+.login-subtitle {
+  color: var(--nexus-text-secondary);
+  font-size: var(--nexus-text-base);
+  line-height: 1.6;
+}
+
+/* ========== FORM ========== */
+.form-group {
+  margin-bottom: var(--nexus-space-lg);
+}
+
+.form-label {
+  display: block;
+  margin-bottom: var(--nexus-space-sm);
+  color: var(--nexus-text-secondary);
+  font-size: var(--nexus-text-sm);
+  font-weight: var(--nexus-font-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-input {
+  width: 100%;
+  padding: var(--nexus-space-md) var(--nexus-space-lg);
+  background: var(--nexus-bg-card);
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-md);
+  color: var(--nexus-text-primary);
+  font-family: var(--nexus-font-primary);
+  font-size: var(--nexus-text-base);
+  transition: var(--nexus-transition-all);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--nexus-primary);
+  box-shadow: 0 0 0 3px var(--nexus-primary-glow);
+  background: var(--nexus-bg-tertiary);
+}
+
+.form-input::placeholder {
+  color: var(--nexus-text-muted);
+}
+
+/* ========== BOTÃO LOGIN ========== */
+.btn-login {
+  width: 100%;
+  padding: var(--nexus-space-lg);
+  background: var(--nexus-gradient-primary);
+  color: var(--nexus-bg-primary);
+  border: none;
+  border-radius: var(--nexus-radius-md);
+  font-family: var(--nexus-font-primary);
+  font-weight: var(--nexus-font-semibold);
+  font-size: var(--nexus-text-base);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: var(--nexus-transition-all);
+  box-shadow: var(--nexus-shadow-neon);
+  position: relative;
+  overflow: hidden;
+  margin-top: var(--nexus-space-md);
+}
+
+.btn-login::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent);
+  transition: left var(--nexus-transition-slow);
+}
+
+.btn-login:hover::before {
+  left: 100%;
+}
+
+.btn-login:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--nexus-shadow-neon-strong);
+}
+
+.btn-login:active {
+  transform: translateY(0);
+}
+
+.btn-login:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ========== ALERTS ========== */
+.alert {
+  padding: var(--nexus-space-md);
+  border-radius: var(--nexus-radius-md);
+  margin-bottom: var(--nexus-space-lg);
+  font-size: var(--nexus-text-sm);
+  border-left: 4px solid;
+  display: none;
+}
+
+.alert.show {
+  display: block;
+  animation: fadeInDown 0.5s ease-out;
+}
+
+.alert-error {
+  background: rgba(255, 23, 68, 0.1);
+  border-left-color: var(--nexus-error);
+  color: var(--nexus-error);
+}
+
+.alert-success {
+  background: rgba(0, 255, 136, 0.1);
+  border-left-color: var(--nexus-success);
+  color: var(--nexus-success);
+}
+
+/* ========== FOOTER ========== */
+.login-footer {
+  text-align: center;
+  margin-top: var(--nexus-space-xl);
+  color: var(--nexus-text-secondary);
+  font-size: var(--nexus-text-sm);
+}
+
+.login-link {
+  color: var(--nexus-primary);
+  text-decoration: none;
+  font-weight: var(--nexus-font-semibold);
+  transition: var(--nexus-transition-base);
+}
+
+.login-link:hover {
+  text-decoration: underline;
+  text-shadow: 0 0 10px var(--nexus-primary-glow);
+}
+
+/* ========== DIVIDER ========== */
+.divider {
+  text-align: center;
+  margin: var(--nexus-space-xl) 0;
+  color: var(--nexus-text-muted);
+  font-size: var(--nexus-text-sm);
+  position: relative;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: var(--nexus-border);
+}
+
+.divider::before {
+  left: 0;
+}
+
+.divider::after {
+  right: 0;
+}
+
+/* ========== RESPONSIVIDADE ========== */
+@media (max-width: 768px) {
+  .login-container {
+    padding: var(--nexus-space-md);
+  }
+
+  .login-card {
+    padding: var(--nexus-space-2xl) var(--nexus-space-xl);
+    max-width: 100%;
+  }
+
+  .logo-login {
+    font-size: var(--nexus-text-2xl);
+  }
+
+  .logo-login img {
+    height: 50px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: var(--nexus-space-xl);
+  }
+
+  .logo-login {
+    font-size: var(--nexus-text-xl);
+  }
+}
+
+/* ========== BODY BASE ========== */
+body {
+  font-family: var(--nexus-font-primary);
+  background: var(--nexus-bg-primary);
+  color: var(--nexus-text-primary);
+  margin: 0;
+  padding: 0;
+}

@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Consórcio - Boletos</title>
+    <link rel="stylesheet" href="/static/css/nexus-core.css">
+    <link rel="stylesheet" href="/static/css/crm-cliente.css">
+    <style>
+        .actions-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--nexus-space-xl);
+            gap: var(--nexus-space-md);
+            flex-wrap: wrap;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: var(--nexus-space-md);
+        }
+
+        .btn {
+            padding: var(--nexus-space-md) var(--nexus-space-lg);
+            border: none;
+            border-radius: var(--nexus-radius-md);
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--nexus-transition-all);
+        }
+
+        .btn-primary {
+            background: var(--nexus-green);
+            color: var(--nexus-bg-primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--nexus-green-hover);
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--nexus-border-color);
+            color: var(--nexus-text-primary);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--nexus-green);
+            color: var(--nexus-green);
+        }
+
+        .table-container {
+            background: var(--nexus-card-bg);
+            border: 1px solid var(--nexus-border-color);
+            border-radius: var(--nexus-radius-lg);
+            padding: var(--nexus-space-lg);
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            border-bottom: 2px solid var(--nexus-border-color);
+        }
+
+        .data-table th {
+            color: var(--nexus-green);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: var(--nexus-space-md);
+            text-align: left;
+        }
+
+        .data-table td {
+            color: var(--nexus-text-primary);
+            padding: var(--nexus-space-md);
+            border-bottom: 1px solid rgba(57, 255, 20, 0.1);
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(57, 255, 20, 0.05);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: var(--nexus-radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: rgba(57, 255, 20, 0.2);
+            color: var(--nexus-green);
+        }
+
+        .badge-warning {
+            background: rgba(255, 200, 0, 0.2);
+            color: #ffc800;
+        }
+
+        .badge-danger {
+            background: rgba(255, 50, 50, 0.2);
+            color: #ff5050;
+        }
+
+        .btn-icon {
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid var(--nexus-border-color);
+            border-radius: var(--nexus-radius-sm);
+            color: var(--nexus-text-secondary);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: var(--nexus-transition-all);
+        }
+
+        .btn-icon:hover {
+            border-color: var(--nexus-green);
+            color: var(--nexus-green);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: var(--nexus-space-xl);
+        }
+
+        .modal-overlay.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal {
+            background: var(--nexus-bg-secondary);
+            border: 1px solid var(--nexus-border-color);
+            border-radius: var(--nexus-radius-lg);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--nexus-space-xl);
+            border-bottom: 1px solid var(--nexus-border-color);
+        }
+
+        .modal-title {
+            color: var(--nexus-green);
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .btn-close {
+            background: transparent;
+            border: none;
+            color: var(--nexus-text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .btn-close:hover {
+            color: var(--nexus-green);
+        }
+
+        .modal-body {
+            padding: var(--nexus-space-xl);
+        }
+
+        .form-group {
+            margin-bottom: var(--nexus-space-lg);
+        }
+
+        .form-label {
+            display: block;
+            color: var(--nexus-green);
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: var(--nexus-space-sm);
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: var(--nexus-space-md);
+            background: var(--nexus-card-bg);
+            border: 1px solid var(--nexus-border-color);
+            border-radius: var(--nexus-radius-md);
+            color: var(--nexus-text-primary);
+            font-size: 1rem;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--nexus-green);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--nexus-space-md);
+            padding: var(--nexus-space-xl);
+            border-top: 1px solid var(--nexus-border-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-logo">
+            <img src="/static/images/nexus_Logotipo.png" alt="Nexus" style="height: 60px; margin-bottom: 1rem; filter: drop-shadow(0 0 20px rgba(57, 255, 20, 0.4));">
+            <h2>Portal Consórcio</h2>
+            <p>Gestão de Consórcios</p>
+        </div>
+
+        <ul class="sidebar-menu">
+            <li class="menu-item">
+                <a href="/portal-consorcio/dashboard" class="menu-link">
+                    <span class="menu-icon">📊</span>
+                    <span class="menu-text">Dashboard</span>
+                </a>
+            </li>
+            <li class="menu-item">
+                <a href="/portal-consorcio/boletos" class="menu-link active">
+                    <span class="menu-icon">📄</span>
+                    <span class="menu-text">Boletos</span>
+                </a>
+            </li>
+        </ul>
+
+        <button onclick="logout()" class="logout-btn">
+            🚪 Sair
+        </button>
+    </div>
+
+    <div class="main-content">
+        <div class="topbar">
+            <h1 class="page-title">Boletos</h1>
+        </div>
+
+        <div class="content-wrapper">
+            <div class="actions-bar">
+                <h2 style="color: var(--nexus-text-primary); margin: 0;">Boletos Gerados</h2>
+                <div class="btn-group">
+                    <button onclick="abrirModalIndividual()" class="btn btn-primary">
+                        Gerar Boleto Individual
+                    </button>
+                    <button onclick="abrirModalLote()" class="btn btn-secondary">
+                        Gerar Lote
+                    </button>
+                    <button onclick="enviarBoletoModelo()" class="btn btn-accent" style="background: var(--nexus-purple); color: white;">
+                        📋 Enviar Modelo para Todos
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div id="loading" class="loading">Carregando...</div>
+                <table class="data-table" id="tabelaBoletos" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Contrato</th>
+                            <th>Parcela</th>
+                            <th>Valor</th>
+                            <th>Vencimento</th>
+                            <th>Status</th>
+                            <th>Envio</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyBoletos"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Gerar Individual -->
+    <div id="modalIndividual" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Gerar Boleto Individual</h2>
+                <button class="btn-close" onclick="fecharModalIndividual()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="formIndividual">
+                    <div class="form-group">
+                        <label class="form-label">Cliente *</label>
+                        <select id="clienteIndividual" class="form-select" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Número da Parcela *</label>
+                        <input type="number" id="numeroParcelaIndividual" class="form-input" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Data Vencimento *</label>
+                        <input type="date" id="dataVencimentoIndividual" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Valor (deixe vazio para usar valor da parcela do cliente)</label>
+                        <input type="number" step="0.01" id="valorIndividual" class="form-input">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="fecharModalIndividual()">Cancelar</button>
+                <button class="btn btn-primary" onclick="gerarBoletoIndividual()">Gerar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Gerar Lote -->
+    <div id="modalLote" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Gerar Boletos em Lote</h2>
+                <button class="btn-close" onclick="fecharModalLote()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="formLote">
+                    <div class="form-group">
+                        <label class="form-label">Cliente *</label>
+                        <select id="clienteLote" class="form-select" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Quantidade de Parcelas *</label>
+                        <input type="number" id="quantidadeParcelas" class="form-input" min="1" max="72" value="12" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Parcela Inicial *</label>
+                        <input type="number" id="parcelaInicial" class="form-input" min="1" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Data da 1ª Parcela *</label>
+                        <input type="date" id="dataPrimeiraParcela" class="form-input" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="fecharModalLote()">Cancelar</button>
+                <button class="btn btn-primary" onclick="gerarBoletoLote()">Gerar Lote</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Visualizador de PDF -->
+    <div id="modalVisualizadorPDF" class="modal-overlay" style="display: none; z-index: 10000;">
+        <div class="modal-content-pdf">
+            <div class="modal-header-pdf">
+                <h3 style="color: var(--nexus-green); margin: 0;">Visualizar Boleto</h3>
+                <button onclick="fecharModalPDF()" class="btn-close-pdf" style="background: transparent; border: none; color: var(--nexus-green); font-size: 1.5rem; cursor: pointer; padding: 0; width: 30px; height: 30px;">&times;</button>
+            </div>
+            <div class="modal-body-pdf">
+                <iframe id="iframePDF" style="width: 100%; height: 100%; border: none;" src=""></iframe>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .modal-content-pdf {
+            background: var(--nexus-bg-secondary);
+            border: 2px solid var(--nexus-green);
+            border-radius: var(--nexus-radius-lg);
+            width: 90%;
+            max-width: 1200px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 40px rgba(57, 255, 20, 0.3);
+        }
+
+        .modal-header-pdf {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--nexus-space-lg);
+            border-bottom: 1px solid var(--nexus-border-color);
+        }
+
+        .modal-body-pdf {
+            flex: 1;
+            padding: var(--nexus-space-lg);
+            overflow: hidden;
+        }
+
+        .btn-icon {
+            background: transparent;
+            border: 1px solid var(--nexus-border-color);
+            padding: 6px 10px;
+            border-radius: var(--nexus-radius-sm);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: var(--nexus-transition-all);
+            margin: 0 2px;
+        }
+
+        .btn-icon:hover {
+            border-color: var(--nexus-green);
+            background: rgba(57, 255, 20, 0.1);
+        }
+    </style>
+
+    <script>
+        let clientes = [];
+        let boletos = [];
+
+        async function carregarClientes() {
+            try {
+                const response = await fetch('/portal-consorcio/api/clientes');
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    clientes = data.clientes.filter(c => c.ativo && c.status_contrato === 'ativo');
+                    popularSelectsClientes();
+                }
+            } catch (error) {
+                console.error('Erro ao carregar clientes:', error);
+            }
+        }
+
+        function popularSelectsClientes() {
+            const options = clientes.map(c =>
+                `<option value="${c.id}">${c.nome_completo} - ${c.numero_contrato}</option>`
+            ).join('');
+
+            document.getElementById('clienteIndividual').innerHTML = '<option value="">Selecione...</option>' + options;
+            document.getElementById('clienteLote').innerHTML = '<option value="">Selecione...</option>' + options;
+        }
+
+        async function carregarBoletos() {
+            try {
+                const response = await fetch('/portal-consorcio/api/boletos');
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    if (response.status === 401) {
+                        window.location.href = '/portal-consorcio/login';
+                        return;
+                    }
+                    throw new Error(data.error);
+                }
+
+                boletos = data.boletos;
+                renderizarBoletos();
+
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao carregar boletos');
+            }
+        }
+
+        function renderizarBoletos() {
+            const tbody = document.getElementById('tbodyBoletos');
+            const loading = document.getElementById('loading');
+            const tabela = document.getElementById('tabelaBoletos');
+
+            loading.style.display = 'none';
+            tabela.style.display = 'table';
+
+            if (boletos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Nenhum boleto gerado ainda</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = boletos.map(b => `
+                <tr>
+                    <td>${b.nome_completo}</td>
+                    <td>${b.numero_contrato}</td>
+                    <td>${b.numero_parcela}</td>
+                    <td>${formatarMoeda(b.valor_original)}</td>
+                    <td>${formatarData(b.data_vencimento)}</td>
+                    <td>${getBadgeStatus(b.status)}</td>
+                    <td>${getBadgeEnvio(b.status_envio)}</td>
+                    <td>
+                        <button class="btn-icon" onclick="downloadBoleto(${b.id})" title="Download PDF">📥</button>
+                        <button class="btn-icon" onclick="enviarWhatsApp(${b.id})" title="Enviar WhatsApp">📱</button>
+                        <button class="btn-icon" onclick="visualizarBoleto(${b.id})" title="Visualizar">👁️</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function formatarMoeda(valor) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(valor || 0);
+        }
+
+        function formatarData(data) {
+            if (!data) return '-';
+            return new Date(data).toLocaleDateString('pt-BR');
+        }
+
+        function getBadgeStatus(status) {
+            const badges = {
+                'pendente': '<span class="badge badge-warning">Pendente</span>',
+                'pago': '<span class="badge badge-success">Pago</span>',
+                'vencido': '<span class="badge badge-danger">Vencido</span>'
+            };
+            return badges[status] || status;
+        }
+
+        function getBadgeEnvio(status) {
+            const badges = {
+                'nao_enviado': '<span class="badge badge-warning">Não Enviado</span>',
+                'enviado': '<span class="badge badge-success">Enviado</span>',
+                'erro': '<span class="badge badge-danger">Erro</span>'
+            };
+            return badges[status] || status;
+        }
+
+        function abrirModalIndividual() {
+            document.getElementById('formIndividual').reset();
+            document.getElementById('modalIndividual').classList.add('show');
+        }
+
+        function fecharModalIndividual() {
+            document.getElementById('modalIndividual').classList.remove('show');
+        }
+
+        function abrirModalLote() {
+            document.getElementById('formLote').reset();
+            document.getElementById('modalLote').classList.add('show');
+        }
+
+        function fecharModalLote() {
+            document.getElementById('modalLote').classList.remove('show');
+        }
+
+        async function gerarBoletoIndividual() {
+            const dados = {
+                cliente_final_id: parseInt(document.getElementById('clienteIndividual').value),
+                numero_parcela: parseInt(document.getElementById('numeroParcelaIndividual').value),
+                data_vencimento: document.getElementById('dataVencimentoIndividual').value,
+                valor: document.getElementById('valorIndividual').value || null
+            };
+
+            if (!dados.cliente_final_id || !dados.numero_parcela || !dados.data_vencimento) {
+                alert('Preencha todos os campos obrigatórios');
+                return;
+            }
+
+            try {
+                const response = await fetch('/portal-consorcio/api/boletos/gerar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    alert(data.message);
+                    fecharModalIndividual();
+                    carregarBoletos();
+                } else {
+                    alert(data.error || 'Erro ao gerar boleto');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao gerar boleto');
+            }
+        }
+
+        async function gerarBoletoLote() {
+            const dados = {
+                cliente_final_id: parseInt(document.getElementById('clienteLote').value),
+                quantidade_parcelas: parseInt(document.getElementById('quantidadeParcelas').value),
+                parcela_inicial: parseInt(document.getElementById('parcelaInicial').value),
+                data_primeira_parcela: document.getElementById('dataPrimeiraParcela').value
+            };
+
+            if (!dados.cliente_final_id || !dados.quantidade_parcelas || !dados.data_primeira_parcela) {
+                alert('Preencha todos os campos obrigatórios');
+                return;
+            }
+
+            if (!confirm(`Gerar ${dados.quantidade_parcelas} boletos?`)) return;
+
+            try {
+                const response = await fetch('/portal-consorcio/api/boletos/gerar-lote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    alert(`${data.boletos_gerados} boletos gerados com sucesso!`);
+                    if (data.erros && data.erros.length > 0) {
+                        console.log('Erros:', data.erros);
+                    }
+                    fecharModalLote();
+                    carregarBoletos();
+                } else {
+                    alert(data.error || 'Erro ao gerar lote');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao gerar lote de boletos');
+            }
+        }
+
+        async function downloadBoleto(id) {
+            window.open(`/portal-consorcio/api/boletos/${id}/download`, '_blank');
+        }
+
+        function visualizarBoleto(id) {
+            const modal = document.getElementById('modalVisualizadorPDF');
+            const iframe = document.getElementById('iframePDF');
+
+            // Definir URL do PDF no iframe (usar endpoint de visualização inline)
+            iframe.src = `/portal-consorcio/api/boletos/${id}/visualizar`;
+
+            // Mostrar modal
+            modal.style.display = 'flex';
+        }
+
+        function fecharModalPDF() {
+            const modal = document.getElementById('modalVisualizadorPDF');
+            const iframe = document.getElementById('iframePDF');
+
+            // Limpar iframe
+            iframe.src = '';
+
+            // Esconder modal
+            modal.style.display = 'none';
+        }
+
+        async function enviarWhatsApp(id) {
+            if (!confirm('Deseja enviar este boleto por WhatsApp?')) return;
+
+            try {
+                const response = await fetch(`/portal-consorcio/api/boletos/${id}/enviar-whatsapp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    alert('Boleto enviado com sucesso via WhatsApp!');
+                    carregarBoletos(); // Recarregar para atualizar status
+                } else {
+                    alert(data.error || 'Erro ao enviar boleto');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao enviar boleto via WhatsApp');
+            }
+        }
+
+        async function enviarBoletoModelo() {
+            // Solicitar ID do cliente Nexus
+            const clienteNexusId = prompt('Digite o ID do Cliente Nexus (empresa) para enviar o boleto modelo:');
+
+            if (!clienteNexusId) return;
+
+            // Solicitar mensagem personalizada (opcional)
+            const mensagem = prompt('Digite uma mensagem personalizada (ou deixe em branco para usar a padrão):');
+
+            if (mensagem === null) return; // Cancelou
+
+            if (!confirm(`Isso enviará o boleto modelo (modelo-boleto.pdf) para TODOS os clientes ativos do Cliente Nexus ID ${clienteNexusId} via WhatsApp. Continuar?`)) return;
+
+            try {
+                const response = await fetch('/portal-consorcio/api/boletos/enviar-modelo-massa', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        cliente_nexus_id: parseInt(clienteNexusId),
+                        mensagem: mensagem || null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    let detalhes = `Boleto modelo enviado com sucesso!\n\n`;
+                    detalhes += `Total de clientes: ${data.total_clientes}\n`;
+                    detalhes += `Enviados com sucesso: ${data.total_enviados}\n`;
+                    detalhes += `Erros: ${data.total_erros}\n\n`;
+
+                    if (data.total_erros > 0) {
+                        detalhes += `Clientes com erro:\n`;
+                        data.resultados.filter(r => r.status === 'erro').forEach(r => {
+                            detalhes += `- ${r.nome}: ${r.erro}\n`;
+                        });
+                    }
+
+                    alert(detalhes);
+                    carregarBoletos(); // Recarregar lista
+                } else {
+                    alert(`Erro ao enviar: ${data.error || 'Erro desconhecido'}`);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao enviar boleto modelo');
+            }
+        }
+
+        // Event listeners para fechar modal de PDF
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('modalVisualizadorPDF');
+
+            // Fechar ao clicar fora do conteúdo
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    fecharModalPDF();
+                }
+            });
+
+            // Fechar com ESC
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && modal.style.display === 'flex') {
+                    fecharModalPDF();
+                }
+            });
+        });
+
+        async function logout() {
+            if (!confirm('Deseja realmente sair?')) return;
+            await fetch('/portal-consorcio/api/logout', { method: 'POST' });
+            window.location.href = '/portal-consorcio/login';
+        }
+
+        // Carregar ao iniciar
+        carregarClientes();
+        carregarBoletos();
+    </script>
+</body>
+</html>

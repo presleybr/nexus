@@ -1,0 +1,558 @@
+/* ============================================
+   NEXUS CRM - COMPONENTES REUTILIZÁVEIS
+   Botões, Cards, Inputs, Badges, etc.
+   ============================================ */
+
+/* ========== BOTÕES ========== */
+
+/* Botão Primary - Verde Neon com gradiente */
+.btn-primary,
+.btn-nexus {
+  background: var(--nexus-gradient-primary);
+  color: var(--nexus-bg-primary);
+  border: none;
+  padding: var(--nexus-space-md) var(--nexus-space-xl);
+  border-radius: var(--nexus-radius-md);
+  font-weight: var(--nexus-font-semibold);
+  font-size: var(--nexus-text-base);
+  font-family: var(--nexus-font-primary);
+  cursor: pointer;
+  transition: var(--nexus-transition-all);
+  box-shadow: var(--nexus-shadow-neon);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nexus-space-sm);
+  text-decoration: none;
+}
+
+.btn-primary::before,
+.btn-nexus::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent);
+  transition: left var(--nexus-transition-slow);
+}
+
+.btn-primary:hover::before,
+.btn-nexus:hover::before {
+  left: 100%;
+}
+
+.btn-primary:hover,
+.btn-nexus:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--nexus-shadow-neon-strong);
+  background: var(--nexus-gradient-primary-hover);
+}
+
+.btn-primary:active,
+.btn-nexus:active {
+  transform: translateY(0);
+}
+
+/* Botão Secondary - Outline Verde Neon */
+.btn-secondary,
+.btn-outline {
+  background: transparent;
+  color: var(--nexus-primary);
+  border: 2px solid var(--nexus-primary);
+  padding: var(--nexus-space-md) var(--nexus-space-xl);
+  border-radius: var(--nexus-radius-md);
+  font-weight: var(--nexus-font-semibold);
+  font-size: var(--nexus-text-base);
+  cursor: pointer;
+  transition: var(--nexus-transition-all);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nexus-space-sm);
+  text-decoration: none;
+}
+
+.btn-secondary:hover,
+.btn-outline:hover {
+  background: var(--nexus-primary);
+  color: var(--nexus-bg-primary);
+  box-shadow: var(--nexus-shadow-neon);
+  transform: translateY(-2px);
+}
+
+/* Botão Ghost - Transparente com hover */
+.btn-ghost {
+  background: transparent;
+  color: var(--nexus-text-secondary);
+  border: 1px solid var(--nexus-border-subtle);
+  padding: var(--nexus-space-md) var(--nexus-space-xl);
+  border-radius: var(--nexus-radius-md);
+  font-weight: var(--nexus-font-medium);
+  cursor: pointer;
+  transition: var(--nexus-transition-all);
+  text-decoration: none;
+}
+
+.btn-ghost:hover {
+  background: var(--nexus-bg-glass);
+  border-color: var(--nexus-border);
+  color: var(--nexus-primary);
+}
+
+/* Tamanhos de botões */
+.btn-sm {
+  padding: var(--nexus-space-sm) var(--nexus-space-lg);
+  font-size: var(--nexus-text-sm);
+}
+
+.btn-lg {
+  padding: var(--nexus-space-lg) var(--nexus-space-2xl);
+  font-size: var(--nexus-text-lg);
+}
+
+.btn-block {
+  width: 100%;
+  display: flex;
+}
+
+/* Botão com ícone */
+.btn-icon {
+  padding: var(--nexus-space-md);
+  aspect-ratio: 1;
+  border-radius: var(--nexus-radius-md);
+}
+
+/* ========== CARDS ========== */
+
+/* Card Glassmorphism */
+.card-glass,
+.card-nexus {
+  background: var(--nexus-bg-glass);
+  backdrop-filter: blur(var(--nexus-blur-md));
+  -webkit-backdrop-filter: blur(var(--nexus-blur-md));
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-lg);
+  padding: var(--nexus-space-xl);
+  box-shadow: var(--nexus-shadow-md);
+  transition: var(--nexus-transition-all);
+}
+
+.card-glass:hover,
+.card-nexus:hover {
+  border-color: var(--nexus-border-hover);
+  box-shadow: var(--nexus-shadow-lg), var(--nexus-shadow-neon-sm);
+  transform: translateY(-4px);
+}
+
+/* Card com fundo sólido */
+.card-solid {
+  background: var(--nexus-bg-card);
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-lg);
+  padding: var(--nexus-space-xl);
+  box-shadow: var(--nexus-shadow-md);
+  transition: var(--nexus-transition-all);
+}
+
+/* Card com gradiente */
+.card-gradient {
+  background: var(--nexus-gradient-glass);
+  backdrop-filter: blur(var(--nexus-blur-lg));
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-lg);
+  padding: var(--nexus-space-xl);
+  box-shadow: var(--nexus-shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-gradient::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--nexus-gradient-radial);
+  opacity: 0.3;
+  z-index: -1;
+}
+
+/* ========== BADGES & TAGS ========== */
+
+/* Badge Neon */
+.badge-neon,
+.badge-primary {
+  display: inline-block;
+  padding: var(--nexus-space-xs) var(--nexus-space-md);
+  background: rgba(57, 255, 20, 0.1);
+  border: 1px solid var(--nexus-primary);
+  border-radius: var(--nexus-radius-full);
+  color: var(--nexus-primary);
+  font-size: var(--nexus-text-sm);
+  font-weight: var(--nexus-font-semibold);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: var(--nexus-shadow-neon-sm);
+}
+
+/* Badge Success */
+.badge-success {
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid var(--nexus-success);
+  color: var(--nexus-success);
+  padding: var(--nexus-space-xs) var(--nexus-space-md);
+  border-radius: var(--nexus-radius-full);
+  font-size: var(--nexus-text-sm);
+  font-weight: var(--nexus-font-semibold);
+  display: inline-block;
+}
+
+/* Badge Warning */
+.badge-warning {
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid var(--nexus-warning);
+  color: var(--nexus-warning);
+  padding: var(--nexus-space-xs) var(--nexus-space-md);
+  border-radius: var(--nexus-radius-full);
+  font-size: var(--nexus-text-sm);
+  font-weight: var(--nexus-font-semibold);
+  display: inline-block;
+}
+
+/* Badge Error */
+.badge-error {
+  background: rgba(255, 23, 68, 0.1);
+  border: 1px solid var(--nexus-error);
+  color: var(--nexus-error);
+  padding: var(--nexus-space-xs) var(--nexus-space-md);
+  border-radius: var(--nexus-radius-full);
+  font-size: var(--nexus-text-sm);
+  font-weight: var(--nexus-font-semibold);
+  display: inline-block;
+}
+
+/* ========== INPUTS & FORMS ========== */
+
+/* Input padrão */
+.input-nexus,
+.form-input {
+  width: 100%;
+  padding: var(--nexus-space-md);
+  background: var(--nexus-bg-card);
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-md);
+  color: var(--nexus-text-primary);
+  font-family: var(--nexus-font-primary);
+  font-size: var(--nexus-text-base);
+  transition: var(--nexus-transition-all);
+}
+
+.input-nexus:focus,
+.form-input:focus {
+  outline: none;
+  border-color: var(--nexus-primary);
+  box-shadow: 0 0 0 3px var(--nexus-primary-glow);
+  background: var(--nexus-bg-tertiary);
+}
+
+.input-nexus::placeholder,
+.form-input::placeholder {
+  color: var(--nexus-text-muted);
+}
+
+/* Textarea */
+.textarea-nexus {
+  width: 100%;
+  padding: var(--nexus-space-md);
+  background: var(--nexus-bg-card);
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-md);
+  color: var(--nexus-text-primary);
+  font-family: var(--nexus-font-primary);
+  font-size: var(--nexus-text-base);
+  resize: vertical;
+  min-height: 120px;
+  transition: var(--nexus-transition-all);
+}
+
+.textarea-nexus:focus {
+  outline: none;
+  border-color: var(--nexus-primary);
+  box-shadow: 0 0 0 3px var(--nexus-primary-glow);
+}
+
+/* Select */
+.select-nexus {
+  width: 100%;
+  padding: var(--nexus-space-md);
+  background: var(--nexus-bg-card);
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-md);
+  color: var(--nexus-text-primary);
+  font-family: var(--nexus-font-primary);
+  font-size: var(--nexus-text-base);
+  cursor: pointer;
+  transition: var(--nexus-transition-all);
+}
+
+.select-nexus:focus {
+  outline: none;
+  border-color: var(--nexus-primary);
+  box-shadow: 0 0 0 3px var(--nexus-primary-glow);
+}
+
+/* Label */
+.form-label {
+  display: block;
+  margin-bottom: var(--nexus-space-sm);
+  color: var(--nexus-text-secondary);
+  font-size: var(--nexus-text-sm);
+  font-weight: var(--nexus-font-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ========== LOGO ========== */
+
+.nexus-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--nexus-space-sm);
+  font-family: var(--nexus-font-display);
+  font-weight: var(--nexus-font-bold);
+  font-size: var(--nexus-text-2xl);
+  color: var(--nexus-text-primary);
+  text-decoration: none;
+}
+
+.nexus-logo img {
+  height: 40px;
+  filter: drop-shadow(0 0 10px var(--nexus-primary-glow));
+  transition: var(--nexus-transition-base);
+}
+
+.nexus-logo:hover img {
+  filter: drop-shadow(0 0 20px var(--nexus-primary));
+}
+
+.nexus-logo-text {
+  background: var(--nexus-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Logo grande (Hero) */
+.nexus-logo-lg {
+  font-size: var(--nexus-text-4xl);
+}
+
+.nexus-logo-lg img {
+  height: 60px;
+}
+
+/* ========== TEXT UTILITIES ========== */
+
+/* Gradiente no texto */
+.text-gradient {
+  background: var(--nexus-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Texto neon */
+.text-neon {
+  color: var(--nexus-primary);
+  text-shadow: 0 0 10px var(--nexus-primary-glow);
+}
+
+/* Texto muted */
+.text-muted {
+  color: var(--nexus-text-muted);
+}
+
+.text-secondary {
+  color: var(--nexus-text-secondary);
+}
+
+/* ========== DIVIDERS ========== */
+
+/* Divider com efeito neon */
+.divider-neon {
+  width: 100%;
+  height: 1px;
+  background: var(--nexus-gradient-primary);
+  box-shadow: var(--nexus-shadow-neon-sm);
+  margin: var(--nexus-space-xl) 0;
+  border: none;
+}
+
+/* Divider simples */
+.divider {
+  width: 100%;
+  height: 1px;
+  background: var(--nexus-border);
+  margin: var(--nexus-space-lg) 0;
+  border: none;
+}
+
+/* ========== ALERTS ========== */
+
+.alert {
+  padding: var(--nexus-space-md) var(--nexus-space-lg);
+  border-radius: var(--nexus-radius-md);
+  border-left: 4px solid;
+  margin-bottom: var(--nexus-space-md);
+}
+
+.alert-success {
+  background: rgba(0, 255, 136, 0.1);
+  border-left-color: var(--nexus-success);
+  color: var(--nexus-success);
+}
+
+.alert-warning {
+  background: rgba(255, 215, 0, 0.1);
+  border-left-color: var(--nexus-warning);
+  color: var(--nexus-warning);
+}
+
+.alert-error {
+  background: rgba(255, 23, 68, 0.1);
+  border-left-color: var(--nexus-error);
+  color: var(--nexus-error);
+}
+
+.alert-info {
+  background: rgba(57, 255, 20, 0.1);
+  border-left-color: var(--nexus-primary);
+  color: var(--nexus-primary);
+}
+
+/* ========== PROGRESS BARS ========== */
+
+.progress {
+  width: 100%;
+  height: 8px;
+  background: var(--nexus-bg-tertiary);
+  border-radius: var(--nexus-radius-full);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--nexus-gradient-primary);
+  border-radius: var(--nexus-radius-full);
+  transition: width var(--nexus-transition-slow);
+  box-shadow: var(--nexus-shadow-neon-sm);
+}
+
+/* ========== TOOLTIPS ========== */
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip .tooltip-text {
+  visibility: hidden;
+  background: var(--nexus-bg-card);
+  color: var(--nexus-text-primary);
+  text-align: center;
+  border-radius: var(--nexus-radius-md);
+  padding: var(--nexus-space-sm) var(--nexus-space-md);
+  position: absolute;
+  z-index: var(--nexus-z-tooltip);
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: var(--nexus-text-sm);
+  border: 1px solid var(--nexus-border);
+  box-shadow: var(--nexus-shadow-lg);
+  opacity: 0;
+  transition: opacity var(--nexus-transition-base);
+}
+
+.tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* ========== SPINNER / LOADING ========== */
+
+.spinner {
+  border: 3px solid var(--nexus-border);
+  border-top: 3px solid var(--nexus-primary);
+  border-radius: var(--nexus-radius-full);
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spinner-sm {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+
+/* ========== CONTAINER ========== */
+
+.container {
+  width: 100%;
+  max-width: var(--nexus-max-width-7xl);
+  margin: 0 auto;
+  padding: 0 var(--nexus-space-lg);
+}
+
+.container-sm {
+  max-width: var(--nexus-max-width-3xl);
+}
+
+.container-md {
+  max-width: var(--nexus-max-width-5xl);
+}
+
+/* ========== RESPONSIVIDADE ========== */
+
+@media (max-width: 768px) {
+  .btn-primary,
+  .btn-nexus,
+  .btn-secondary,
+  .btn-outline {
+    padding: var(--nexus-space-sm) var(--nexus-space-lg);
+    font-size: var(--nexus-text-sm);
+  }
+
+  .card-glass,
+  .card-nexus,
+  .card-solid {
+    padding: var(--nexus-space-lg);
+  }
+
+  .nexus-logo {
+    font-size: var(--nexus-text-xl);
+  }
+
+  .nexus-logo img {
+    height: 32px;
+  }
+}

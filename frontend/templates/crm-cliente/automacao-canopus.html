@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automação Canopus - Nexus CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/crm-cliente.css">
+
+    <style>
+        .canopus-header {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            border-left: 4px solid #39FF14;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .canopus-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        .canopus-header p {
+            color: #888;
+            font-size: 1rem;
+        }
+
+        .action-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .action-card {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            border-radius: 12px;
+            padding: 2rem;
+            border-left: 4px solid #39FF14;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-card::before {
+            content: attr(data-step);
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 4rem;
+            font-weight: 900;
+            color: rgba(57, 255, 20, 0.1);
+            z-index: 0;
+        }
+
+        .action-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(57, 255, 20, 0.2);
+        }
+
+        .action-card h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.75rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .action-card p {
+            color: #888;
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .step-indicator {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            background: #39FF14;
+            color: #000;
+            border-radius: 50%;
+            font-weight: 800;
+            font-size: 1.1rem;
+            margin-right: 0.75rem;
+        }
+
+        .step-google-drive { border-left-color: #4285f4; }
+        .step-google-drive::before { color: rgba(66, 133, 244, 0.1); }
+        .step-google-drive .step-indicator { background: #4285f4; color: #fff; }
+        .step-google-drive h3 { color: #4285f4; }
+
+        .step-import { border-left-color: #34a853; }
+        .step-import::before { color: rgba(52, 168, 83, 0.1); }
+        .step-import .step-indicator { background: #34a853; color: #fff; }
+        .step-import h3 { color: #34a853; }
+
+        .step-download { border-left-color: #fbbc04; }
+        .step-download::before { color: rgba(251, 188, 4, 0.1); }
+        .step-download .step-indicator { background: #fbbc04; color: #000; }
+        .step-download h3 { color: #fbbc04; }
+
+        .step-crm { border-left-color: #ea4335; }
+        .step-crm::before { color: rgba(234, 67, 53, 0.1); }
+        .step-crm .step-indicator { background: #ea4335; color: #fff; }
+        .step-crm h3 { color: #ea4335; }
+
+        .step-dispatch { border-left-color: #9333ea; }
+        .step-dispatch::before { color: rgba(147, 51, 234, 0.1); }
+        .step-dispatch .step-indicator { background: #9333ea; color: #fff; }
+        .step-dispatch h3 { color: #9333ea; }
+
+        .drive-link-input {
+            width: 100%;
+            padding: 0.75rem;
+            background: #1a1a1a;
+            color: #fff;
+            border: 2px solid #4285f4;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .drive-link-input:focus {
+            outline: none;
+            border-color: #34a853;
+            box-shadow: 0 0 0 3px rgba(52, 168, 83, 0.2);
+        }
+
+        .action-card p {
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn-canopus {
+            background: linear-gradient(135deg, #39FF14 0%, #2dd40f 100%);
+            color: #000;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn-canopus:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(57, 255, 20, 0.3);
+        }
+
+        .btn-canopus:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #333;
+            color: #fff;
+        }
+
+        .btn-secondary:hover {
+            background: #444;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+        }
+
+        .progress-section {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .progress-section.active {
+            display: block;
+        }
+
+        .progress-bar {
+            background: #333;
+            border-radius: 8px;
+            height: 24px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #39FF14 0%, #2dd40f 100%);
+            height: 100%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #000;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stat-box {
+            background: #222;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #39FF14;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .boletos-table {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .boletos-table h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 1rem;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #222;
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #39FF14;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #333;
+            transition: background 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background: #222;
+        }
+
+        td {
+            padding: 1rem;
+            color: #ccc;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-sucesso {
+            background: rgba(57, 255, 20, 0.2);
+            color: #39FF14;
+        }
+
+        .status-pendente {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+
+        .status-erro {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .action-btn {
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: #39FF14;
+            color: #000;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        .log-container {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+
+        .log-entry {
+            padding: 0.25rem 0;
+            color: #888;
+        }
+
+        .log-entry.success { color: #39FF14; }
+        .log-entry.error { color: #ef4444; }
+        .log-entry.warning { color: #ffc107; }
+        .log-entry.info { color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div class="crm-container">
+        <!-- Sidebar (mesmo do dashboard) -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="\static\images\nexus_Logotipo.png" alt="Nexus" style="height: 80px; margin-bottom: 15px;">
+                <p id="empresaNome">Carregando...</p>
+            </div>
+
+            <nav>
+                <ul class="sidebar-menu">
+                    <li class="menu-item">
+                        <a href="/crm/dashboard" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/cadastro-clientes" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Clientes
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/whatsapp" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                            </svg>
+                            WhatsApp
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/disparos" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            Disparos
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/automacao-canopus" class="menu-link active">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                            </svg>
+                            Automação Canopus
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/monitoramento" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            Monitoramento
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/graficos" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="12" y1="20" x2="12" y2="10"></line>
+                                <line x1="18" y1="20" x2="18" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="16"></line>
+                            </svg>
+                            Gráficos
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <button onclick="logout()" class="btn-logout">
+                <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Sair
+            </button>
+        </aside>
+
+        <!-- Conteúdo Principal -->
+        <main class="main-content">
+            <div class="canopus-header">
+                <h1>🚀 Automação Canopus</h1>
+                <p>Baixe, importe e gerencie boletos automaticamente do sistema Canopus</p>
+            </div>
+
+            <!-- Cards de Ação - Reorganizados em Etapas -->
+            <div class="action-cards">
+                <!-- ETAPA 1: Google Drive -->
+                <div class="action-card step-google-drive" data-step="1">
+                    <h3>
+                        <span class="step-indicator">1</span>
+                        Configurar Planilha do Google Drive
+                    </h3>
+                    <p>📂 Cole o link da planilha do Google Drive e faça o download automático</p>
+
+                    <!-- Input para Link do Drive -->
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; color: #4285f4; font-weight: 600; position: relative; z-index: 1;">
+                            🔗 Link do Google Drive:
+                        </label>
+                        <input
+                            type="text"
+                            id="inputLinkDrive"
+                            class="drive-link-input"
+                            placeholder="https://docs.google.com/spreadsheets/d/..."
+                            style="position: relative; z-index: 1;"
+                        />
+                    </div>
+
+                    <!-- Botão Atualizar/Baixar Planilha do Drive -->
+                    <button class="btn-canopus" id="btnAtualizarPlanilhaDrive" style="margin-bottom: 0; background: linear-gradient(135deg, #4285f4 0%, #34a853 100%); position: relative; z-index: 1;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path>
+                        </svg>
+                        🔄 Baixar Planilha do Drive
+                    </button>
+                </div>
+
+                <!-- ETAPA 2: Importar Planilha -->
+                <div class="action-card step-import" data-step="2">
+                    <h3>
+                        <span class="step-indicator">2</span>
+                        Importar Planilha para o Banco
+                    </h3>
+                    <p>📊 Selecione quais pontos de venda importar e processe os dados no banco</p>
+
+                    <!-- Seleção de Pontos de Venda -->
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; color: #34a853; font-weight: 600; position: relative; z-index: 1;">
+                            📍 Selecione os Pontos de Venda:
+                        </label>
+                        <select id="selectPontosVenda" style="width: 100%; padding: 0.75rem; background: #1a1a1a; color: #fff; border: 2px solid #34a853; border-radius: 8px; font-size: 0.95rem; cursor: pointer; position: relative; z-index: 1;">
+                            <option value="ambos">🔄 Ambos (17308 + 24627)</option>
+                            <option value="17308">📌 Apenas PV 17308</option>
+                            <option value="24627" selected>📌 Apenas PV 24627</option>
+                        </select>
+                    </div>
+
+                    <!-- Botão Importar Planilha -->
+                    <button class="btn-canopus" id="btnImportarPlanilha" style="background: #34a853; position: relative; z-index: 1;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <line x1="9" y1="15" x2="15" y2="15"></line>
+                        </svg>
+                        Importar Planilha
+                    </button>
+                </div>
+
+                <!-- ETAPA 3: Baixar Boletos -->
+                <div class="action-card step-download" data-step="3">
+                    <h3>
+                        <span class="step-indicator">3</span>
+                        Baixar Boletos do Sistema
+                    </h3>
+                    <p>📥 Baixa automaticamente os boletos dos clientes importados</p>
+
+                    <!-- Seletor de Ponto de Venda -->
+                    <div style="margin-bottom: 1.5rem; position: relative; z-index: 1;">
+                        <label style="display: block; color: #888; font-size: 0.9rem; margin-bottom: 0.75rem;">Ponto de Venda:</label>
+                        <div style="display: flex; gap: 1.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: not-allowed; opacity: 0.5;">
+                                <input type="checkbox" id="pvDownload17308" value="17308" disabled style="width: 18px; height: 18px;">
+                                <span style="color: #888; font-size: 0.95rem;">PV 17308 (Sem senha)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="pvDownload24627" value="24627" checked style="width: 18px; height: 18px;">
+                                <span style="color: #fff; font-size: 0.95rem;">PV 24627</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de Progresso -->
+                    <div id="downloadProgress" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px; display: none; position: relative; z-index: 1;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span style="color: #888; font-size: 0.9rem;">Progresso:</span>
+                            <span id="downloadProgressText" style="color: #39FF14; font-weight: 600;">0 de 0</span>
+                        </div>
+                        <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                            <div id="downloadProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #39FF14, #2ecc71); transition: width 0.3s ease;"></div>
+                        </div>
+                    </div>
+
+                    <button class="btn-canopus" id="btnIniciarDownload" style="background: #fbbc04; color: #000; position: relative; z-index: 1;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Iniciar Download de Boletos
+                    </button>
+                </div>
+
+                <!-- ETAPA 4: Importar Boletos -->
+                <div class="action-card step-crm" data-step="4">
+                    <h3>
+                        <span class="step-indicator">4</span>
+                        Importar Boletos para o CRM
+                    </h3>
+                    <p>💾 Importa os PDFs baixados para o banco de dados do Nexus CRM</p>
+                    <button class="btn-canopus btn-secondary" id="btnImportarBoletos" disabled style="position: relative; z-index: 1;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        Importar Boletos
+                    </button>
+                </div>
+
+                <!-- ETAPA 5: Disparar -->
+                <div class="action-card step-dispatch" data-step="5">
+                    <h3>
+                        <span class="step-indicator">5</span>
+                        Disparar via WhatsApp
+                    </h3>
+                    <p>📱 Envie os boletos via WhatsApp para os clientes automaticamente</p>
+                    <button class="btn-canopus btn-secondary" onclick="window.location.href='/crm/disparos'" style="position: relative; z-index: 1;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                        Configurar Disparos
+                    </button>
+                </div>
+            </div>
+
+            <!-- Seção de Progresso -->
+            <div class="progress-section" id="progressSection">
+                <h3 style="color: #fff; margin-bottom: 1rem;">Progresso do Download</h3>
+
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%;">0%</div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-value" id="statTotal">0</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="statSucesso">0</div>
+                        <div class="stat-label">Sucesso</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="statErro">0</div>
+                        <div class="stat-label">Erros</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="statPendente">0</div>
+                        <div class="stat-label">Pendentes</div>
+                    </div>
+                </div>
+
+                <div class="log-container" id="logContainer">
+                    <div class="log-entry info">[INFO] Aguardando início da execução...</div>
+                </div>
+            </div>
+
+            <!-- Tabela de Boletos Baixados -->
+            <div class="boletos-table">
+                <h3>📄 Boletos Baixados</h3>
+                <div class="table-container">
+                    <table id="boletosTable">
+                        <thead>
+                            <tr>
+                                <th>Cliente (CPF)</th>
+                                <th>Valor</th>
+                                <th>Vencimento</th>
+                                <th>Grupo/Cota</th>
+                                <th>Arquivo</th>
+                                <th>Tamanho</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="boletosTableBody">
+                            <tr>
+                                <td colspan="8" class="empty-state">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        <polyline points="10 9 9 9 8 9"></polyline>
+                                    </svg>
+                                    <p>Nenhum boleto baixado ainda. Clique em "Iniciar Download" para começar.</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/crm-comum.js"></script>
+    <script>
+        let execucaoAtual = null;
+        let intervaloPolling = null;
+
+        // Carregar informações da empresa
+        carregarInformacoesEmpresa();
+
+        // Carregar link do Drive salvo (se existir)
+        async function carregarLinkDrive() {
+            try {
+                const response = await fetch('/api/automation/consultores-planilhas');
+                const data = await response.json();
+
+                if (data.success) {
+                    const consultor = data.data.consultores.find(c =>
+                        c.nome.toLowerCase().includes('dener') ||
+                        c.nome.toLowerCase().includes('danner') ||
+                        c.nome.toLowerCase().includes('den')
+                    );
+
+                    if (consultor && consultor.link_planilha_drive) {
+                        document.getElementById('inputLinkDrive').value = consultor.link_planilha_drive;
+                        adicionarLog('info', `📋 Link do Drive carregado: ${consultor.nome}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao carregar link do Drive:', error);
+            }
+        }
+
+        carregarLinkDrive();
+
+        // Importar planilha
+        document.getElementById('btnImportarPlanilha').addEventListener('click', async () => {
+            const btn = document.getElementById('btnImportarPlanilha');
+            const pontosVendaSelecionados = document.getElementById('selectPontosVenda').value;
+
+            // Mensagem de confirmação dinâmica baseada na seleção
+            let mensagemConfirmacao = 'Deseja importar/atualizar a planilha do Dener?\n\n';
+            if (pontosVendaSelecionados === 'ambos') {
+                mensagemConfirmacao += 'Isso irá importar todos os clientes dos PV 17308 E 24627 para o banco de dados.';
+            } else if (pontosVendaSelecionados === '17308') {
+                mensagemConfirmacao += 'Isso irá importar todos os clientes do PV 17308 para o banco de dados.';
+            } else {
+                mensagemConfirmacao += 'Isso irá importar todos os clientes do PV 24627 para o banco de dados.';
+            }
+
+            if (!confirm(mensagemConfirmacao)) {
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span>Importando...</span>';
+
+            try {
+                const response = await fetch('/api/automation/importar-planilha-dener', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pontos_venda: pontosVendaSelecionados
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    let mensagemSucesso = `✓ Planilha importada com sucesso!\n\n`;
+                    mensagemSucesso += `Pontos de Venda: ${pontosVendaSelecionados === 'ambos' ? '17308 + 24627' : pontosVendaSelecionados}\n\n`;
+                    mensagemSucesso += `Novos clientes: ${result.data.importados}\n`;
+                    mensagemSucesso += `Atualizados: ${result.data.atualizados}\n`;
+                    mensagemSucesso += `Erros: ${result.data.erros}\n`;
+                    mensagemSucesso += `Total processado: ${result.data.total_processados}`;
+
+                    alert(mensagemSucesso);
+
+                    adicionarLog('success', `Planilha importada (PV ${pontosVendaSelecionados}): ${result.data.total_processados} clientes`);
+                } else {
+                    alert('Erro ao importar planilha: ' + result.error);
+                    adicionarLog('error', 'Erro ao importar planilha');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao conectar com o servidor');
+                adicionarLog('error', 'Erro de conexão');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>Importar Planilha do Dener';
+            }
+        });
+
+        // Atualizar planilha do Drive
+        document.getElementById('btnAtualizarPlanilhaDrive').addEventListener('click', async () => {
+            const btn = document.getElementById('btnAtualizarPlanilhaDrive');
+            const inputLinkDrive = document.getElementById('inputLinkDrive');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span>🔄 Baixando do Drive...</span>';
+
+            try {
+                adicionarLog('info', '🌐 Iniciando download da planilha do Google Drive...');
+
+                // Primeiro, vamos buscar os consultores com planilhas configuradas
+                const responseConsultores = await fetch('/api/automation/consultores-planilhas');
+                const dataConsultores = await responseConsultores.json();
+
+                if (!dataConsultores.success) {
+                    throw new Error(dataConsultores.error || 'Erro ao buscar consultores');
+                }
+
+                // Procurar o consultor (Dener/Danner/Den)
+                const consultor = dataConsultores.data.consultores.find(c =>
+                    c.nome.toLowerCase().includes('dener') ||
+                    c.nome.toLowerCase().includes('danner') ||
+                    c.nome.toLowerCase().includes('den')
+                );
+
+                if (!consultor) {
+                    adicionarLog('error', '❌ Consultor não encontrado no sistema');
+                    alert('Erro: Consultor não encontrado no banco de dados.\n\nVerifique se existe um consultor cadastrado.');
+                    return;
+                }
+
+                const nomeConsultor = consultor.nome;
+
+                // Verificar se há link no input OU no banco
+                let linkDrive = inputLinkDrive.value.trim();
+
+                if (!linkDrive && !consultor.link_planilha_drive) {
+                    adicionarLog('error', '⚠️ Nenhum link do Google Drive fornecido');
+                    alert('Por favor, cole o link do Google Drive no campo acima!');
+                    inputLinkDrive.focus();
+                    return;
+                }
+
+                // Se há link no input, salvar no banco
+                if (linkDrive) {
+                    adicionarLog('info', '💾 Salvando link do Drive no banco de dados...');
+
+                    const responseConfig = await fetch(`/api/automation/consultor/${consultor.id}/configurar-planilha`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ link_drive: linkDrive })
+                    });
+
+                    const dataConfig = await responseConfig.json();
+
+                    if (!dataConfig.success) {
+                        throw new Error(dataConfig.error || 'Erro ao configurar link do Drive');
+                    }
+
+                    adicionarLog('success', '✅ Link do Google Drive salvo com sucesso!');
+                    consultor.link_planilha_drive = linkDrive;
+                } else {
+                    // Usar o link que já está no banco
+                    linkDrive = consultor.link_planilha_drive;
+                    adicionarLog('info', '📋 Usando link do Drive salvo anteriormente');
+                }
+
+                // Agora fazer o download da planilha
+                adicionarLog('info', `📥 Baixando planilha do consultor ${nomeConsultor}...`);
+
+                const responseDownload = await fetch(`/api/automation/consultor/${consultor.id}/atualizar-planilha`, {
+                    method: 'POST'
+                });
+
+                const resultDownload = await responseDownload.json();
+
+                if (resultDownload.success) {
+                    const data = resultDownload.data;
+
+                    let mensagemSucesso = `✅ Planilha atualizada com sucesso!\n\n`;
+                    mensagemSucesso += `📁 Arquivo: ${data.arquivo_nome}\n`;
+                    mensagemSucesso += `📊 Tamanho: ${(data.tamanho / 1024).toFixed(2)} KB\n`;
+                    mensagemSucesso += `💾 Local: automation/canopus/excel_files/\n\n`;
+                    mensagemSucesso += `A planilha foi baixada do Google Drive e está pronta para ser importada!`;
+
+                    alert(mensagemSucesso);
+                    adicionarLog('success', `✅ ${data.mensagem}`);
+                    adicionarLog('info', `📁 Arquivo: ${data.arquivo_nome} (${(data.tamanho / 1024).toFixed(2)} KB)`);
+
+                } else {
+                    throw new Error(resultDownload.error || 'Erro desconhecido ao baixar planilha');
+                }
+
+            } catch (error) {
+                console.error('Erro:', error);
+                adicionarLog('error', `❌ Erro ao atualizar planilha: ${error.message}`);
+                alert('Erro ao atualizar planilha do Drive:\n\n' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path></svg> 🔄 Baixar Planilha do Drive';
+            }
+        });
+
+        // Iniciar download
+        document.getElementById('btnIniciarDownload').addEventListener('click', async () => {
+            const btn = document.getElementById('btnIniciarDownload');
+
+            // Verificar qual PV foi selecionado
+            const pv24627Checked = document.getElementById('pvDownload24627').checked;
+            const pv17308Checked = document.getElementById('pvDownload17308').checked;
+
+            if (!pv24627Checked && !pv17308Checked) {
+                alert('Por favor, selecione ao menos um Ponto de Venda');
+                return;
+            }
+
+            // Como apenas 24627 está disponível, usar ele
+            const pontoVenda = pv24627Checked ? '24627' : '17308';
+
+            btn.disabled = true;
+            btn.innerHTML = '<span>Processando...</span>';
+
+            // Mostrar indicador de progresso
+            const progressContainer = document.getElementById('downloadProgress');
+            progressContainer.style.display = 'block';
+
+            mostrarProgresso();
+            adicionarLog('info', `Iniciando download de boletos do PV ${pontoVenda}...`);
+
+            // Calcular o PRÓXIMO mês (não o mês atual)
+            const hoje = new Date();
+            const proximoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
+            const mesNome = proximoMes.toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase();
+            const anoProximoMes = proximoMes.getFullYear();
+
+            adicionarLog('info', `Buscando boletos de ${mesNome}/${anoProximoMes}`);
+
+            try {
+                const response = await fetch('/api/automation/baixar-boletos-ponto-venda', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ponto_venda: pontoVenda,
+                        mes: mesNome,
+                        ano: anoProximoMes
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Mostrar informações do início do processamento
+                    document.getElementById('statTotal').textContent = result.data.total_clientes || 0;
+                    document.getElementById('statSucesso').textContent = 0;
+                    document.getElementById('statErro').textContent = 0;
+                    document.getElementById('statPendente').textContent = result.data.total_clientes || 0;
+
+                    const progresso = 0;
+
+                    document.getElementById('progressFill').style.width = `${progresso}%`;
+                    document.getElementById('progressFill').textContent = `${progresso}%`;
+
+                    adicionarLog('success', `✅ ${result.message}`);
+                    adicionarLog('info', `Total de clientes: ${result.data.total_clientes}`);
+                    adicionarLog('warning', '⏳ O Chromium abrirá em alguns segundos... Aguarde!');
+
+                    // Iniciar polling para atualizar lista de boletos a cada 5 segundos
+                    let boletosPollingInterval = setInterval(() => {
+                        carregarBoletosBaixados();
+                    }, 5000);
+
+                    // Parar polling após 15 minutos (tempo máximo estimado)
+                    setTimeout(() => {
+                        clearInterval(boletosPollingInterval);
+                        adicionarLog('info', '⏹️ Polling de atualização de boletos encerrado');
+                        carregarBoletosBaixados(); // Última atualização
+                    }, 15 * 60 * 1000);
+                } else {
+                    adicionarLog('error', 'Erro ao iniciar download: ' + result.error);
+                    alert('Erro ao iniciar download: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                adicionarLog('error', 'Erro ao conectar com o servidor');
+                alert('Erro ao conectar com o servidor');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Iniciar Download';
+            }
+        });
+
+        // Importar boletos
+        document.getElementById('btnImportarBoletos').addEventListener('click', async () => {
+            if (!confirm('Deseja importar todos os boletos baixados para o banco de dados?')) {
+                return;
+            }
+
+            const btn = document.getElementById('btnImportarBoletos');
+            btn.disabled = true;
+            btn.innerHTML = '<span>Importando...</span>';
+
+            try {
+                const response = await fetch('/api/automation/importar-boletos', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const msg = `Importação concluída!
+
+📁 Total de PDFs: ${result.data.total_pdfs}
+✅ Importados: ${result.data.importados}
+⏭️ Já existentes: ${result.data.ja_existentes}
+⚠️ Sem cliente: ${result.data.sem_cliente}
+❌ Erros: ${result.data.erros}
+
+Os boletos importados já estão prontos para envio via WhatsApp!`;
+                    alert(msg);
+                    carregarBoletosBaixados();
+                } else {
+                    alert('Erro ao importar: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao conectar com o servidor');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Importar Boletos';
+            }
+        });
+
+        function mostrarProgresso() {
+            document.getElementById('progressSection').classList.add('active');
+        }
+
+        function iniciarPolling(execucaoId) {
+            intervaloPolling = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/automation/execucoes/${execucaoId}`);
+                    const result = await response.json();
+
+                    if (result.success) {
+                        const exec = result.data.execucao;
+                        atualizarProgresso(exec);
+
+                        if (exec.status === 'concluida' || exec.status === 'erro') {
+                            pararPolling();
+                            finalizarExecucao(exec);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Erro no polling:', error);
+                }
+            }, 3000);
+        }
+
+        function pararPolling() {
+            if (intervaloPolling) {
+                clearInterval(intervaloPolling);
+                intervaloPolling = null;
+            }
+        }
+
+        function atualizarProgresso(execucao) {
+            const stats = execucao.estatisticas || {};
+            const total = stats.total || 0;
+            const sucesso = stats.sucesso || 0;
+            const erro = stats.erro || 0;
+            const processados = sucesso + erro;
+            const progresso = total > 0 ? (processados / total * 100) : 0;
+
+            document.getElementById('progressFill').style.width = progresso + '%';
+            document.getElementById('progressFill').textContent = Math.round(progresso) + '%';
+
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statSucesso').textContent = sucesso;
+            document.getElementById('statErro').textContent = erro;
+            document.getElementById('statPendente').textContent = total - processados;
+
+            // Atualizar novo indicador de progresso customizado
+            const progressText = document.getElementById('downloadProgressText');
+            const progressBar = document.getElementById('downloadProgressBar');
+
+            if (progressText) {
+                progressText.textContent = `${processados} de ${total}`;
+            }
+            if (progressBar) {
+                progressBar.style.width = `${progresso}%`;
+            }
+
+            if (execucao.logs && execucao.logs.length > 0) {
+                const ultimoLog = execucao.logs[execucao.logs.length - 1];
+                adicionarLog('info', ultimoLog);
+            }
+        }
+
+        function finalizarExecucao(execucao) {
+            const btn = document.getElementById('btnIniciarDownload');
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Iniciar Download de Boletos';
+
+            document.getElementById('btnImportarBoletos').disabled = false;
+
+            if (execucao.status === 'concluida') {
+                adicionarLog('success', '✓ Execução concluída com sucesso!');
+                carregarBoletosBaixados();
+            } else {
+                adicionarLog('error', '✗ Execução finalizada com erros');
+            }
+        }
+
+        function adicionarLog(tipo, mensagem) {
+            const logContainer = document.getElementById('logContainer');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${tipo}`;
+            const timestamp = new Date().toLocaleTimeString('pt-BR');
+            logEntry.textContent = `[${timestamp}] ${mensagem}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        async function carregarBoletosBaixados() {
+            try {
+                const response = await fetch('/api/automation/boletos-baixados');
+                const result = await response.json();
+
+                if (result.success && result.data.length > 0) {
+                    const tbody = document.getElementById('boletosTableBody');
+                    tbody.innerHTML = '';
+
+                    result.data.forEach(boleto => {
+                        const tr = document.createElement('tr');
+
+                        // Mostrar dados REAIS extraídos do PDF quando disponível
+                        const statusEmoji = boleto.dados_extraidos ? '✅' : '⚠️';
+                        const statusTexto = boleto.dados_extraidos ? 'Processado' : 'Baixado';
+                        const statusClass = boleto.dados_extraidos ? 'sucesso' : 'pendente';
+
+                        tr.innerHTML = `
+                            <td>
+                                <strong>${boleto.cliente_nome}</strong>
+                                ${boleto.cpf !== 'N/A' ? `<br><small style="color: #888;">CPF: ${boleto.cpf}</small>` : ''}
+                            </td>
+                            <td>
+                                ${boleto.valor > 0 ? `<strong style="color: #39FF14;">R$ ${boleto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>` : boleto.valor_str}
+                            </td>
+                            <td>${boleto.vencimento}</td>
+                            <td>
+                                ${boleto.grupo_cota !== 'N/A' ? boleto.grupo_cota : '-'}
+                            </td>
+                            <td>${boleto.arquivo_nome}</td>
+                            <td>${formatarTamanho(boleto.tamanho)}</td>
+                            <td>
+                                <span class="status-badge status-${statusClass}">
+                                    ${statusEmoji} ${statusTexto}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="action-btn" onclick="baixarBoleto('${boleto.arquivo_nome}')">📥 Baixar</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    // HABILITAR botão "Importar Boletos" quando houver PDFs disponíveis
+                    document.getElementById('btnImportarBoletos').disabled = false;
+                } else {
+                    // DESABILITAR botão se não houver boletos
+                    document.getElementById('btnImportarBoletos').disabled = true;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar boletos:', error);
+            }
+        }
+
+        function formatarTamanho(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function baixarBoleto(nomeArquivo) {
+            window.open(`/api/automation/download-boleto?nome=${encodeURIComponent(nomeArquivo)}`, '_blank');
+        }
+
+        // Carregar boletos ao carregar a página
+        carregarBoletosBaixados();
+    </script>
+</body>
+</html>

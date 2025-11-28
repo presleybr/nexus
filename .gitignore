@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Flask
+instance/
+.webassets-cache
+
+# Arquivos de ambiente
+.env
+.env.local
+
+# Banco de dados
+*.db
+*.sqlite3
+
+# Boletos gerados
+boletos/**/*.pdf
+!boletos/.gitkeep
+
+# Sessões WhatsApp
+whatsapp_sessions/
+
+# Automation Downloads
+automation/canopus/downloads/**/*.pdf
+automation/canopus/excel_files/**/*.xlsx
+!automation/canopus/downloads/.gitkeep
+!automation/canopus/excel_files/.gitkeep
+
+# Playwright
+playwright/.auth/
+trace.zip
+screenshots/
+*.png
+test-results/
+
+# Logs
+*.log
+logs/
+app.log
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+nul

@@ -1,0 +1,53 @@
+# ============================================================================
+# DEPENDÊNCIAS DA AUTOMAÇÃO CANOPUS
+# Sistema: Nexus CRM - Módulo de Automação de Download de Boletos
+# ============================================================================
+
+# Playwright - Automação de navegador
+playwright==1.40.0
+
+# Processamento de Excel
+pandas==2.1.4
+openpyxl==3.1.2
+xlrd==2.0.1
+
+# Banco de dados PostgreSQL
+psycopg[binary]==3.1.16
+psycopg-pool==3.2.0
+
+# Criptografia
+cryptography==41.0.7
+
+# Utilitários
+python-dotenv==1.0.0
+python-dateutil==2.8.2
+
+# Logging aprimorado (opcional)
+colorlog==6.8.0
+
+# HTTP requests (para integração com API WhatsApp e Canopus API)
+requests==2.31.0
+
+# Parsing HTML (para Canopus API)
+beautifulsoup4==4.12.2
+lxml==5.1.0
+
+# ============================================================================
+# DEPENDÊNCIAS DO PROJETO NEXUS (se necessário)
+# ============================================================================
+
+# Flask (já instalado no backend)
+# Flask==3.0.0
+
+# ============================================================================
+# NOTAS DE INSTALAÇÃO
+# ============================================================================
+
+# 1. Instalar dependências:
+#    pip install -r requirements.txt
+
+# 2. Instalar navegadores do Playwright:
+#    playwright install chromium
+
+# 3. (Opcional) Instalar todos os navegadores:
+#    playwright install

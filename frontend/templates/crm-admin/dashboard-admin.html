@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Nexus CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Nexus Design System -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/crm-cliente.css">
+</head>
+<body>
+    <div class="crm-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="/static/images/nexus_Logotipo.png" alt="Nexus Admin" style="height: 80px; margin-bottom: 15px;">
+                <p style="color: var(--nexus-primary); font-weight: 600;">Painel Admin</p>
+            </div>
+            <nav><ul class="sidebar-menu">
+                <li><a href="/admin/dashboard" class="menu-link active"><span class="menu-icon">📊</span> Dashboard</a></li>
+            </ul></nav>
+            <button class="logout-btn" onclick="logout()">🚪 Sair</button>
+        </aside>
+        <main class="main-content">
+            <header class="content-header"><h1>Painel Administrativo</h1><p class="breadcrumb">Visão geral do sistema</p></header>
+
+            <div class="cards-grid">
+                <div class="card"><div class="card-header"><span class="card-title">Total de Empresas</span><span class="card-icon">🏢</span></div><div class="card-value" id="totalEmpresas">-</div></div>
+                <div class="card"><div class="card-header"><span class="card-title">Total de Clientes</span><span class="card-icon">👥</span></div><div class="card-value" id="totalClientes">-</div></div>
+                <div class="card"><div class="card-header"><span class="card-title">Boletos Totais</span><span class="card-icon">📄</span></div><div class="card-value" id="totalBoletos">-</div></div>
+                <div class="card"><div class="card-header"><span class="card-title">Status Sistema</span><span class="card-icon">✅</span></div><div class="card-value">ATIVO</div></div>
+            </div>
+
+            <div class="table-container">
+                <h3 style="margin-bottom: 1rem; color: var(--cor-destaque);">🏢 Empresas Cadastradas</h3>
+                <div id="listaEmpresas" class="loading">Carregando...</div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        async function carregarDados() {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+
+            document.getElementById('totalEmpresas').textContent = data.sistema?.total_clientes_nexus || 0;
+            document.getElementById('totalClientes').textContent = data.sistema?.total_clientes_finais || 0;
+            document.getElementById('totalBoletos').textContent = data.sistema?.total_boletos_enviados || 0;
+        }
+
+        function logout() {
+            fetch('/api/auth/logout', {method: 'POST'}).then(() => window.location.href = '/');
+        }
+
+        carregarDados();
+    </script>
+</body>
+</html>

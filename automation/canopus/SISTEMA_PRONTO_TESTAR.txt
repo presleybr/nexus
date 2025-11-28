@@ -1,0 +1,130 @@
+================================================================================
+                    SISTEMA DE AUTOMACAO CANOPUS - DENER
+                           PRONTO PARA TESTAR LOGIN
+================================================================================
+
+CONFIGURACAO ATUAL
+================================================================================
+
+[OK] Banco de dados PostgreSQL:
+     - Host: localhost:5434
+     - Database: nexus_crm
+     - Senha correta: nexus2025
+     - Tabelas criadas: 6
+     - Consultor Dener cadastrado (ID: 5)
+
+[OK] Pontos de Venda cadastrados:
+     - PV 17308 (ID: 1)
+     - PV 24627 (ID: 2)
+
+[OK] Excel do Dener processado:
+     - Arquivo: D:\Nexus\planilhas\DENER__PLANILHA_GERAL.xlsx
+     - Total de clientes: 152
+     - Clientes "Em dia": 113
+       - PV 17308: 73 clientes
+       - PV 24627: 40 clientes
+
+[OK] Seletores CSS mapeados:
+     - Usuario: #edtUsuario
+     - Senha: #edtSenha
+     - Botao Login: #btnLogin
+
+[OK] URL de login configurada:
+     - https://cnp3.consorciocanopus.com.br/WWW/frmCorCCCnsLogin.aspx
+
+================================================================================
+                         EXECUTAR TESTE DE LOGIN
+================================================================================
+
+1. Abra o terminal no diretorio:
+
+   cd D:\Nexus\automation\canopus
+
+2. Execute o comando:
+
+   python teste_automacao.py --teste login --usuario 24627 --senha Sonhorealizado2! --ponto-venda 17308
+
+3. O que vai acontecer:
+
+   [1] Abre navegador Chrome (visivel)
+   [2] Acessa pagina de login do Canopus
+   [3] Preenche usuario: 24627
+   [4] Preenche senha: Sonhorealizado2!
+   [5] Clica no botao Login
+   [6] Tira 3 screenshots (antes/durante/depois)
+   [7] Verifica se login funcionou
+
+4. Resultado esperado:
+
+   [OK] Login realizado com sucesso!
+
+   OU
+
+   [ERRO] Falha no login: <detalhes do erro>
+
+================================================================================
+                              ARQUIVOS CRIADOS
+================================================================================
+
+Screenshots ficam em:
+   D:\Nexus\automation\canopus\logs\antes_login.png
+   D:\Nexus\automation\canopus\logs\antes_clicar_login.png
+   D:\Nexus\automation\canopus\logs\apos_login.png
+
+Logs ficam em:
+   D:\Nexus\automation\canopus\logs\canopus_YYYYMMDD.log
+
+================================================================================
+                            PROXIMOS PASSOS
+================================================================================
+
+DEPOIS que o login funcionar:
+
+   [ ] Passo 1: Mapear seletores da tela de BUSCA DE CLIENTE
+               (campo CPF, botao buscar, lista de resultados)
+
+   [ ] Passo 2: Mapear seletores da tela de EMISSAO DE BOLETO
+               (selecionar parcela, botao gerar)
+
+   [ ] Passo 3: Mapear seletores de DOWNLOAD DO PDF
+               (botao download, confirmar arquivo baixado)
+
+   [ ] Passo 4: Executar download real dos 113 boletos
+
+================================================================================
+                        SE LOGIN FALHAR, VERIFICAR:
+================================================================================
+
+1. Screenshots em logs/ para ver o que aconteceu
+2. Arquivo de log para detalhes tecnico
+3. Verificar se credenciais estao corretas (usuario: 24627)
+4. Verificar se ha CAPTCHA ou validacao extra na tela
+5. Verificar se seletores ainda estao corretos (site pode ter mudado)
+
+================================================================================
+                              COMANDOS UTEIS
+================================================================================
+
+Listar clientes do Dener:
+   python processar_dener.py --listar
+
+Simular processamento:
+   python processar_dener.py --simular
+
+Exportar clientes para JSON:
+   python processar_dener.py --exportar
+
+Testar conexao com banco:
+   python testar_conexao_db.py
+
+Testar importacao do Excel:
+   python testar_dener.py
+
+================================================================================
+                           EXECUTE AGORA:
+================================================================================
+
+cd D:\Nexus\automation\canopus
+python teste_automacao.py --teste login --usuario 24627 --senha Sonhorealizado2! --ponto-venda 17308
+
+================================================================================

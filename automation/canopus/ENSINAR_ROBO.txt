@@ -1,0 +1,106 @@
+================================================================================
+                    COMO ENSINAR O ROBO - PASSO A PASSO
+================================================================================
+
+[OK] Login funcionando!
+
+Agora o robo precisa aprender 3 coisas:
+
+    1. BUSCAR CLIENTE (por CPF)
+    2. EMITIR BOLETO
+    3. BAIXAR PDF
+
+
+================================================================================
+                         METODO MAIS FACIL
+================================================================================
+
+Execute este comando:
+
+    python mapear_seletores_interativo.py
+
+
+O script vai:
+
+    [1] Fazer login automaticamente
+    [2] PAUSAR e pedir para voce mapear BUSCA DE CLIENTE
+    [3] PAUSAR e pedir para voce mapear EMISSAO DE BOLETO
+    [4] PAUSAR e pedir para voce mapear DOWNLOAD PDF
+    [5] SALVAR tudo em seletores_mapeados.json
+
+
+================================================================================
+                         O QUE VOCE VAI FAZER
+================================================================================
+
+Em cada pausa:
+
+    1. NAVEGAR ate a tela (busca, emissao, etc)
+    2. Pressionar F12
+    3. Clicar no icone de selecao (seta)
+    4. Clicar nos campos/botoes
+    5. ANOTAR os seletores:
+       - Se tem id="algo" -> use #algo
+       - Se tem name="algo" -> use input[name="algo"]
+       - Se tem class="algo" -> use .algo
+    6. DIGITAR os seletores no terminal
+
+
+================================================================================
+                              EXEMPLO
+================================================================================
+
+Voce clica no campo de CPF e ve:
+
+    <input id="txtCPF" name="cpf" type="text" />
+
+Opcoes de seletor:
+
+    #txtCPF              (por ID - melhor opcao!)
+    input[name="cpf"]    (por name)
+    input[type="text"]   (muito generico, evite)
+
+
+================================================================================
+                         SELETORES A MAPEAR
+================================================================================
+
+BUSCA DE CLIENTE:
+    [ ] Campo onde digita o CPF
+    [ ] Botao de buscar
+    [ ] Lista de resultados
+    [ ] Link para abrir o cliente
+
+EMISSAO DE BOLETO:
+    [ ] Menu/link de emissao
+    [ ] Seletor de parcela/mes
+    [ ] Botao de gerar boleto
+    [ ] Mensagem de sucesso
+
+DOWNLOAD:
+    [ ] Link ou botao de download do PDF
+
+
+================================================================================
+                         DEPOIS DE MAPEAR
+================================================================================
+
+O arquivo seletores_mapeados.json vai ter todos os seletores.
+
+Ai so copiar para config.py e rodar:
+
+    python processar_dener.py --processar
+
+
+E o robo vai baixar os 113 boletos automaticamente!
+
+
+================================================================================
+                         EXECUTE AGORA
+================================================================================
+
+cd D:\Nexus\automation\canopus
+python mapear_seletores_interativo.py
+
+
+================================================================================

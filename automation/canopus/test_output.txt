@@ -1,0 +1,116 @@
+2025-11-26 00:38:31 - config - INFO - Configuração carregada - Base: D:\Nexus\automation\canopus
+2025-11-26 00:38:31 - canopus_automation - INFO - \U0001f310 Iniciando navegador...
+2025-11-26 00:38:33 - canopus_automation - INFO - \u2705 Navegador iniciado
+2025-11-26 00:38:33 - canopus_automation - INFO - \U0001f510 Fazendo login - User: 24627
+2025-11-26 00:38:33 - canopus_automation - INFO - Navegando para: https://cnp3.consorciocanopus.com.br/WWW/frmCorCCCnsLogin.aspx
+2025-11-26 00:38:36 - canopus_automation - INFO - \U0001f4f8 Screenshot: antes_login.png
+2025-11-26 00:38:36 - canopus_automation - INFO - Preenchendo usuário...
+2025-11-26 00:38:36 - canopus_automation - INFO - Preenchendo senha...
+2025-11-26 00:38:37 - canopus_automation - INFO - \U0001f4f8 Screenshot: antes_clicar_login.png
+2025-11-26 00:38:37 - canopus_automation - INFO - Clicando no botão Login...
+2025-11-26 00:38:38 - canopus_automation - INFO - Aguardando navegação...
+2025-11-26 00:38:40 - canopus_automation - INFO - \U0001f4f8 Screenshot: apos_login.png
+2025-11-26 00:38:40 - canopus_automation - INFO - URL após login: https://cnp3.consorciocanopus.com.br/WWW/frmMain.aspx
+2025-11-26 00:38:40 - canopus_automation - INFO - \u2705 Login realizado com sucesso!
+2025-11-26 00:38:40 - canopus_automation - INFO - \U0001f50d Buscando cliente: 708.990.571-36
+2025-11-26 00:38:40 - canopus_automation - INFO - \U0001f50d Navegando para busca avançada...
+2025-11-26 00:38:40 - canopus_automation - INFO - Clicando no ícone de Atendimento...
+2025-11-26 00:38:42 - canopus_automation - INFO - \U0001f4f8 Screenshot: apos_clicar_atendimento.png
+2025-11-26 00:38:42 - canopus_automation - INFO - Clicando em 'Busca avançada'...
+2025-11-26 00:38:45 - canopus_automation - INFO - \U0001f4f8 Screenshot: apos_busca_avancada.png
+2025-11-26 00:38:45 - canopus_automation - INFO - \u2705 Navegado para busca avançada
+2025-11-26 00:38:45 - canopus_automation - INFO - Selecionando tipo de busca: CPF
+2025-11-26 00:38:45 - canopus_automation - INFO - \U0001f4f8 Screenshot: apos_selecionar_cpf.png
+2025-11-26 00:38:45 - canopus_automation - INFO - Preenchendo CPF: 708.990.571-36
+2025-11-26 00:38:47 - canopus_automation - INFO - \U0001f4f8 Screenshot: apos_preencher_cpf.png
+2025-11-26 00:38:47 - canopus_automation - INFO - Clicando em Buscar...
+2025-11-26 00:38:49 - canopus_automation - INFO - \U0001f4f8 Screenshot: resultado_busca.png
+2025-11-26 00:38:49 - canopus_automation - INFO - Encontrados 2 resultado(s)
+2025-11-26 00:38:49 - canopus_automation - INFO - Clicando no segundo resultado (com grupo/cota)...
+2025-11-26 00:38:52 - canopus_automation - INFO - \U0001f4f8 Screenshot: apos_clicar_cliente.png
+2025-11-26 00:38:52 - canopus_automation - INFO - \u2705 Cliente acessado: 708.990.571-36
+2025-11-26 00:38:52 - canopus_automation - INFO - \U0001f4c4 Navegando para emissão de cobrança...
+2025-11-26 00:38:52 - canopus_automation - INFO - Clicando em 'Emissão de Cobrança'...
+2025-11-26 00:38:55 - canopus_automation - INFO - \U0001f4f8 Screenshot: apos_clicar_emissao.png
+2025-11-26 00:38:55 - canopus_automation - INFO - \u2705 Navegado para emissão de cobrança
+2025-11-26 00:38:55 - canopus_automation - INFO - \U0001f4e5 Emitindo e baixando boleto...
+2025-11-26 00:38:55 - canopus_automation - INFO - Aguardando página de emissão carregar...
+2025-11-26 00:38:57 - canopus_automation - INFO - \U0001f4f8 Screenshot: tela_emissao.png
+2025-11-26 00:38:57 - canopus_automation - INFO - Buscando checkboxes: input[id*="grdBoleto_Avulso"][id*="imgEmite_Boleto"]
+2025-11-26 00:38:57 - canopus_automation - INFO - Encontrados 2 checkbox(es)
+2025-11-26 00:38:57 - canopus_automation - INFO - Selecionando segundo boleto (com valor)...
+2025-11-26 00:38:58 - canopus_automation - INFO - \U0001f4f8 Screenshot: checkbox_selecionado.png
+2025-11-26 00:38:58 - canopus_automation - INFO - Configurando interceptação de PDF...
+2025-11-26 00:38:58 - canopus_automation - INFO - Verificando botão 'Emitir Cobrança': #ctl00_Conteudo_btnEmitir
+2025-11-26 00:38:58 - canopus_automation - INFO - Botão visível: True
+2025-11-26 00:38:58 - canopus_automation - INFO - Clicando em 'Emitir Cobrança'...
+2025-11-26 00:38:58 - canopus_automation - INFO - \U0001f4f8 Screenshot: antes_emitir.png
+2025-11-26 00:38:59 - canopus_automation - INFO - \u2705 Clique executado, aguardando nova aba...
+2025-11-26 00:38:59 - canopus_automation - INFO - \U0001f4c2 Nova aba aberta inicialmente: about:blank
+2025-11-26 00:38:59 - canopus_automation - INFO - \U0001f4e5 Interceptando resposta: https://cnp3.consorciocanopus.com.br/WWW/CONCM/frmConCmImpressao.aspx?...
+2025-11-26 00:38:59 - canopus_automation - INFO -    Content-Type: text/html; charset=utf-8
+2025-11-26 00:38:59 - canopus_automation - INFO - \U0001f4e5 Interceptando resposta: https://cnp3.consorciocanopus.com.br/WWW/CONCM/frmConCmImpressao.aspx?...
+2025-11-26 00:38:59 - canopus_automation - INFO -    Content-Type: application/pdf
+2025-11-26 00:38:59 - canopus_automation - INFO - \U0001f4e6 Corpo recebido: 345 bytes
+2025-11-26 00:38:59 - canopus_automation - WARNING - \u26a0\ufe0f NÃO é PDF real! Preview: <!doctype html><html><body style='height: 100%; width: 100%; overflow: hidden; margin:0px; background-color: rgb(38, 38, 38);'><embed name='D5F3A2481B526A6D70D7FD2777A39BF2' style='position:absolute; left: 0; top: 0;'width='100%' height='100%' src='about:blank' type='application/pdf' internalid='D5F
+2025-11-26 00:39:01 - canopus_automation - INFO - \u23f3 Aguardando URL mudar de about:blank... (4/15)
+2025-11-26 00:39:03 - canopus_automation - INFO - \u23f3 Aguardando URL mudar de about:blank... (8/15)
+2025-11-26 00:39:05 - canopus_automation - INFO - \u23f3 Aguardando URL mudar de about:blank... (12/15)
+2025-11-26 00:39:06 - canopus_automation - WARNING - \u26a0\ufe0f  URL ainda é about:blank após 7.5s
+2025-11-26 00:39:06 - canopus_automation - INFO - Aguardando carregamento completo do PDF...
+2025-11-26 00:39:06 - canopus_automation - INFO - \u2705 Estado 'load' atingido
+2025-11-26 00:39:06 - canopus_automation - INFO - Aguardando interceptação completa...
+2025-11-26 00:39:11 - canopus_automation - INFO - \u2705 URL final: about:blank...
+2025-11-26 00:39:11 - canopus_automation - WARNING - \u26a0\ufe0f Erro ao tirar screenshot: Page.screenshot: Target page, context or browser has been closed
+2025-11-26 00:39:11 - canopus_automation - WARNING - \u26a0\ufe0f PDF NÃO foi interceptado!
+2025-11-26 00:39:11 - canopus_automation - WARNING - \u26a0\ufe0f PDF não foi interceptado ou muito pequeno, tentando métodos alternativos...
+2025-11-26 00:39:11 - canopus_automation - INFO - \U0001f504 Tentando via JavaScript PDF viewer...
+2025-11-26 00:39:11 - canopus_automation - WARNING - \u26a0\ufe0f Falha no método JavaScript viewer: Page.content: Target page, context or browser has been closed
+2025-11-26 00:39:11 - canopus_automation - INFO - \U0001f504 Tentando CDP...
+2025-11-26 00:39:11 - canopus_automation - WARNING - \u26a0\ufe0f  Falha no CDP: BrowserContext.new_cdp_session: page: no object with guid page@5ebbb859920f5123ae9304b0cbda6ac8
+2025-11-26 00:39:11 - canopus_automation - ERROR - \u274c Todos os métodos falharam para baixar o PDF!
+2025-11-26 00:39:11 - canopus_automation - ERROR - \u274c Erro ao baixar boleto: Não foi possível baixar o PDF por nenhum método disponível
+2025-11-26 00:39:11 - canopus_automation - INFO - \U0001f4f8 Screenshot: erro_boleto.png
+2025-11-26 00:39:11 - canopus_automation - INFO - \U0001f512 Fechando navegador...
+2025-11-26 00:39:12 - canopus_automation - INFO - \u2705 Navegador fechado
+
+================================================================================
+TESTE: BUSCA DE CPF NO CANOPUS
+================================================================================
+
+[*] Buscando credenciais do PV 17.308...
+[OK] Credencial encontrada - Usuario: 24627
+
+================================================================================
+ETAPA 1: LOGIN
+================================================================================
+
+[OK] Login realizado!
+
+================================================================================
+ETAPA 2: BUSCAR CPF 708.990.571-36
+================================================================================
+
+[OK] Cliente encontrado e acessado!
+
+================================================================================
+ETAPA 3: EMISSÃO DE COBRANÇA
+================================================================================
+
+[OK] Navegado para Emissão de Cobrança!
+
+================================================================================
+ETAPA 4: EMITIR E BAIXAR BOLETO
+================================================================================
+
+[*] Pasta de destino: D:\Nexus\automation\canopus\downloads\Danner
+
+[ERRO] Falha ao emitir/baixar boleto
+
+================================================================================
+TESTE FINALIZADO!
+================================================================================
+
+O navegador permanecerá aberto.
+Pressione ENTER para fechar ou feche o navegador manualmente...
+

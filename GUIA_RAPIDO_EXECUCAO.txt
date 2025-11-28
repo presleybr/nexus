@@ -1,0 +1,137 @@
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║        🚀 GUIA RÁPIDO - INICIAR NEXUS COM EVOLUTION API      ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+
+📋 REQUISITOS:
+   ✅ Docker Desktop instalado
+   ✅ Docker Desktop RODANDO (ícone na bandeja)
+   ✅ PostgreSQL rodando na porta 5434
+
+═══════════════════════════════════════════════════════════════
+
+🎯 OPÇÃO 1: EXECUÇÃO AUTOMÁTICA (RECOMENDADO)
+
+   1. Abra Prompt de Comando (CMD) como ADMINISTRADOR
+
+   2. Execute:
+      D:\Nexus\start-nexus-completo.bat
+
+   3. Aguarde ambos os serviços iniciarem
+
+   4. Acesse: http://localhost:5000
+
+═══════════════════════════════════════════════════════════════
+
+🎯 OPÇÃO 2: PASSO A PASSO MANUAL
+
+   TERMINAL 1 - Evolution API:
+   ───────────────────────────
+   cd D:\Nexus\evolution-api
+   docker compose up -d
+
+   (ou se não funcionar: docker-compose up -d)
+
+   Aguarde 15 segundos
+
+   TERMINAL 2 - Flask:
+   ───────────────────────────
+   cd D:\Nexus
+   venv\Scripts\activate
+   python start.py
+
+═══════════════════════════════════════════════════════════════
+
+🔍 VERIFICAR SE EVOLUTION API ESTÁ RODANDO:
+
+   CMD:
+   ────
+   docker ps
+
+   Deve mostrar: nexus_evolution_api ... Up
+
+
+   NAVEGADOR:
+   ──────────
+   http://localhost:8080
+
+   Deve mostrar resposta da API
+
+═══════════════════════════════════════════════════════════════
+
+❌ SE DER ERRO:
+
+   ERRO: "docker compose não é reconhecido"
+   ──────────────────────────────────────────
+   Solução:
+   1. Verifique se Docker Desktop está ABERTO e RODANDO
+   2. Tente: docker-compose up -d (com hífen)
+   3. Reinicie o Docker Desktop
+
+
+   ERRO: "Porta 8080 já em uso"
+   ───────────────────────────────
+   Solução:
+   netstat -ano | findstr :8080
+   taskkill /PID <número_que_apareceu> /F
+
+
+   ERRO: "Failed to establish connection"
+   ──────────────────────────────────────
+   Solução:
+   Evolution API não está rodando!
+   Execute: D:\Nexus\evolution-api\start.bat
+
+═══════════════════════════════════════════════════════════════
+
+✅ APÓS TUDO INICIAR:
+
+   1. Acesse: http://localhost:5000/crm/whatsapp
+
+   2. Clique: "Conectar WhatsApp"
+
+   3. Escaneie QR Code com celular
+
+   4. Aguarde conexão
+
+   5. Pronto! 🎉
+
+═══════════════════════════════════════════════════════════════
+
+🛑 PARAR TUDO:
+
+   OPÇÃO 1:
+   ────────
+   D:\Nexus\stop-nexus-completo.bat
+
+   OPÇÃO 2:
+   ────────
+   Flask: CTRL+C na janela do terminal
+   Evolution: docker compose down
+
+═══════════════════════════════════════════════════════════════
+
+📞 COMANDOS ÚTEIS:
+
+   Ver logs Evolution API:     docker compose logs -f
+   Status containers:          docker ps
+   Reiniciar Evolution:        docker compose restart
+   Remover e recriar:          docker compose down && docker compose up -d
+
+═══════════════════════════════════════════════════════════════
+
+🎯 EXECUÇÃO SUPER RÁPIDA (COLA NO CMD):
+
+cd D:\Nexus\evolution-api && docker compose up -d && timeout /t 15 && cd D:\Nexus && start cmd /k "venv\Scripts\activate && python start.py"
+
+═══════════════════════════════════════════════════════════════
+
+✨ URLs IMPORTANTES:
+
+   Nexus CRM:        http://localhost:5000
+   Evolution API:    http://localhost:8080
+   WhatsApp CRM:     http://localhost:5000/crm/whatsapp
+   Portal Consórcio: http://localhost:5000/portal-consorcio
+
+═══════════════════════════════════════════════════════════════

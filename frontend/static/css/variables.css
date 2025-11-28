@@ -1,0 +1,204 @@
+/* ============================================
+   NEXUS CRM - DESIGN SYSTEM
+   Identidade Visual Tech & IA
+   Verde Neon + Preto + Glassmorphism
+   ============================================ */
+
+:root {
+  /* ========== CORES PRIMÁRIAS ========== */
+  --nexus-primary: #39FF14;           /* Verde Neon */
+  --nexus-primary-dark: #2DD10D;      /* Verde Neon Escuro */
+  --nexus-primary-light: #5FFF3D;     /* Verde Neon Claro */
+  --nexus-primary-glow: rgba(57, 255, 20, 0.5); /* Brilho */
+
+  /* ========== CORES SECUNDÁRIAS ========== */
+  --nexus-secondary: #0A4D0A;         /* Verde Escuro */
+  --nexus-secondary-dark: #053505;    /* Verde Muito Escuro */
+  --nexus-secondary-light: #0D660D;   /* Verde Médio */
+
+  /* ========== BACKGROUNDS ========== */
+  --nexus-bg-primary: #000000;        /* Preto Absoluto */
+  --nexus-bg-secondary: #0A0E0A;      /* Preto Esverdeado */
+  --nexus-bg-tertiary: #0F140F;       /* Cinza Muito Escuro */
+  --nexus-bg-card: rgba(15, 20, 15, 0.8); /* Card com transparência */
+  --nexus-bg-glass: rgba(255, 255, 255, 0.05); /* Glassmorphism */
+  --nexus-bg-glass-strong: rgba(255, 255, 255, 0.1); /* Glass mais visível */
+
+  /* ========== TEXTOS ========== */
+  --nexus-text-primary: #FFFFFF;      /* Branco */
+  --nexus-text-secondary: #E0E0E0;    /* Cinza Claro */
+  --nexus-text-tertiary: #A0A0A0;     /* Cinza Médio */
+  --nexus-text-muted: #707070;        /* Cinza Escuro */
+
+  /* ========== BORDAS ========== */
+  --nexus-border: rgba(57, 255, 20, 0.2);
+  --nexus-border-hover: rgba(57, 255, 20, 0.5);
+  --nexus-border-active: #39FF14;
+  --nexus-border-subtle: rgba(255, 255, 255, 0.1);
+
+  /* ========== SOMBRAS & EFEITOS ========== */
+  --nexus-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --nexus-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --nexus-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --nexus-shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.6);
+
+  --nexus-shadow-neon: 0 0 20px var(--nexus-primary-glow),
+                       0 0 40px var(--nexus-primary-glow);
+  --nexus-shadow-neon-strong: 0 0 10px var(--nexus-primary),
+                              0 0 20px var(--nexus-primary),
+                              0 0 40px var(--nexus-primary-glow);
+  --nexus-shadow-neon-sm: 0 0 10px var(--nexus-primary-glow);
+
+  /* ========== GRADIENTES ========== */
+  --nexus-gradient-primary: linear-gradient(135deg,
+    var(--nexus-primary) 0%,
+    var(--nexus-secondary) 100%);
+
+  --nexus-gradient-primary-hover: linear-gradient(135deg,
+    var(--nexus-primary-light) 0%,
+    var(--nexus-primary) 100%);
+
+  --nexus-gradient-dark: linear-gradient(135deg,
+    var(--nexus-bg-secondary) 0%,
+    var(--nexus-bg-primary) 100%);
+
+  --nexus-gradient-glass: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 100%);
+
+  --nexus-gradient-radial: radial-gradient(circle at center,
+    rgba(57, 255, 20, 0.1) 0%,
+    transparent 70%);
+
+  /* ========== TIPOGRAFIA ========== */
+  --nexus-font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  --nexus-font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --nexus-font-mono: 'Fira Code', 'Courier New', monospace;
+
+  /* ========== TAMANHOS DE FONTE ========== */
+  --nexus-text-xs: 0.75rem;    /* 12px */
+  --nexus-text-sm: 0.875rem;   /* 14px */
+  --nexus-text-base: 1rem;     /* 16px */
+  --nexus-text-lg: 1.125rem;   /* 18px */
+  --nexus-text-xl: 1.25rem;    /* 20px */
+  --nexus-text-2xl: 1.5rem;    /* 24px */
+  --nexus-text-3xl: 1.875rem;  /* 30px */
+  --nexus-text-4xl: 2.25rem;   /* 36px */
+  --nexus-text-5xl: 3rem;      /* 48px */
+  --nexus-text-6xl: 3.75rem;   /* 60px */
+
+  /* ========== PESOS DE FONTE ========== */
+  --nexus-font-light: 300;
+  --nexus-font-regular: 400;
+  --nexus-font-medium: 500;
+  --nexus-font-semibold: 600;
+  --nexus-font-bold: 700;
+  --nexus-font-extrabold: 800;
+
+  /* ========== ESPAÇAMENTOS ========== */
+  --nexus-space-xs: 0.25rem;   /* 4px */
+  --nexus-space-sm: 0.5rem;    /* 8px */
+  --nexus-space-md: 1rem;      /* 16px */
+  --nexus-space-lg: 1.5rem;    /* 24px */
+  --nexus-space-xl: 2rem;      /* 32px */
+  --nexus-space-2xl: 3rem;     /* 48px */
+  --nexus-space-3xl: 4rem;     /* 64px */
+  --nexus-space-4xl: 6rem;     /* 96px */
+
+  /* ========== BORDER RADIUS ========== */
+  --nexus-radius-sm: 0.25rem;  /* 4px */
+  --nexus-radius-md: 0.5rem;   /* 8px */
+  --nexus-radius-lg: 1rem;     /* 16px */
+  --nexus-radius-xl: 1.5rem;   /* 24px */
+  --nexus-radius-2xl: 2rem;    /* 32px */
+  --nexus-radius-full: 9999px;
+
+  /* ========== TRANSIÇÕES ========== */
+  --nexus-transition-fast: 0.15s ease;
+  --nexus-transition-base: 0.3s ease;
+  --nexus-transition-slow: 0.5s ease;
+  --nexus-transition-all: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ========== Z-INDEX ========== */
+  --nexus-z-base: 1;
+  --nexus-z-dropdown: 1000;
+  --nexus-z-sticky: 1020;
+  --nexus-z-fixed: 1030;
+  --nexus-z-modal-backdrop: 1040;
+  --nexus-z-modal: 1050;
+  --nexus-z-popover: 1060;
+  --nexus-z-tooltip: 1070;
+  --nexus-z-notification: 1080;
+
+  /* ========== LARGURAS MÁXIMAS ========== */
+  --nexus-max-width-xs: 20rem;    /* 320px */
+  --nexus-max-width-sm: 24rem;    /* 384px */
+  --nexus-max-width-md: 28rem;    /* 448px */
+  --nexus-max-width-lg: 32rem;    /* 512px */
+  --nexus-max-width-xl: 36rem;    /* 576px */
+  --nexus-max-width-2xl: 42rem;   /* 672px */
+  --nexus-max-width-3xl: 48rem;   /* 768px */
+  --nexus-max-width-4xl: 56rem;   /* 896px */
+  --nexus-max-width-5xl: 64rem;   /* 1024px */
+  --nexus-max-width-6xl: 72rem;   /* 1152px */
+  --nexus-max-width-7xl: 80rem;   /* 1280px */
+  --nexus-max-width-full: 100%;
+
+  /* ========== BREAKPOINTS ========== */
+  --nexus-breakpoint-sm: 640px;
+  --nexus-breakpoint-md: 768px;
+  --nexus-breakpoint-lg: 1024px;
+  --nexus-breakpoint-xl: 1280px;
+  --nexus-breakpoint-2xl: 1536px;
+
+  /* ========== CORES DE STATUS ========== */
+  --nexus-success: #00FF88;
+  --nexus-success-glow: rgba(0, 255, 136, 0.3);
+  --nexus-warning: #FFD700;
+  --nexus-warning-glow: rgba(255, 215, 0, 0.3);
+  --nexus-error: #FF1744;
+  --nexus-error-glow: rgba(255, 23, 68, 0.3);
+  --nexus-info: #00E5FF;
+  --nexus-info-glow: rgba(0, 229, 255, 0.3);
+
+  /* ========== OPACIDADES ========== */
+  --nexus-opacity-10: 0.1;
+  --nexus-opacity-20: 0.2;
+  --nexus-opacity-30: 0.3;
+  --nexus-opacity-40: 0.4;
+  --nexus-opacity-50: 0.5;
+  --nexus-opacity-60: 0.6;
+  --nexus-opacity-70: 0.7;
+  --nexus-opacity-80: 0.8;
+  --nexus-opacity-90: 0.9;
+
+  /* ========== ALIASES PARA COMPATIBILIDADE ========== */
+  /* Para código legado que usa nomes antigos */
+  --cor-primaria: var(--nexus-primary);
+  --cor-destaque: var(--nexus-primary);
+  --cor-texto-primario: var(--nexus-text-primary);
+  --cor-texto-secundario: var(--nexus-text-secondary);
+  --cor-background: var(--nexus-bg-primary);
+  --cor-background-card: var(--nexus-bg-card);
+
+  /* ========== BLUR ========== */
+  --nexus-blur-sm: 4px;
+  --nexus-blur-md: 8px;
+  --nexus-blur-lg: 16px;
+  --nexus-blur-xl: 24px;
+}
+
+/* ========== DARK MODE (já é o padrão) ========== */
+[data-theme="dark"] {
+  /* Mantém as mesmas variáveis */
+}
+
+/* ========== LIGHT MODE (caso necessário no futuro) ========== */
+[data-theme="light"] {
+  --nexus-bg-primary: #FFFFFF;
+  --nexus-bg-secondary: #F5F5F5;
+  --nexus-bg-tertiary: #E0E0E0;
+  --nexus-text-primary: #000000;
+  --nexus-text-secondary: #404040;
+  --nexus-text-tertiary: #707070;
+}

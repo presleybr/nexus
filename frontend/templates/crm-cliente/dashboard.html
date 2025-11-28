@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Nexus CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Nexus Design System -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/crm-cliente.css">
+
+    <style>
+        .widget-automacao {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            border-left: 4px solid #39FF14;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .widget-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .widget-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .widget-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .status-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.ativo {
+            background: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
+
+        .status-indicator.inativo {
+            background: #ef4444;
+            box-shadow: 0 0 10px #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-top: 0.25rem;
+        }
+
+        .status-value.ativo {
+            color: #10b981;
+        }
+
+        .status-value.inativo {
+            color: #ef4444;
+        }
+
+        .dia-section {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(57, 255, 20, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(57, 255, 20, 0.2);
+        }
+
+        .dia-label {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 0.5rem;
+        }
+
+        .dia-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #39FF14;
+        }
+
+        .actions-section {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .actions-section .btn-primary,
+        .actions-section .btn-secondary {
+            flex: 1;
+        }
+
+        .proximo-disparo-info {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: rgba(57, 255, 20, 0.05);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: #888;
+            text-align: center;
+        }
+
+        .proximo-disparo-info strong {
+            color: #39FF14;
+        }
+
+        @media (max-width: 1024px) {
+            .widget-content {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .dia-section {
+                text-align: left;
+            }
+        }
+
+        /* Estilos da tabela de boletos (mesmo da página automação canopus) */
+        .boletos-table {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .boletos-table h3 {
+            color: #fff;
+            margin-bottom: 1.5rem;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .boletos-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .boletos-table thead {
+            background: #222;
+        }
+
+        .boletos-table th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #39FF14;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+        }
+
+        .boletos-table tbody tr {
+            border-bottom: 1px solid #333;
+            transition: background 0.2s ease;
+        }
+
+        .boletos-table tbody tr:hover {
+            background: #222;
+        }
+
+        .boletos-table td {
+            padding: 1rem;
+            color: #ccc;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-sucesso {
+            background: rgba(57, 255, 20, 0.2);
+            color: #39FF14;
+        }
+
+        .status-pendente {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+
+        .status-pago {
+            background: rgba(57, 255, 20, 0.2);
+            color: #39FF14;
+        }
+
+        .status-enviado {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .status-nao_enviado {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .action-btn {
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: #39FF14;
+            color: #000;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    <div class="crm-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="/static/images/nexus_Logotipo.png" alt="Nexus" style="height: 80px; margin-bottom: 15px;">
+                <p id="empresaNome">Carregando...</p>
+            </div>
+
+            <nav>
+                <ul class="sidebar-menu">
+                    <li class="menu-item">
+                        <a href="/crm/dashboard" class="menu-link active">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/cadastro-clientes" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Clientes
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/whatsapp" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                            </svg>
+                            WhatsApp
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/disparos" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            Disparos
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/automacao-canopus" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                            </svg>
+                            Automação Canopus
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/monitoramento" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            Monitoramento
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/graficos" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="12" y1="20" x2="12" y2="10"></line>
+                                <line x1="18" y1="20" x2="18" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="16"></line>
+                            </svg>
+                            Gráficos
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <button class="logout-btn" onclick="logout()">
+                <svg style="width: 18px; height: 18px; vertical-align: middle; margin-right: 8px;" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Sair
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Dashboard</h1>
+                <p class="breadcrumb">Visão geral do sistema</p>
+            </header>
+
+            <!-- Cards de Estatísticas -->
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Total de Clientes</span>
+                        <span class="card-icon">👥</span>
+                    </div>
+                    <div class="card-value" id="totalClientes">-</div>
+                    <div class="card-footer">Clientes cadastrados</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Boletos Gerados</span>
+                        <span class="card-icon">📄</span>
+                    </div>
+                    <div class="card-value" id="totalBoletos">-</div>
+                    <div class="card-footer">Total de boletos</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Boletos Enviados</span>
+                        <span class="card-icon">✅</span>
+                    </div>
+                    <div class="card-value" id="boletosEnviados">-</div>
+                    <div class="card-footer">Enviados com sucesso</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Boletos Pendentes</span>
+                        <span class="card-icon">⏳</span>
+                    </div>
+                    <div class="card-value" id="boletosPendentes">-</div>
+                    <div class="card-footer">Aguardando envio</div>
+                </div>
+            </div>
+
+            <!-- Ações Rápidas -->
+            <div class="cards-grid">
+                <div class="card" style="cursor: pointer;" onclick="window.location.href='/crm/cadastro-clientes'">
+                    <div class="card-header">
+                        <span class="card-title">Cadastrar Cliente</span>
+                        <span class="card-icon">➕</span>
+                    </div>
+                    <p style="color: var(--cor-texto-secundario);">Adicione novos clientes ao sistema</p>
+                </div>
+
+                <div class="card" style="cursor: pointer; border-left: 4px solid #f59e0b;" onclick="resetarDados()">
+                    <div class="card-header">
+                        <span class="card-title">🗑️ Resetar Dados</span>
+                        <span class="card-icon" style="color: #f59e0b;">⚠️</span>
+                    </div>
+                    <p style="color: var(--cor-texto-secundario);">Limpa TODOS os clientes e boletos do banco</p>
+                </div>
+
+                <div class="card" style="cursor: pointer; border-left: 4px solid #ef4444;" onclick="resetarReimportar()">
+                    <div class="card-header">
+                        <span class="card-title">🔄 Resetar e Reimportar</span>
+                        <span class="card-icon" style="color: #ef4444;">⚠️</span>
+                    </div>
+                    <p style="color: var(--cor-texto-secundario);">Limpa dados antigos e reimporta do Excel + PDFs</p>
+                </div>
+
+                <div class="card" style="cursor: pointer;" onclick="window.location.href='/crm/disparos'">
+                    <div class="card-header">
+                        <span class="card-title">Iniciar Disparo</span>
+                        <span class="card-icon">🚀</span>
+                    </div>
+                    <p style="color: var(--cor-texto-secundario);">Envie boletos via WhatsApp</p>
+                </div>
+
+                <div class="card" style="cursor: pointer;" onclick="window.location.href='/crm/whatsapp'">
+                    <div class="card-header">
+                        <span class="card-title">Conectar WhatsApp</span>
+                        <span class="card-icon">📱</span>
+                    </div>
+                    <p style="color: var(--cor-texto-secundario);">Configure sua conexão WhatsApp</p>
+
+                    <!-- Status da Automação -->
+                    <div class="status-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <div id="statusIndicator" class="status-indicator inativo"></div>
+                        <div class="status-text">
+                            <span class="status-label">Status Automação</span>
+                            <span id="statusAutomacao" class="status-value inativo">Carregando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Últimos Boletos -->
+            <div class="boletos-table">
+                <h3>📋 Últimos Boletos</h3>
+                <div id="ultimosBoletos" class="loading">Carregando...</div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/crm-cliente.js"></script>
+
+    <script>
+        // Variável global para armazenar a configuração
+        let configuracaoAutomacao = null;
+
+        // Carregar configurações de automação
+        async function carregarConfiguracaoAutomacao() {
+            try {
+                const response = await fetch('/api/crm/configuracoes-automacao');
+                const data = await response.json();
+
+                if (data.success && data.configuracao) {
+                    configuracaoAutomacao = data.configuracao;
+                    atualizarWidgetAutomacao();
+                }
+            } catch (error) {
+                console.error('Erro ao carregar configuração de automação:', error);
+            }
+        }
+
+        // Atualizar o widget com os dados carregados
+        function atualizarWidgetAutomacao() {
+            if (!configuracaoAutomacao) return;
+
+            const habilitado = configuracaoAutomacao.disparo_automatico_habilitado;
+            const diaDoMes = configuracaoAutomacao.dia_do_mes || 1;
+
+            // Atualizar status (apenas elementos que existem)
+            const statusText = document.getElementById('statusAutomacao');
+            const statusIndicator = document.getElementById('statusIndicator');
+
+            if (statusText && statusIndicator) {
+                if (habilitado) {
+                    statusText.textContent = 'Ativado';
+                    statusText.className = 'status-value ativo';
+                    statusIndicator.className = 'status-indicator ativo';
+                } else {
+                    statusText.textContent = 'Desativado';
+                    statusText.className = 'status-value inativo';
+                    statusIndicator.className = 'status-indicator inativo';
+                }
+            }
+        }
+
+        // Toggle automação (ativar/desativar)
+        async function toggleAutomacaoDashboard() {
+            if (!configuracaoAutomacao) return;
+
+            const novoStatus = !configuracaoAutomacao.disparo_automatico_habilitado;
+
+            const confirmacao = novoStatus
+                ? 'Tem certeza que deseja ATIVAR os disparos automáticos mensais?'
+                : 'Tem certeza que deseja DESATIVAR os disparos automáticos?';
+
+            if (!confirm(confirmacao)) return;
+
+            try {
+                const response = await fetch('/api/crm/configuracoes-automacao', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        disparo_automatico_habilitado: novoStatus
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    configuracaoAutomacao.disparo_automatico_habilitado = novoStatus;
+                    atualizarWidgetAutomacao();
+                    alert(novoStatus ? 'Automação ATIVADA com sucesso!' : 'Automação DESATIVADA com sucesso!');
+                } else {
+                    alert('Erro ao atualizar: ' + (data.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao atualizar configuração');
+            }
+        }
+
+        // Carregar estatísticas do dashboard
+        async function carregarDashboardStats() {
+            try {
+                // 1. Buscar estatísticas gerais do CRM
+                const statsResponse = await fetch('/api/crm/dashboard-stats');
+                const statsData = await statsResponse.json();
+
+                if (statsData.success) {
+                    // Atualizar cards de estatísticas
+                    document.getElementById('totalClientes').textContent = statsData.stats.total_clientes || 0;
+                    document.getElementById('totalBoletos').textContent = statsData.stats.total_boletos || 0;
+                    document.getElementById('boletosEnviados').textContent = statsData.stats.boletos_enviados || 0;
+                    document.getElementById('boletosPendentes').textContent = statsData.stats.boletos_pendentes || 0;
+                }
+
+                // 2. Buscar boletos baixados (mesma API da automação-canopus)
+                // Adicionar timestamp para evitar cache
+                const timestamp = new Date().getTime();
+                const boletosResponse = await fetch(`/api/automation/boletos-baixados?_=${timestamp}`, {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
+                const boletosData = await boletosResponse.json();
+
+                const container = document.getElementById('ultimosBoletos');
+
+                if (boletosData.success && boletosData.data && boletosData.data.length > 0) {
+                    // Pegar apenas os últimos 10 boletos
+                    const ultimos10 = boletosData.data.slice(0, 10);
+                    const totalBoletos = boletosData.data.length;
+
+                    let html = '';
+
+                    // Mostrar aviso se houver mais de 10 boletos
+                    if (totalBoletos > 10) {
+                        html += `
+                            <div style="background: rgba(57, 255, 20, 0.1); border-left: 3px solid #39FF14; padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 4px;">
+                                <span style="color: #39FF14; font-weight: 600;">📊 ${totalBoletos} boletos disponíveis</span>
+                                <span style="color: #888; margin-left: 1rem;">Exibindo os 10 mais recentes</span>
+                            </div>
+                        `;
+                    }
+
+                    html += `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Cliente / CPF</th>
+                                        <th>Valor</th>
+                                        <th>Vencimento</th>
+                                        <th>Arquivo</th>
+                                        <th>Tamanho</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    ultimos10.forEach(boleto => {
+                        // Mostrar CPF e valor extraídos do PDF
+                        const cpfDisplay = boleto.cpf && boleto.cpf !== 'N/A' ? boleto.cpf : '-';
+                        const valorDisplay = boleto.dados_extraidos && boleto.valor > 0
+                            ? `<strong style="color: #39FF14;">R$ ${boleto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>`
+                            : boleto.valor_str;
+                        const statusClass = boleto.dados_extraidos ? 'sucesso' : 'pendente';
+                        const statusEmoji = boleto.dados_extraidos ? '✅' : '⚠️';
+                        const statusTexto = boleto.dados_extraidos ? 'Processado' : 'Baixado';
+
+                        html += `
+                            <tr>
+                                <td>
+                                    <strong>${boleto.cliente_nome}</strong>
+                                    ${boleto.cpf && boleto.cpf !== 'N/A' ? `<br><small style="color: #888;">CPF: ${boleto.cpf}</small>` : ''}
+                                </td>
+                                <td>${valorDisplay}</td>
+                                <td>${boleto.vencimento || boleto.mes}</td>
+                                <td>${boleto.arquivo_nome}</td>
+                                <td>${formatarTamanho(boleto.tamanho)}</td>
+                                <td>
+                                    <span class="status-badge status-${statusClass}">
+                                        ${statusEmoji} ${statusTexto}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="action-btn" onclick="baixarBoleto('${boleto.arquivo_nome}')">📥 Baixar</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            <p>Nenhum boleto baixado ainda.</p>
+                            <p style="margin-top: 1rem;">
+                                <a href="/crm/automacao-canopus" style="color: #39FF14;">
+                                    Clique aqui para baixar boletos →
+                                </a>
+                            </p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar estatísticas:', error);
+                // Mostrar zeros em caso de erro
+                document.getElementById('totalClientes').textContent = '0';
+                document.getElementById('totalBoletos').textContent = '0';
+                document.getElementById('boletosEnviados').textContent = '0';
+                document.getElementById('boletosPendentes').textContent = '0';
+            }
+        }
+
+        // Formatar tamanho de arquivo em bytes
+        function formatarTamanho(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Baixar boleto PDF
+        function baixarBoleto(nomeArquivo) {
+            window.open(`/api/automation/download-boleto?nome=${encodeURIComponent(nomeArquivo)}`, '_blank');
+        }
+
+        // Resetar e Reimportar Tudo
+        async function resetarDados() {
+            if (!confirm('⚠️ ATENÇÃO: Esta ação irá DELETAR TODOS OS CLIENTES E BOLETOS existentes no banco de dados!\n\n🛑 Esta ação NÃO pode ser desfeita!\n\n❌ Os dados serão PERMANENTEMENTE APAGADOS!\n\nDeseja continuar?')) {
+                return;
+            }
+
+            // Perguntar se deseja deletar arquivos físicos também
+            const deletarArquivos = confirm('📁 Deseja também DELETAR OS ARQUIVOS FÍSICOS (PDFs) dos boletos?\n\n✅ SIM = Deleta banco + arquivos (limpeza completa)\n❌ NÃO = Deleta apenas o banco (arquivos permanecem)\n\nRecomendado: SIM para limpeza completa');
+
+            if (!confirm(`Confirmação Final:\n\n🗑️ Você está prestes a APAGAR:\n- Banco de dados (clientes e boletos)\n${deletarArquivos ? '- Arquivos físicos (PDFs)\n' : ''}\nTem certeza ABSOLUTA?`)) {
+                return;
+            }
+
+            // Mostrar loading
+            const container = document.getElementById('ultimosBoletos');
+            container.innerHTML = '<div class="loading">⏳ Resetando dados...</div>';
+
+            try {
+                const response = await fetch('/api/automation/resetar-dados', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        deletar_arquivos: deletarArquivos
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    let mensagem = `✅ Dados resetados com sucesso!\n\n` +
+                                  `Registros Deletados do Banco:\n` +
+                                  `- ${result.clientes_deletados} clientes\n` +
+                                  `- ${result.boletos_deletados} boletos\n`;
+
+                    if (deletarArquivos && result.arquivos_deletados > 0) {
+                        mensagem += `\nArquivos Físicos Deletados:\n` +
+                                   `- ${result.arquivos_deletados} PDFs\n`;
+                    }
+
+                    mensagem += `\nO sistema está limpo e pronto para nova importação.`;
+
+                    alert(mensagem);
+
+                    // Forçar reload completo sem cache
+                    setTimeout(() => {
+                        window.location.reload(true);
+                    }, 500);
+                } else {
+                    alert('❌ Erro ao resetar dados: ' + result.error);
+                    container.innerHTML = `<div class="empty-state"><p>Erro ao resetar dados. Tente novamente.</p></div>`;
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro ao conectar com o servidor');
+                container.innerHTML = `<div class="empty-state"><p>Erro de conexão. Tente novamente.</p></div>`;
+            }
+        }
+
+        async function resetarReimportar() {
+            if (!confirm('⚠️ ATENÇÃO: Esta ação irá DELETAR TODOS OS CLIENTES E BOLETOS existentes no banco de dados!\n\nDepois, reimportará tudo do zero a partir do Excel e dos PDFs baixados.\n\n🛑 Esta ação NÃO pode ser desfeita!\n\nDeseja continuar?')) {
+                return;
+            }
+
+            if (!confirm('Tem certeza MESMO? Todos os dados atuais serão perdidos!')) {
+                return;
+            }
+
+            // Mostrar loading
+            const container = document.getElementById('ultimosBoletos');
+            container.innerHTML = '<div class="loading">⏳ Resetando e reimportando dados...</div>';
+
+            try {
+                const response = await fetch('/api/automation/resetar-e-reimportar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`✅ Reimportação completa!\n\n` +
+                          `Dados Deletados:\n` +
+                          `- ${result.dados_antigos.clientes_deletados} clientes\n` +
+                          `- ${result.dados_antigos.boletos_deletados} boletos\n\n` +
+                          `Dados Importados:\n` +
+                          `- ${result.dados_novos.clientes_importados} clientes\n` +
+                          `- ${result.dados_novos.boletos_importados} boletos\n\n` +
+                          `Atualizando dashboard...`);
+
+                    // Recarregar dashboard
+                    carregarDashboardStats();
+                } else {
+                    alert('❌ Erro ao resetar e reimportar: ' + result.error);
+                    container.innerHTML = `<div class="empty-state"><p>Erro ao resetar dados. Tente novamente.</p></div>`;
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro ao conectar com o servidor');
+                container.innerHTML = `<div class="empty-state"><p>Erro de conexão. Tente novamente.</p></div>`;
+            }
+        }
+
+        // Inicializar ao carregar a página
+        document.addEventListener('DOMContentLoaded', function() {
+            carregarConfiguracaoAutomacao();
+            carregarDashboardStats();
+
+            // Recarregar estatísticas a cada 30 segundos
+            setInterval(carregarDashboardStats, 30000);
+        });
+    </script>
+</body>
+</html>

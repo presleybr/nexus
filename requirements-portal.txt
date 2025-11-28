@@ -1,0 +1,5 @@
+# Dependências do Portal Consórcio
+reportlab==4.4.4
+python-barcode==0.16.1
+Pillow==12.0.0
+python-dateutil==2.9.0.post0

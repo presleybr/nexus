@@ -1,0 +1,304 @@
+================================================================================
+                    GUIA DE INSTALAÇÃO - NEXUS CRM
+                     Aqui seu tempo vale ouro
+================================================================================
+
+📍 LOCALIZAÇÃO: D:\Nexus
+
+================================================================================
+PASSO 1: VERIFICAR PRÉ-REQUISITOS
+================================================================================
+
+Antes de começar, certifique-se de ter instalado:
+
+1. Python 3.10 ou superior
+   - Download: https://www.python.org/downloads/
+   - No instalador, marque "Add Python to PATH"
+
+2. PostgreSQL 12 ou superior
+   - Download: https://www.postgresql.org/download/
+   - Anote a senha que você definir para o usuário "postgres"
+
+3. Editor de texto (Notepad++ ou VS Code recomendado)
+
+================================================================================
+PASSO 2: CONFIGURAR VARIÁVEIS DE AMBIENTE
+================================================================================
+
+1. Abra o arquivo: D:\Nexus\.env
+
+2. Edite a linha DB_PASSWORD:
+   DE:  DB_PASSWORD=postgres
+   PARA: DB_PASSWORD=SUA_SENHA_AQUI
+
+3. Salve o arquivo
+
+================================================================================
+PASSO 3: INSTALAR DEPENDÊNCIAS PYTHON
+================================================================================
+
+1. Abra o PowerShell ou CMD
+
+2. Navegue até a pasta do projeto:
+   cd D:\Nexus
+
+3. Crie um ambiente virtual:
+   python -m venv venv
+
+4. Ative o ambiente virtual:
+
+   Windows (PowerShell):
+   venv\Scripts\Activate.ps1
+
+   Windows (CMD):
+   venv\Scripts\activate.bat
+
+   Você verá (venv) no início da linha
+
+5. Instale as dependências:
+   pip install -r backend/requirements.txt
+
+   Aguarde a instalação (pode levar 2-3 minutos)
+
+================================================================================
+PASSO 4: INICIAR O SISTEMA
+================================================================================
+
+1. Com o ambiente virtual ativo, execute:
+   python start.py
+
+2. O sistema irá:
+   - Verificar PostgreSQL
+   - Criar o banco de dados
+   - Criar as tabelas
+   - Criar usuário admin
+
+3. Quando perguntado "Deseja popular com dados fake?", digite:
+   s   [Enter]
+
+4. Aguarde a população dos dados (30 segundos)
+
+5. O servidor Flask iniciará automaticamente
+
+6. Você verá:
+   🌐 Servidor disponível em: http://localhost:5000
+
+================================================================================
+PASSO 5: ACESSAR O SISTEMA
+================================================================================
+
+1. Abra seu navegador
+
+2. Acesse: http://localhost:5000
+
+3. Você verá a página inicial do Nexus CRM
+
+4. Clique em "Entrar como Cliente"
+
+5. Use um dos logins:
+
+   Email: empresa1@nexus.com
+   Senha: empresa123
+
+6. Você está dentro do sistema! 🎉
+
+================================================================================
+ESTRUTURA DE PASTAS CRIADA
+================================================================================
+
+D:\Nexus\
+├── backend/              # Código Python do servidor
+├── frontend/             # HTML, CSS, JavaScript
+├── database/             # Scripts do banco de dados
+├── automation/           # Scripts de automação
+├── boletos/              # PDFs gerados (criado automaticamente)
+├── logs/                 # Logs do sistema (criado automaticamente)
+├── whatsapp_sessions/    # Sessões WhatsApp (criado automaticamente)
+├── .env                  # Configurações (VOCÊ EDITOU ESTE ARQUIVO)
+├── start.py              # Script de inicialização
+├── README.md             # Documentação completa
+├── QUICKSTART.md         # Guia rápido
+└── MANUAL.md             # Manual das 33 etapas
+
+================================================================================
+LOGINS DISPONÍVEIS (APÓS POPULAR COM DADOS FAKE)
+================================================================================
+
+CLIENTES:
+- empresa1@nexus.com / empresa123
+- empresa2@nexus.com / empresa223
+- empresa3@nexus.com / empresa323
+
+ADMINISTRADOR:
+- admin@nexus.com / admin123
+
+================================================================================
+COMANDOS ÚTEIS
+================================================================================
+
+Iniciar o sistema completo:
+  python start.py
+
+Apenas iniciar o servidor Flask:
+  python backend/app.py
+
+Reiniciar o banco de dados:
+  python database/init_db.py
+
+Popular com dados fake novamente:
+  python database/seed_data.py
+
+Gerar boletos via script:
+  python automation/boleto_generator.py
+
+Executar automação completa:
+  python automation/whatsapp_dispatcher.py
+
+Parar o servidor:
+  Ctrl + C no terminal
+
+================================================================================
+SOLUÇÃO DE PROBLEMAS
+================================================================================
+
+PROBLEMA: "PostgreSQL não está acessível"
+SOLUÇÃO:
+  1. Verifique se o PostgreSQL está rodando
+  2. Windows: Abra "Serviços" e procure por "postgresql"
+  3. Se estiver parado, clique com botão direito e "Iniciar"
+  4. Verifique se a senha no .env está correta
+
+PROBLEMA: "Módulo não encontrado" ou "ModuleNotFoundError"
+SOLUÇÃO:
+  1. Certifique-se de que o ambiente virtual está ativo
+  2. Você deve ver (venv) no início da linha do terminal
+  3. Se não estiver ativo: venv\Scripts\activate
+  4. Reinstale as dependências: pip install -r backend/requirements.txt
+
+PROBLEMA: "Porta 5000 já em uso"
+SOLUÇÃO:
+  1. Abra o arquivo .env
+  2. Altere FLASK_PORT=5000 para FLASK_PORT=8080
+  3. Salve e reinicie o servidor
+  4. Acesse http://localhost:8080
+
+PROBLEMA: "Erro ao criar banco de dados"
+SOLUÇÃO:
+  1. Verifique se você tem permissões de administrador
+  2. Execute o CMD/PowerShell como Administrador
+  3. Tente novamente
+
+PROBLEMA: Página não carrega ou erro 404
+SOLUÇÃO:
+  1. Verifique se o servidor está rodando
+  2. Olhe no terminal se há mensagens de erro
+  3. Tente acessar http://localhost:5000/ (com a barra no final)
+
+================================================================================
+FUNCIONALIDADES PRINCIPAIS
+================================================================================
+
+✅ Dashboard com estatísticas em tempo real
+✅ Cadastro e gestão de clientes
+✅ Geração automática de boletos em PDF
+✅ Conexão com WhatsApp via QR Code
+✅ Disparo automático de boletos
+✅ Mensagem anti-bloqueio configurável
+✅ Organização automática de pastas
+✅ Histórico completo de automações
+✅ Logs detalhados do sistema
+✅ Gráficos e relatórios
+✅ Painel administrativo
+
+================================================================================
+PRIMEIROS PASSOS RECOMENDADOS
+================================================================================
+
+1. Faça login como empresa1@nexus.com
+
+2. Explore o Dashboard
+   - Veja os clientes já cadastrados
+   - Veja os boletos já gerados
+
+3. Cadastre um novo cliente
+   - Clique em "Clientes" no menu
+   - Preencha o formulário
+   - Clique em "Cadastrar Cliente"
+
+4. Gere boletos
+   - Vá para "Disparos"
+   - Clique em "Gerar Boletos"
+   - Os PDFs serão criados em D:\Nexus\boletos\
+
+5. Configure o WhatsApp (opcional)
+   - Vá para "WhatsApp"
+   - Gere o QR Code
+   - Escaneie com seu celular
+
+6. Execute a automação completa
+   - Vá para "Disparos"
+   - Clique em "Iniciar Automação"
+   - Acompanhe o processo
+
+================================================================================
+ARQUIVOS DE DOCUMENTAÇÃO
+================================================================================
+
+README.md          - Documentação completa e detalhada
+QUICKSTART.md      - Guia rápido de 5 minutos
+docs/MANUAL.md     - Manual técnico das 33 etapas
+INSTALACAO.txt     - Este arquivo
+
+================================================================================
+SUPORTE E AJUDA
+================================================================================
+
+📧 Documentação: Leia README.md e MANUAL.md
+💻 Código: Todo código está comentado em português
+🐛 Logs: Verifique o terminal e a pasta logs/
+📝 Issues: Veja os arquivos de documentação
+
+================================================================================
+TECNOLOGIAS UTILIZADAS
+================================================================================
+
+Backend:  Python 3.10, Flask 3.0, PostgreSQL
+Frontend: HTML5, CSS3, JavaScript Vanilla
+PDF:      ReportLab
+Database: PostgreSQL com psycopg2
+Auth:     bcrypt, Flask-Session
+
+================================================================================
+INFORMAÇÕES DO SISTEMA
+================================================================================
+
+Nome:     Nexus CRM
+Versão:   1.0.0
+Porta:    5000 (padrão)
+Database: nexus_crm
+Encoding: UTF-8
+
+================================================================================
+PRÓXIMOS PASSOS
+================================================================================
+
+Agora que o sistema está instalado e funcionando:
+
+1. ✅ Explore todas as funcionalidades
+2. ✅ Leia a documentação completa (README.md)
+3. ✅ Entenda as 33 etapas (docs/MANUAL.md)
+4. ✅ Personalize as configurações
+5. ✅ Configure sua mensagem anti-bloqueio
+6. ✅ Cadastre seus próprios clientes
+7. ✅ Execute a automação completa
+
+================================================================================
+
+🎉 INSTALAÇÃO CONCLUÍDA COM SUCESSO!
+
+Aqui seu tempo vale ouro ⏱️
+
+Sistema CRM Nexus - Automação de Boletos via WhatsApp
+© 2024 - Todos os direitos reservados
+
+================================================================================

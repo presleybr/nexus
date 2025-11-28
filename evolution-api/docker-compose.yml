@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  evolution-api:
+    container_name: nexus_evolution_api
+    image: atendai/evolution-api:latest
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      # Server
+      SERVER_TYPE: http
+      SERVER_PORT: 8080
+      SERVER_URL: http://localhost:8080
+
+      # CORS
+      CORS_ORIGIN: "*"
+      CORS_METHODS: "GET,POST,PUT,DELETE"
+      CORS_CREDENTIALS: "true"
+
+      # Authentication
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: "nexus-evolution-key-2025-secure"
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+
+      # Database PostgreSQL
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: "postgresql://postgres:nexus2025@host.docker.internal:5434/nexus_crm"
+      DATABASE_CONNECTION_CLIENT_NAME: evolution_nexus
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      DATABASE_SAVE_DATA_CHATS: "true"
+
+      # Store
+      STORE_MESSAGES: "true"
+      STORE_MESSAGE_UP: "true"
+      STORE_CONTACTS: "true"
+      STORE_CHATS: "true"
+
+      # Webhooks
+      WEBHOOK_GLOBAL_ENABLED: "true"
+      WEBHOOK_GLOBAL_URL: "http://host.docker.internal:5000/api/webhook/whatsapp"
+      WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: "false"
+
+      # Webhook Events
+      WEBHOOK_EVENTS_QRCODE_UPDATED: "true"
+      WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
+      WEBHOOK_EVENTS_MESSAGES_UPDATE: "true"
+      WEBHOOK_EVENTS_SEND_MESSAGE: "true"
+      WEBHOOK_EVENTS_CONNECTION_UPDATE: "true"
+
+      # QR Code Settings
+      QRCODE_LIMIT: "30"
+      QRCODE_COLOR: "#39FF14"
+
+      # Instance Settings
+      CONFIG_SESSION_PHONE_CLIENT: "Nexus CRM"
+      CONFIG_SESSION_PHONE_NAME: "Chrome"
+      DEL_INSTANCE: "false"
+      DEL_TEMP_INSTANCES: "true"
+
+      # Log Settings
+      LOG_LEVEL: "ERROR,WARN,INFO"
+      LOG_COLOR: "true"
+      LOG_BAILEYS: "error"
+
+      # Language
+      LANGUAGE: "pt-BR"
+
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+
+    networks:
+      - nexus_network
+
+volumes:
+  evolution_instances:
+  evolution_store:
+
+networks:
+  nexus_network:
+    driver: bridge

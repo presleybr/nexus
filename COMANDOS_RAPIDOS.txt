@@ -1,0 +1,289 @@
+================================================================================
+                    COMANDOS RÁPIDOS - NEXUS CRM
+                    Referência Rápida de Comandos
+================================================================================
+
+🚀 INICIALIZAÇÃO
+================================================================================
+
+Ativar ambiente virtual:
+  Windows: venv\Scripts\activate
+  Linux:   source venv/bin/activate
+
+Iniciar sistema completo (recomendado):
+  python start.py
+
+Iniciar apenas Flask:
+  python backend/app.py
+
+Parar servidor:
+  Ctrl + C
+
+================================================================================
+🗄️ BANCO DE DADOS
+================================================================================
+
+Criar/Recriar banco:
+  python database/init_db.py
+
+Popular com dados fake:
+  python database/seed_data.py
+
+Criar backup:
+  python database/backup.py
+
+Conectar via psql:
+  psql -U postgres -d nexus_crm
+
+================================================================================
+🤖 AUTOMAÇÃO
+================================================================================
+
+Gerar boletos (todas empresas):
+  python automation/boleto_generator.py
+
+Executar automação completa:
+  python automation/whatsapp_dispatcher.py
+
+Organizar pastas:
+  python automation/folder_organizer.py
+
+================================================================================
+📊 CONSULTAS SQL ÚTEIS
+================================================================================
+
+Ver todos os usuários:
+  SELECT * FROM usuarios;
+
+Ver empresas cadastradas:
+  SELECT * FROM clientes_nexus;
+
+Ver total de clientes por empresa:
+  SELECT * FROM view_dashboard_cliente;
+
+Ver boletos pendentes:
+  SELECT * FROM boletos WHERE status_envio = 'pendente';
+
+Ver últimos logs:
+  SELECT * FROM logs_sistema ORDER BY data_hora DESC LIMIT 20;
+
+Ver status do sistema:
+  SELECT * FROM status_sistema;
+
+Contar totais:
+  SELECT COUNT(*) FROM clientes_finais;
+  SELECT COUNT(*) FROM boletos;
+
+Ver histórico de automações:
+  SELECT * FROM historico_automacoes ORDER BY data_execucao DESC;
+
+================================================================================
+🔧 MANUTENÇÃO
+================================================================================
+
+Reinstalar dependências:
+  pip install -r backend/requirements.txt --upgrade
+
+Limpar cache Python:
+  find . -type d -name "__pycache__" -exec rm -r {} +
+  (Windows: del /s /q __pycache__)
+
+Verificar erros Python:
+  python -m py_compile backend/app.py
+
+Ver processos na porta 5000:
+  Windows: netstat -ano | findstr :5000
+  Linux:   lsof -i :5000
+
+================================================================================
+📁 LOCALIZAÇÃO DE ARQUIVOS
+================================================================================
+
+Configurações:
+  .env (raiz do projeto)
+
+Logs:
+  logs/
+
+Boletos gerados:
+  boletos/empresa_X/mes_Y/
+
+Banco de dados:
+  PostgreSQL padrão (sem arquivo local)
+
+Backups:
+  backups/
+
+Sessões WhatsApp:
+  whatsapp_sessions/
+
+================================================================================
+🌐 URLs DO SISTEMA
+================================================================================
+
+Página inicial:
+  http://localhost:5000/
+
+Login cliente:
+  http://localhost:5000/login-cliente
+
+Login admin:
+  http://localhost:5000/login-admin
+
+Dashboard cliente:
+  http://localhost:5000/crm/dashboard
+
+Dashboard admin:
+  http://localhost:5000/admin/dashboard
+
+API Status:
+  http://localhost:5000/api/status
+
+API Logs:
+  http://localhost:5000/api/logs
+
+================================================================================
+🔐 LOGINS PADRÃO
+================================================================================
+
+CLIENTES:
+  empresa1@nexus.com / empresa123
+  empresa2@nexus.com / empresa223
+  empresa3@nexus.com / empresa323
+
+ADMIN:
+  admin@nexus.com / admin123
+
+⚠️  ALTERE AS SENHAS EM PRODUÇÃO!
+
+================================================================================
+🐛 DEBUGGING
+================================================================================
+
+Ver logs do Flask:
+  (aparecem no terminal onde você executou python start.py)
+
+Ver logs do banco:
+  SELECT * FROM logs_sistema WHERE tipo = 'error' ORDER BY data_hora DESC;
+
+Verificar conexão PostgreSQL:
+  psql -U postgres -h localhost -c "SELECT version();"
+
+Testar endpoints API:
+  curl http://localhost:5000/api/status
+
+Modo debug (desenvolvimento):
+  Já está ativo se FLASK_ENV=development no .env
+
+================================================================================
+📦 ESTRUTURA DE IMPORTAÇÃO PYTHON
+================================================================================
+
+Importar models:
+  from models import Usuario, ClienteNexus, ClienteFinal, Boleto
+
+Importar services:
+  from services import automation_service, whatsapp_service, pdf_generator
+
+Importar config:
+  from config import Config
+
+Executar query direta:
+  from models import execute_query
+  resultado = execute_query("SELECT * FROM usuarios", fetch=True)
+
+================================================================================
+🔄 RESETAR SISTEMA
+================================================================================
+
+Reset completo (CUIDADO - APAGA TUDO):
+
+  1. Parar o servidor (Ctrl+C)
+
+  2. Dropar banco (via psql):
+     DROP DATABASE nexus_crm;
+
+  3. Recriar tudo:
+     python database/init_db.py
+     python database/seed_data.py
+
+  4. Reiniciar:
+     python start.py
+
+================================================================================
+📝 VARIÁVEIS DE AMBIENTE (.env)
+================================================================================
+
+Alterar porta:
+  FLASK_PORT=8080
+
+Alterar modo:
+  FLASK_ENV=production
+
+Alterar banco:
+  DB_NAME=outro_banco
+  DB_USER=outro_usuario
+  DB_PASSWORD=outra_senha
+
+Habilitar debug:
+  FLASK_DEBUG=True
+
+================================================================================
+🎯 ENDPOINTS API PRINCIPAIS
+================================================================================
+
+POST /api/auth/login
+  Body: {"username": "...", "password": "..."}
+
+GET /api/crm/dashboard
+  Headers: Cookie (sessão)
+
+POST /api/crm/clientes
+  Body: {"nome": "...", "cpf": "...", "whatsapp": "..."}
+
+GET /api/crm/boletos
+
+POST /api/automation/executar-completa
+
+POST /api/whatsapp/enviar-mensagem
+  Body: {"numero": "...", "mensagem": "..."}
+
+================================================================================
+💡 DICAS RÁPIDAS
+================================================================================
+
+✅ Sempre ative o venv antes de executar comandos Python
+✅ Verifique se PostgreSQL está rodando antes de iniciar
+✅ Use python start.py para inicialização completa
+✅ Consulte README.md para documentação completa
+✅ Veja MANUAL.md para entender as 33 etapas
+✅ Use QUICKSTART.md para início rápido
+
+================================================================================
+🆘 ERROS COMUNS E SOLUÇÕES
+================================================================================
+
+"ModuleNotFoundError":
+  → Ative o venv: venv\Scripts\activate
+
+"PostgreSQL não está acessível":
+  → Inicie o serviço PostgreSQL
+
+"Porta já em uso":
+  → Altere FLASK_PORT no .env
+
+"Acesso negado":
+  → Verifique senha no .env
+
+"Arquivo não encontrado":
+  → Verifique se está na pasta D:\Nexus
+
+================================================================================
+
+📚 MAIS INFORMAÇÕES:
+  - README.md (documentação completa)
+  - QUICKSTART.md (guia rápido)
+  - docs/MANUAL.md (33 etapas detalhadas)
+  - INSTALACAO.txt (guia de instalação)
+
+================================================================================

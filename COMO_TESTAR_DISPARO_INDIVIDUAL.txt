@@ -1,0 +1,64 @@
+================================================================================
+COMO TESTAR O DISPARO INDIVIDUAL
+================================================================================
+
+PROBLEMA: Dropdown de clientes vazio
+CAUSA: Você está logado com um usuário que não tem clientes com boletos pendentes
+
+SOLUÇÃO: Fazer login com o usuário correto
+
+================================================================================
+PASSO A PASSO
+================================================================================
+
+1. Acesse: http://127.0.0.1:5000/
+
+2. Faça LOGOUT se estiver logado
+
+3. Faça LOGIN com as credenciais corretas:
+
+   Email: empresa1@nexus.com
+   Senha: nexus123
+
+   Este usuário está vinculado à "Cred MS Consorcios" que possui:
+   - 31 boletos pendentes (não enviados)
+   - 5 clientes com boletos pendentes
+
+4. Após o login, acesse: http://127.0.0.1:5000/crm/disparos
+
+5. No card "Disparo Individual para Teste", o dropdown agora mostrará:
+   - ADILSON EVANGELISTA DA SILVA (1 boleto)
+   - BRUNA RAFAELA DE SOUZA ARAGAO (1 boleto)
+   - DANIEL PASSARELI ROCHA (1 boleto)
+   - DIEGO VICTOR LINO (1 boleto)
+   - EDMILSON DOS SANTOS (1 boleto)
+
+================================================================================
+USUÁRIOS DISPONÍVEIS NO SISTEMA
+================================================================================
+
+✅ empresa1@nexus.com (Cred MS Consorcios)
+   - 31 boletos pendentes
+   - 5 clientes com boletos
+   - USE ESTE para testar disparos
+
+❌ empresa2@nexus.com (Marketing Pro)
+   - 0 boletos
+   - Dropdown aparecerá vazio
+
+❌ empresa3@nexus.com (Consultoria Empresarial)
+   - 0 boletos
+   - Dropdown aparecerá vazio
+
+================================================================================
+VERIFICAR QUAL USUÁRIO ESTÁ LOGADO
+================================================================================
+
+Abra o Console do navegador (F12) e digite:
+
+    fetch('/api/crm/numeros-notificacao').then(r => r.json()).then(console.log)
+
+Se retornar "total: 0", você está logado com empresa2 ou empresa3.
+Se retornar números, você está logado corretamente.
+
+================================================================================
