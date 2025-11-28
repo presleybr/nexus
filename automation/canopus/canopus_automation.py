@@ -5,6 +5,7 @@ Bot para download automatizado de boletos do sistema Canopus
 
 import asyncio
 import logging
+import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime
@@ -22,7 +23,24 @@ from playwright.async_api import (
 from canopus_config import CanopusConfig
 import pandas as pd
 
+# Configurar logging para tempo real no console
 logger = logging.getLogger(__name__)
+
+# Forçar output sem buffering para logs em tempo real
+class UnbufferedStreamHandler(logging.StreamHandler):
+    """Handler que força flush imediato após cada log"""
+    def emit(self, record):
+        super().emit(record)
+        self.flush()
+
+# Configurar handler para stdout com flush imediato
+if not logger.handlers:
+    handler = UnbufferedStreamHandler(sys.stdout)
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
 
 # ============================================================================

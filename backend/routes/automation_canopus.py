@@ -1479,15 +1479,38 @@ def baixar_boletos_ponto_venda():
 
                                 # REGISTRAR DOWNLOAD NA TABELA downloads_canopus
                                 try:
+                                    logger.info("🔍 DEBUG: Iniciando processo de registro no banco...")
+                                    sys.stdout.flush()
+
                                     arquivo_pdf = resultado.get('dados_boleto', {}).get('arquivo_caminho')
                                     arquivo_nome = resultado.get('dados_boleto', {}).get('arquivo_nome')
                                     arquivo_tamanho = resultado.get('dados_boleto', {}).get('arquivo_tamanho', 0)
 
-                                    if arquivo_pdf and Path(arquivo_pdf).exists():
+                                    logger.info(f"🔍 DEBUG: arquivo_pdf={arquivo_pdf}")
+                                    logger.info(f"🔍 DEBUG: arquivo_nome={arquivo_nome}")
+                                    logger.info(f"🔍 DEBUG: arquivo_tamanho={arquivo_tamanho}")
+                                    sys.stdout.flush()
+
+                                    if not arquivo_pdf:
+                                        logger.error("❌ DEBUG: arquivo_pdf está None!")
+                                        sys.stdout.flush()
+                                    elif not Path(arquivo_pdf).exists():
+                                        logger.error(f"❌ DEBUG: Arquivo não existe: {arquivo_pdf}")
+                                        sys.stdout.flush()
+                                    else:
+                                        logger.info(f"✅ DEBUG: Arquivo existe: {arquivo_pdf}")
+                                        sys.stdout.flush()
+
                                         atualizar_status(etapa=f'Registrando download no banco... ({idx}/{len(cpfs)})')
+
+                                        logger.info("🔍 DEBUG: Conectando ao banco...")
+                                        sys.stdout.flush()
 
                                         with get_db_connection() as conn_import:
                                             with conn_import.cursor() as cur_import:
+                                                logger.info(f"🔍 DEBUG: Buscando consultor_id para CPF {cpf}...")
+                                                sys.stdout.flush()
+
                                                 # Buscar consultor_id pelo CPF do cliente
                                                 cur_import.execute("""
                                                     SELECT consultor_id FROM clientes_finais
@@ -1498,13 +1521,31 @@ def baixar_boletos_ponto_venda():
                                                 consultor_row = cur_import.fetchone()
                                                 consultor_id = consultor_row['consultor_id'] if consultor_row else None
 
+                                                logger.info(f"🔍 DEBUG: consultor_id encontrado: {consultor_id}")
+                                                sys.stdout.flush()
+
                                                 # Verificar se download já existe
+                                                logger.info(f"🔍 DEBUG: Verificando se download já existe...")
+                                                sys.stdout.flush()
+
                                                 cur_import.execute("""
                                                     SELECT id FROM downloads_canopus
                                                     WHERE cpf = %s AND nome_arquivo = %s
                                                 """, (cpf, arquivo_nome))
 
-                                                if not cur_import.fetchone():
+                                                existe = cur_import.fetchone()
+                                                logger.info(f"🔍 DEBUG: Download existe? {existe is not None}")
+                                                sys.stdout.flush()
+
+                                                if not existe:
+                                                    logger.info(f"🔍 DEBUG: Inserindo registro no banco...")
+                                                    logger.info(f"   CPF: {cpf}")
+                                                    logger.info(f"   Consultor ID: {consultor_id}")
+                                                    logger.info(f"   Nome arquivo: {arquivo_nome}")
+                                                    logger.info(f"   Caminho: {arquivo_pdf}")
+                                                    logger.info(f"   Tamanho: {arquivo_tamanho}")
+                                                    sys.stdout.flush()
+
                                                     # Inserir registro de download
                                                     cur_import.execute("""
                                                         INSERT INTO downloads_canopus (
@@ -1526,14 +1567,22 @@ def baixar_boletos_ponto_venda():
                                                         str(arquivo_pdf),
                                                         arquivo_tamanho
                                                     ))
+
+                                                    logger.info("🔍 DEBUG: Fazendo commit...")
+                                                    sys.stdout.flush()
+
                                                     conn_import.commit()
-                                                    logger.info(f"💾 Download registrado no banco: {arquivo_nome}")
+
+                                                    logger.info(f"💾 ✅ Download registrado no banco: {arquivo_nome}")
+                                                    sys.stdout.flush()
                                                 else:
                                                     logger.info(f"⏭️ Download já registrado: {arquivo_nome}")
+                                                    sys.stdout.flush()
 
                                 except Exception as e_import:
                                     logger.error(f"❌ Erro ao registrar download no banco: {e_import}")
                                     logger.exception("Traceback:")
+                                    sys.stdout.flush()
 
                                 # Atualizar status com sucesso
                                 atualizar_status(
