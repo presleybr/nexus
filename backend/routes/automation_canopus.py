@@ -1075,32 +1075,60 @@ def baixar_boletos_ponto_venda():
 
             async def processar_todos():
                 logger.info("🔄 Função processar_todos() iniciada")
-                from automation.canopus.canopus_automation import CanopusAutomation
-                from pathlib import Path
 
-                pasta_destino = Path(r'D:\Nexus\automation\canopus\downloads\Danner')
+                # IMPORTANTE: Configurar sys.path dentro da thread
+                import sys
+                from pathlib import Path
+                import os
+
+                # Adicionar paths necessários
+                backend_path = Path(__file__).resolve().parent.parent
+                automation_path = backend_path.parent / "automation" / "canopus"
+
+                if str(automation_path) not in sys.path:
+                    sys.path.insert(0, str(automation_path))
+                    logger.info(f"📂 Path adicionado ao sys.path: {automation_path}")
+
+                if str(backend_path) not in sys.path:
+                    sys.path.insert(0, str(backend_path))
+                    logger.info(f"📂 Path adicionado ao sys.path: {backend_path}")
+
+                # Agora sim importar
+                from automation.canopus.canopus_automation import CanopusAutomation
+
+                # Usar path relativo ou variável de ambiente para Render
+                base_dir = os.getenv('DOWNLOAD_BASE_DIR', str(Path(__file__).resolve().parent.parent.parent / 'automation' / 'canopus' / 'downloads'))
+                pasta_destino = Path(base_dir) / 'Danner'
                 pasta_destino.mkdir(parents=True, exist_ok=True)
 
-                # Buscar credenciais do banco
+                logger.info(f"📁 Pasta de destino dos boletos: {pasta_destino}")
+
+                # Buscar credenciais do banco usando conexão centralizada
                 try:
-                    logger.info("🔑 Buscando credenciais do PV 24627...")
-                    from automation.canopus.orquestrador import DatabaseManager
+                    logger.info(f"🔑 Buscando credenciais do PV {ponto_venda}...")
 
-                    with DatabaseManager() as db_manager:
-                        logger.info("✅ DatabaseManager conectado")
-                        credenciais = db_manager.obter_credenciais('24627')
+                    with get_db_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                SELECT usuario, senha, codigo_empresa, ponto_venda
+                                FROM credenciais_canopus
+                                WHERE ponto_venda = %s AND ativo = TRUE
+                                LIMIT 1
+                            """, (ponto_venda,))
 
-                        if not credenciais:
-                            logger.error("❌ Credenciais não encontradas para PV 24627")
-                            logger.error("Execute: python automation/canopus/cadastrar_credencial.py")
-                            return
+                            credencial_row = cur.fetchone()
 
-                        usuario = credenciais['usuario']
-                        senha = credenciais['senha']
-                        codigo_empresa = credenciais.get('codigo_empresa', '0101')
+                            if not credencial_row:
+                                logger.error(f"❌ Credenciais não encontradas para PV {ponto_venda}")
+                                logger.error("Configure as credenciais na tabela credenciais_canopus")
+                                return
 
-                        logger.info(f"✅ Credenciais obtidas - Usuário: {usuario}, Código Empresa: {codigo_empresa}")
-                        logger.info(f"🔐 Senha descriptografada: {'*' * len(senha)}")
+                            usuario = credencial_row['usuario']
+                            senha = credencial_row['senha']
+                            codigo_empresa = credencial_row.get('codigo_empresa', '0101')
+
+                            logger.info(f"✅ Credenciais obtidas - Usuário: {usuario}, Código Empresa: {codigo_empresa}")
+                            logger.info(f"🔐 Senha: {'*' * len(senha)}")
 
                 except Exception as e:
                     logger.error(f"❌ Erro ao buscar credenciais: {e}")
@@ -1143,25 +1171,16 @@ def baixar_boletos_ponto_venda():
                         try:
                             from automation.canopus.canopus_config import CanopusConfig
 
-                            # VERIFICAR SE BOLETO JÁ EXISTE
-                            # Buscar nome do cliente na planilha para gerar nome do arquivo esperado
-                            import pandas as pd
-                            planilha_path = Path("D:/Nexus/automation/canopus/excel_files")
-                            planilhas = list(planilha_path.glob("*__PLANILHA_GERAL.xlsx"))
-                            planilha_path = planilhas[0] if planilhas else None
-
+                            # BUSCAR NOME DO CLIENTE NO BANCO DE DADOS (não mais na planilha local)
                             nome_cliente = None
-                            if planilha_path and planilha_path.exists():
-                                try:
-                                    df = pd.read_excel(planilha_path, sheet_name=0, header=11)
-                                    cpf_limpo = ''.join(filter(str.isdigit, str(cpf)))
-                                    linha = df[df['Unnamed: 1'].astype(str).str.replace(r'\D', '', regex=True) == cpf_limpo]
-                                    if not linha.empty:
-                                        nome_cliente = linha.iloc[0]['Unnamed: 0']
-                                        if pd.notna(nome_cliente):
-                                            nome_cliente = str(nome_cliente).strip().upper().replace(' ', '_')
-                                except Exception as e:
-                                    logger.warning(f"Erro ao buscar cliente na planilha: {e}")
+                            try:
+                                # Buscar cliente correspondente ao CPF no banco
+                                cliente_info = next((c for c in clientes if c['cpf'] == cpf), None)
+                                if cliente_info and cliente_info.get('nome'):
+                                    nome_cliente = str(cliente_info['nome']).strip().upper().replace(' ', '_')
+                                    logger.info(f"✅ Nome do cliente encontrado no banco: {nome_cliente}")
+                            except Exception as e:
+                                logger.warning(f"⚠️ Erro ao buscar nome do cliente no banco: {e}")
 
                             # Se encontrou o nome, verificar se arquivo já existe
                             if nome_cliente:
@@ -1241,7 +1260,7 @@ def baixar_boletos_ponto_venda():
                     logger.info(f"📄 Sem boleto: {stats['sem_boleto']}")
                     logger.info(f"📊 Total processados: {stats['processados']}/{stats['total']}")
                     logger.info("=" * 80)
-                    logger.info("💾 Os boletos estão em: D:\\Nexus\\automation\\canopus\\downloads\\Danner")
+                    logger.info(f"💾 Os boletos estão em: {pasta_destino}")
                     logger.info("🔄 Use o botão 'Importar Boletos' no frontend para importar ao banco")
                     logger.info("=" * 80)
 
