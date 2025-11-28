@@ -981,7 +981,7 @@ class CanopusAutomation:
                 nova_aba_pdf = None
 
                 async def capturar_nova_aba(page):
-                    nonlocal nova_aba_pdf
+                    nonlocal nova_aba_pdf, pdf_bytes_interceptado, pdf_url_interceptado
                     nova_aba_pdf = page
                     logger.info(f"📄 Nova aba detectada: {page.url}")
                     sys.stdout.flush()
@@ -989,10 +989,55 @@ class CanopusAutomation:
                     # Capturar logs do console JavaScript
                     page.on('console', lambda msg: logger.info(f"[CONSOLE] {msg.text}"))
 
-                    # IMPORTANTE: Registrar handler de response NESTA aba específica
+                    # ESTRATÉGIA AGRESSIVA: Usar page.route() para interceptar PDF ANTES do navegador processar
+                    async def route_pdf(route):
+                        nonlocal pdf_bytes_interceptado, pdf_url_interceptado
+                        request = route.request
+                        url = request.url
+
+                        logger.info(f"🔀 [ROUTE] Interceptando: {url[:100]}")
+                        sys.stdout.flush()
+
+                        # Continuar com a requisição normalmente
+                        response = await route.fetch()
+
+                        # Verificar se é PDF
+                        headers = response.headers
+                        content_type = headers.get('content-type', '').lower()
+
+                        logger.info(f"🔀 [ROUTE] Content-Type: {content_type}, Status: {response.status}")
+                        sys.stdout.flush()
+
+                        # Se for PDF, capturar o body ANTES de passar pro navegador
+                        if 'pdf' in content_type or 'frmConCmImpressao' in url:
+                            body = await response.body()
+                            logger.info(f"🔀 [ROUTE] PDF CAPTURADO: {len(body)} bytes ({len(body)/1024:.1f} KB)")
+                            sys.stdout.flush()
+
+                            # Verificar se é PDF real
+                            if body.startswith(b'%PDF'):
+                                pdf_bytes_interceptado = body
+                                pdf_url_interceptado = url
+                                logger.info(f"✅ [ROUTE] PDF REAL confirmado!")
+                                sys.stdout.flush()
+
+                        # Passar resposta pro navegador
+                        await route.fulfill(response=response)
+
+                    # Registrar route handler para TODAS as requisições
+                    await page.route('**/*', route_pdf)
+                    logger.info("🎯 Route handler registrado para captura agressiva")
+                    sys.stdout.flush()
+
+                    # IMPORTANTE: Registrar handler de response NESTA aba específica (fallback)
                     # Isso garante que capturamos o PDF antes do browser processar
                     page.on('response', interceptar_pdf)
                     logger.info("🎯 Handler de PDF registrado na nova aba")
+                    sys.stdout.flush()
+
+                    # Log de navegação
+                    page.on('framenavigated', lambda frame: logger.info(f"🧭 [NAV] Frame navegou: {frame.url[:100]}"))
+                    logger.info("🎯 Listeners de navegação registrados")
                     sys.stdout.flush()
 
                 self.context.on('page', capturar_nova_aba)
@@ -1026,16 +1071,22 @@ class CanopusAutomation:
                 try:
                     pdf_bytes = None
 
-                    # Aguardar até 10 segundos pelo interceptador pegar o PDF real
-                    logger.info("⏳ Aguardando interceptador capturar PDF real (até 10s)...")
+                    # Aguardar até 20 segundos pelo interceptador pegar o PDF real (mais tempo para Render)
+                    logger.info("⏳ Aguardando interceptador capturar PDF real (até 20s)...")
                     sys.stdout.flush()
-                    for tentativa in range(100):  # 100 x 100ms = 10 segundos
+                    for tentativa in range(200):  # 200 x 100ms = 20 segundos
                         if pdf_bytes_interceptado and len(pdf_bytes_interceptado) > 10000:
                             pdf_bytes = pdf_bytes_interceptado
                             logger.info(f"✅ PDF INTERCEPTADO: {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
                             logger.info(f"   URL: {pdf_url_interceptado[:80] if pdf_url_interceptado else 'N/A'}")
                             sys.stdout.flush()
                             break
+
+                        # Log a cada 5 segundos
+                        if tentativa % 50 == 0 and tentativa > 0:
+                            logger.info(f"⏳ Ainda aguardando... ({tentativa/10:.0f}s)")
+                            sys.stdout.flush()
+
                         await asyncio.sleep(0.1)
 
                     # Log do resultado da espera
@@ -1054,13 +1105,23 @@ class CanopusAutomation:
                         sys.stdout.flush()
 
                         try:
-                            # Aguardar um pouco para garantir que a aba carregou o PDF
-                            await asyncio.sleep(2)
+                            # Aguardar mais tempo no Render para garantir que a aba carregou
+                            logger.info("⏳ Aguardando aba carregar completamente...")
+                            sys.stdout.flush()
+                            await asyncio.sleep(5)  # Aumentado de 2 para 5 segundos
 
                             # Verificar a URL atual da aba
                             url_atual = nova_aba_pdf.url
                             logger.info(f"📍 URL da aba popup: {url_atual[:100]}")
                             sys.stdout.flush()
+
+                            # Log do estado da página
+                            try:
+                                titulo = await nova_aba_pdf.title()
+                                logger.info(f"📄 Título da página: {titulo}")
+                                sys.stdout.flush()
+                            except:
+                                pass
 
                             # Se a URL contém PDF ou é a página de impressão, tentar extrair
                             if 'frmConCmImpressao' in url_atual or 'pdf' in url_atual.lower():
