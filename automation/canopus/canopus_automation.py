@@ -844,6 +844,7 @@ class CanopusAutomation:
             pdf_url_interceptado = None
 
             # Ampliar escopo de interceptação para pegar TODAS as requisições
+            # v2.0 - Múltiplas estratégias de captura (response.finished + fetch direto)
             todas_respostas_pdf = []
 
             async def interceptar_pdf(response):
