@@ -21,46 +21,77 @@ document.addEventListener('DOMContentLoaded', function() {
         btnLogin.textContent = 'Entrando...';
 
         try {
-            console.log('[LOGIN] Enviando requisição para /api/auth/login');
-            console.log('[LOGIN] Email:', email);
+            console.log('='.repeat(60));
+            console.log('🔐 DEBUG LOGIN - INÍCIO');
+            console.log('='.repeat(60));
+            console.log('📧 Email:', email);
+            console.log('🔑 Senha length:', password.length);
+            console.log('🔑 Senha:', password); // TEMPORÁRIO - REMOVER EM PRODUÇÃO!
+            console.log('🌐 URL:', window.location.origin + '/api/auth/login');
+
+            const requestBody = { email, password };
+            console.log('📦 Request Body:', JSON.stringify(requestBody, null, 2));
 
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                credentials: 'include', // IMPORTANTE: Para cookies/sessões
-                body: JSON.stringify({ email, password })
+                credentials: 'include',
+                body: JSON.stringify(requestBody)
             });
 
-            console.log('[LOGIN] Response status:', response.status);
-            console.log('[LOGIN] Response ok:', response.ok);
+            console.log('📡 Response status:', response.status);
+            console.log('📡 Response statusText:', response.statusText);
+            console.log('📡 Response ok:', response.ok);
+            console.log('📡 Response headers:', [...response.headers.entries()]);
 
-            const data = await response.json();
-            console.log('[LOGIN] Response data:', data);
+            let data;
+            const contentType = response.headers.get('content-type');
+            console.log('📄 Content-Type:', contentType);
+
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+                console.log('📥 Response JSON:', JSON.stringify(data, null, 2));
+            } else {
+                const text = await response.text();
+                console.log('📥 Response Text:', text);
+                data = { erro: 'Resposta não é JSON: ' + text };
+            }
 
             if (response.ok && data.sucesso) {
-                console.log('[LOGIN] ✅ Login bem-sucedido!');
+                console.log('✅ LOGIN SUCESSO!');
+                console.log('👤 Usuário:', data.usuario);
                 showAlert('Login realizado com sucesso! Redirecionando...', 'success');
 
-                // Redireciona baseado no tipo de usuário
                 setTimeout(() => {
                     if (data.usuario.tipo === 'admin') {
-                        console.log('[LOGIN] Redirecionando para admin dashboard');
+                        console.log('🔀 Redirecionando para /admin/dashboard');
                         window.location.href = '/admin/dashboard';
                     } else {
-                        console.log('[LOGIN] Redirecionando para CRM dashboard');
+                        console.log('🔀 Redirecionando para /crm/dashboard');
                         window.location.href = '/crm/dashboard';
                     }
                 }, 1000);
             } else {
-                console.error('[LOGIN] ❌ Falha no login:', data);
+                console.log('❌ LOGIN FALHOU!');
+                console.log('❌ Status:', response.status);
+                console.log('❌ Data:', data);
+                console.log('❌ Erro:', data.erro);
+                console.log('='.repeat(60));
+
                 showAlert(data.erro || 'Credenciais inválidas', 'error');
                 btnLogin.disabled = false;
                 btnLogin.textContent = 'Entrar';
             }
         } catch (error) {
-            console.error('[LOGIN] ❌ Erro no login:', error);
+            console.log('='.repeat(60));
+            console.error('💥 EXCEPTION NO LOGIN!');
+            console.error('💥 Error type:', error.constructor.name);
+            console.error('💥 Error message:', error.message);
+            console.error('💥 Error stack:', error.stack);
+            console.log('='.repeat(60));
+
             showAlert('Erro ao conectar com o servidor', 'error');
             btnLogin.disabled = false;
             btnLogin.textContent = 'Entrar';
