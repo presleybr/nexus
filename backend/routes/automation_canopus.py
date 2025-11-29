@@ -2764,6 +2764,54 @@ def download_boleto():
         return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 500
 
 
+@automation_canopus_bp.route('/limpar-downloads-antigos', methods=['POST'])
+@handle_errors
+def limpar_downloads_antigos():
+    """
+    Remove downloads com caminho de arquivo (formato antigo)
+    Mantém apenas downloads com base64 (formato novo)
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Contar quantos registros serão removidos
+                cur.execute("""
+                    SELECT COUNT(*) as total FROM downloads_canopus
+                    WHERE caminho_arquivo NOT LIKE 'JVBERi0%'
+                    AND caminho_arquivo NOT LIKE 'JVBER%'
+                """)
+                total_antigos = cur.fetchone()['total']
+
+                logger.info(f"🗑️ Removendo {total_antigos} downloads com formato antigo...")
+
+                # Deletar registros antigos (que têm caminho ao invés de base64)
+                # Base64 de PDF sempre começa com "JVBERi0" (%PDF em base64)
+                cur.execute("""
+                    DELETE FROM downloads_canopus
+                    WHERE caminho_arquivo NOT LIKE 'JVBERi0%'
+                    AND caminho_arquivo NOT LIKE 'JVBER%'
+                """)
+
+                conn.commit()
+
+                logger.info(f"✅ {total_antigos} registros antigos removidos com sucesso")
+
+                return jsonify({
+                    'success': True,
+                    'message': f'{total_antigos} downloads antigos removidos',
+                    'data': {
+                        'removidos': total_antigos
+                    }
+                })
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao limpar downloads antigos: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 # ============================================================================
 # EXEMPLO DE USO (TESTE)
 # ============================================================================
