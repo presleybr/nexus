@@ -581,7 +581,7 @@
                         Importar Boletos para o CRM
                     </h3>
                     <p>💾 Importa os PDFs baixados para o banco de dados do Nexus CRM</p>
-                    <button class="btn-canopus btn-secondary" id="btnImportarBoletos" disabled style="position: relative; z-index: 1;">
+                    <button class="btn-canopus btn-secondary" id="btnImportarBoletos" style="position: relative; z-index: 1;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="17 8 12 3 7 8"></polyline>
@@ -1295,12 +1295,6 @@ Os boletos importados já estão prontos para envio via WhatsApp!`;
                         `;
                         tbody.appendChild(tr);
                     });
-
-                    // HABILITAR botão "Importar Boletos" quando houver PDFs disponíveis
-                    document.getElementById('btnImportarBoletos').disabled = false;
-                } else {
-                    // DESABILITAR botão se não houver boletos
-                    document.getElementById('btnImportarBoletos').disabled = true;
                 }
             } catch (error) {
                 console.error('Erro ao carregar boletos:', error);
