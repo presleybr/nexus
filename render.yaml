@@ -100,6 +100,10 @@ services:
         value: https://nexus-wppconnect.onrender.com
       - key: BASE_URL
         value: https://nexus-wppconnect.onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nexus-crm-db
+          property: connectionString
     healthCheckPath: /
     autoDeploy: true
 

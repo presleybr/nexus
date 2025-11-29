@@ -7,10 +7,21 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const wppconnect = require('@wppconnect-team/wppconnect');
+const fs = require('fs');
+const path = require('path');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const SECRET_KEY = process.env.SECRET_KEY || 'CHANGE_SECRET_KEY';
+
+// Configuração do banco de dados PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('render')
+    ? { rejectUnauthorized: false }
+    : false
+});
 
 // Middlewares
 app.use(cors());
@@ -45,9 +56,11 @@ const clientOptions = {
       isConnected = true;
       qrCode = null;
       console.log('✅✅✅ [STATUS-CALLBACK] WhatsApp CONECTADO! isConnected = true');
+      saveWhatsAppStatus(true, phoneNumber, null);
     } else if (statusSession === 'notLogged') {
       isConnected = false;
       console.log('⚠️ [STATUS-CALLBACK] WhatsApp desconectado, isConnected = false');
+      saveWhatsAppStatus(false, null, null);
     } else if (statusSession === 'qrReadSuccess') {
       console.log('📱 [STATUS-CALLBACK] QR Code lido! Aguardando confirmação...');
       // Iniciar polling para verificar conexão
@@ -59,6 +72,7 @@ const clientOptions = {
     } else if (statusSession === 'desconnectedMobile') {
       isConnected = false;
       console.log('📱 [STATUS-CALLBACK] Desconectado do celular');
+      saveWhatsAppStatus(false, null, null);
     } else if (statusSession === 'browserClose') {
       console.log('🌐 [STATUS-CALLBACK] Browser fechado');
     } else {
@@ -312,7 +326,24 @@ app.get('/status', async (req, res) => {
     console.log('🔍 [/status] phoneNumber:', phoneNumber);
 
     if (!client) {
-      console.log('⚠️ [/status] Cliente não inicializado');
+      console.log('⚠️ [/status] Cliente não inicializado, consultando banco...');
+
+      // Tentar carregar do banco de dados
+      const dbStatus = await getWhatsAppStatus();
+      if (dbStatus) {
+        console.log('📊 [/status] Status do banco:', {
+          connected: dbStatus.is_connected,
+          phone: dbStatus.phone_number
+        });
+
+        return res.json({
+          success: true,
+          connected: dbStatus.is_connected,
+          phone: dbStatus.phone_number,
+          message: 'Status do banco de dados (cliente não inicializado)'
+        });
+      }
+
       return res.json({
         success: true,
         connected: false,
@@ -330,6 +361,9 @@ app.get('/status', async (req, res) => {
       phoneNumber = hostDevice.id.user;
       isConnected = true;
       qrCode = null; // Limpar QR Code quando conectado
+
+      // Salvar status atualizado no banco
+      await saveWhatsAppStatus(true, phoneNumber, null);
     } catch (err) {
       console.log('⚠️ [/status] Não foi possível obter hostDevice:', err.message);
     }
@@ -496,8 +530,112 @@ app.listen(PORT, () => {
     autoClose: clientOptions.autoClose
   });
 
+  // Limpar lock files antes de iniciar
+  cleanChromiumLocks();
+
   initializeWhatsAppClient();
 });
+
+/**
+ * Limpa lock files do Chromium para evitar erros de "browser já rodando"
+ */
+function cleanChromiumLocks() {
+  const tokensDir = path.join(process.cwd(), 'tokens', 'nexus-crm');
+
+  if (!fs.existsSync(tokensDir)) {
+    console.log('⚠️ [CLEANUP] Pasta tokens não existe ainda');
+    return;
+  }
+
+  console.log('🧹 [CLEANUP] Limpando lock files do Chromium...');
+
+  const lockFiles = [
+    'SingletonLock',
+    'SingletonSocket',
+    'SingletonCookie',
+    '.com.google.Chrome.SingletonSocket'
+  ];
+
+  lockFiles.forEach(lockFile => {
+    const lockPath = path.join(tokensDir, lockFile);
+    if (fs.existsSync(lockPath)) {
+      try {
+        fs.unlinkSync(lockPath);
+        console.log(`✅ [CLEANUP] Removido: ${lockFile}`);
+      } catch (err) {
+        console.log(`⚠️ [CLEANUP] Erro ao remover ${lockFile}:`, err.message);
+      }
+    }
+  });
+
+  console.log('✅ [CLEANUP] Limpeza concluída');
+}
+
+/**
+ * Salva o status do WhatsApp no banco de dados
+ */
+async function saveWhatsAppStatus(connected, phone = null, qr = null) {
+  if (!pool) {
+    console.log('⚠️ [DB] Pool de conexão não disponível');
+    return;
+  }
+
+  try {
+    console.log(`💾 [DB] Salvando status: connected=${connected}, phone=${phone ? phone.substring(0, 5) + '...' : null}`);
+
+    const query = `
+      INSERT INTO whatsapp_status (session_name, is_connected, phone_number, qr_code, last_connected_at, last_disconnected_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      ON CONFLICT (session_name)
+      DO UPDATE SET
+        is_connected = $2,
+        phone_number = $3,
+        qr_code = $4,
+        last_connected_at = CASE WHEN $2 = TRUE THEN NOW() ELSE whatsapp_status.last_connected_at END,
+        last_disconnected_at = CASE WHEN $2 = FALSE THEN NOW() ELSE whatsapp_status.last_disconnected_at END,
+        updated_at = NOW()
+    `;
+
+    await pool.query(query, [
+      'nexus-crm',
+      connected,
+      phone,
+      qr,
+      connected ? new Date() : null,
+      !connected ? new Date() : null
+    ]);
+
+    console.log('✅ [DB] Status salvo no banco');
+  } catch (err) {
+    console.error('❌ [DB] Erro ao salvar status:', err.message);
+  }
+}
+
+/**
+ * Recupera o status do WhatsApp do banco de dados
+ */
+async function getWhatsAppStatus() {
+  if (!pool) {
+    console.log('⚠️ [DB] Pool de conexão não disponível');
+    return null;
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM whatsapp_status WHERE session_name = $1',
+      ['nexus-crm']
+    );
+
+    if (result.rows.length > 0) {
+      return result.rows[0];
+    }
+
+    return null;
+  } catch (err) {
+    console.error('❌ [DB] Erro ao recuperar status:', err.message);
+    return null;
+  }
+}
 
 /**
  * Verifica periodicamente se a conexão foi estabelecida
@@ -532,6 +670,9 @@ function checkConnectionStatus() {
           qrCode = null;
           console.log(`📱 [CHECK-CONN] Número: ${phoneNumber}`);
           console.log('✅ [CHECK-CONN] isConnected = true, qrCode = null');
+
+          // Salvar status no banco de dados
+          await saveWhatsAppStatus(true, phoneNumber, null);
         } catch (err) {
           console.error('❌ [CHECK-CONN] Erro ao obter hostDevice:', err.message);
         }
@@ -548,6 +689,17 @@ function checkConnectionStatus() {
 // Função para inicializar cliente WhatsApp
 function initializeWhatsAppClient() {
   console.log('🚀 [INIT] Criando cliente WhatsApp...');
+
+  // Resetar estado antes de tentar reconectar
+  if (!client) {
+    console.log('🔄 [INIT] Resetando estado...');
+    isConnected = false;
+    qrCode = null;
+    phoneNumber = null;
+  }
+
+  // Limpar lock files antes de tentar criar cliente
+  cleanChromiumLocks();
 
   wppconnect.create(clientOptions)
     .then(createdClient => {
