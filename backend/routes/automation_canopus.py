@@ -2471,6 +2471,7 @@ def listar_boletos_baixados():
     Agora funciona no Render! Busca de downloads_canopus E boletos
     """
     from models.database import get_db_connection
+    from psycopg2.extras import RealDictCursor
     import logging
 
     logger = logging.getLogger(__name__)
@@ -2478,7 +2479,7 @@ def listar_boletos_baixados():
 
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # BUSCAR DA TABELA downloads_canopus (que registra os downloads)
                 # JOIN com clientes_finais para pegar dados completos
                 cur.execute("""
