@@ -2497,10 +2497,21 @@ def importar_boletos():
                     logger.info(f"   ✅ Cliente criado (ID: {cliente_id})")
                     stats['clientes_criados'] += 1
 
-                # REMOVIDO: Verificação de boleto já existente
-                # Agora sempre importa/cria boletos, mesmo se já existirem
+                # Verificar se boleto já existe para este cliente e mês
                 mes_ref = vencimento.month if vencimento else datetime.now().month
                 ano_ref = vencimento.year if vencimento else datetime.now().year
+
+                boleto_existente = cur.execute("""
+                    SELECT id FROM boletos
+                    WHERE cliente_final_id = %s
+                    AND mes_referencia = %s
+                    AND ano_referencia = %s
+                """, (cliente_id, mes_ref, ano_ref))
+
+                if cur.fetchone():
+                    logger.info(f"   ℹ️  Boleto já existe para este cliente/mês - pulando")
+                    stats['boletos_ja_existentes'] = stats.get('boletos_ja_existentes', 0) + 1
+                    continue
 
                 # Criar boleto
                 logger.info(f"   ➕ Criando boleto...")
@@ -2611,8 +2622,9 @@ def listar_boletos_baixados():
             with conn.cursor(row_factory=dict_row) as cur:
                 # BUSCAR DA TABELA downloads_canopus (que registra os downloads)
                 # JOIN com clientes_finais para pegar dados completos
+                # Usar DISTINCT ON para evitar duplicação quando um cliente tem múltiplos boletos
                 cur.execute("""
-                    SELECT
+                    SELECT DISTINCT ON (dc.id)
                         dc.id,
                         dc.cpf,
                         dc.nome_arquivo,
@@ -2629,10 +2641,15 @@ def listar_boletos_baixados():
                         b.status as status_boleto
                     FROM downloads_canopus dc
                     LEFT JOIN clientes_finais cf ON dc.cpf = cf.cpf
-                    LEFT JOIN boletos b ON dc.cpf = cf.cpf
-                        AND DATE(b.created_at) = DATE(dc.created_at)
+                    LEFT JOIN LATERAL (
+                        SELECT valor_original, data_vencimento, numero_boleto, status
+                        FROM boletos
+                        WHERE boletos.cliente_final_id = cf.id
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    ) b ON true
                     WHERE dc.status = 'sucesso'
-                    ORDER BY dc.created_at DESC
+                    ORDER BY dc.id, dc.created_at DESC
                     LIMIT 1000
                 """)
 
@@ -3092,8 +3109,18 @@ def resetar_e_reimportar():
 
                 cliente_id = cliente[0]
 
-                # REMOVIDO: Verificação de boleto já existente
-                # Agora sempre importa boletos, mesmo se já existirem
+                # Verificar se boleto já existe para este cliente e mês
+                boleto_existente = cur.execute("""
+                    SELECT id FROM boletos
+                    WHERE cliente_final_id = %s
+                    AND mes_referencia = %s
+                    AND ano_referencia = %s
+                """, (cliente_id, mes_num, ano))
+
+                if cur.fetchone():
+                    logger.info(f"   ℹ️  Boleto já existe para {pdf_file.name} - pulando")
+                    boletos_duplicados = boletos_duplicados + 1 if 'boletos_duplicados' in locals() else 1
+                    continue
 
                 # Dados do boleto
                 data_vencimento = datetime(ano, mes_num, 10).date()  # Dia 10 do mês
