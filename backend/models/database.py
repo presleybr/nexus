@@ -30,13 +30,13 @@ class Database:
     _connection_pool = None
 
     @classmethod
-    def initialize_pool(cls, minconn: int = 1, maxconn: int = 10):
+    def initialize_pool(cls, minconn: int = 2, maxconn: int = 20):
         """
         Inicializa o pool de conexões
 
         Args:
-            minconn: Número mínimo de conexões no pool
-            maxconn: Número máximo de conexões no pool
+            minconn: Número mínimo de conexões no pool (default: 2)
+            maxconn: Número máximo de conexões no pool (default: 20)
         """
         try:
             if cls._connection_pool is None:
@@ -50,11 +50,16 @@ class Database:
             raise
 
     @classmethod
-    def get_connection(cls):
-        """Obtém uma conexão do pool"""
+    def get_connection(cls, timeout: float = 2.0):
+        """
+        Obtém uma conexão do pool
+
+        Args:
+            timeout: Tempo máximo para aguardar uma conexão (segundos). Default: 2.0s
+        """
         if cls._connection_pool is None:
             cls.initialize_pool()
-        return cls._connection_pool.getconn()
+        return cls._connection_pool.getconn(timeout=timeout)
 
     @classmethod
     def return_connection(cls, connection):
