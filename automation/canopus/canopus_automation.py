@@ -1491,6 +1491,29 @@ class CanopusAutomation:
                             sys.stdout.flush()
                             pdf_bytes = None  # Forçar validação a falhar
 
+                    # FALLBACK CRÍTICO (igual código antigo que funcionava):
+                    # Se não conseguiu extrair, usar page.pdf() como último recurso
+                    if not pdf_bytes or len(pdf_bytes) < 10000:
+                        logger.warning("=" * 80)
+                        logger.warning("⚠️ PDF não extraído via JavaScript")
+                        logger.warning("🔄 Usando page.pdf() como FALLBACK (método código antigo)...")
+                        logger.warning("=" * 80)
+                        sys.stdout.flush()
+
+                        try:
+                            pdf_bytes = await nova_aba_controlada.pdf(
+                                format='A4',
+                                print_background=True,
+                                prefer_css_page_size=True,
+                                margin={'top': '0mm', 'right': '0mm', 'bottom': '0mm', 'left': '0mm'}
+                            )
+                            logger.info(f"✅ PDF gerado via page.pdf(): {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
+                            sys.stdout.flush()
+                        except Exception as e_pdf:
+                            logger.error(f"❌ Fallback page.pdf() também falhou: {e_pdf}")
+                            sys.stdout.flush()
+                            pdf_bytes = None
+
                     # VALIDAÇÃO CRÍTICA: Verificar se extraiu PDF válido
                     TAMANHO_MINIMO_PDF = 20000  # 20KB - boletos devem ter pelo menos isso
 
