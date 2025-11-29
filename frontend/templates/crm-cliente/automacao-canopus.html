@@ -679,36 +679,13 @@
 
     <script src="/static/js/crm-comum.js"></script>
     <script>
+        console.log('🚀 Script automacao-canopus.html carregado!');
+
         let execucaoAtual = null;
         let intervaloPolling = null;
 
         // Carregar informações da empresa
         carregarInformacoesEmpresa();
-
-        // Carregar link do Drive salvo (se existir)
-        async function carregarLinkDrive() {
-            try {
-                const response = await fetch('/api/automation/consultores-planilhas');
-                const data = await response.json();
-
-                if (data.success) {
-                    const consultor = data.data.consultores.find(c =>
-                        c.nome.toLowerCase().includes('dener') ||
-                        c.nome.toLowerCase().includes('danner') ||
-                        c.nome.toLowerCase().includes('den')
-                    );
-
-                    if (consultor && consultor.link_planilha_drive) {
-                        document.getElementById('inputLinkDrive').value = consultor.link_planilha_drive;
-                        adicionarLog('info', `📋 Link do Drive carregado: ${consultor.nome}`);
-                    }
-                }
-            } catch (error) {
-                console.error('Erro ao carregar link do Drive:', error);
-            }
-        }
-
-        carregarLinkDrive();
 
         // Upload manual de planilha
         document.getElementById('btnUploadPlanilha').addEventListener('click', async () => {
@@ -791,169 +768,6 @@
             }
         });
 
-        // Importar planilha do Google Drive (desabilitado - não funciona no Render)
-        document.getElementById('btnImportarPlanilha')?.addEventListener('click', async () => {
-            const btn = document.getElementById('btnImportarPlanilha');
-            const pontosVendaSelecionados = document.getElementById('selectPontosVenda').value;
-
-            // Mensagem de confirmação dinâmica baseada na seleção
-            let mensagemConfirmacao = 'Deseja baixar do Google Drive e importar?\n\n';
-            if (pontosVendaSelecionados === 'ambos') {
-                mensagemConfirmacao += 'Isso irá baixar a planilha do Drive e importar todos os clientes dos PV 17308 E 24627 para o banco de dados.';
-            } else if (pontosVendaSelecionados === '17308') {
-                mensagemConfirmacao += 'Isso irá baixar a planilha do Drive e importar todos os clientes do PV 17308 para o banco de dados.';
-            } else {
-                mensagemConfirmacao += 'Isso irá baixar a planilha do Drive e importar todos os clientes do PV 24627 para o banco de dados.';
-            }
-
-            if (!confirm(mensagemConfirmacao)) {
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerHTML = '<span>⏳ Baixando e importando...</span>';
-
-            adicionarLog('info', '📥 Baixando planilha do Google Drive...');
-
-            try {
-                const response = await fetch('/api/automation/importar-planilha-dener', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        pontos_venda: pontosVendaSelecionados
-                    })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    let mensagemSucesso = `✓ Planilha importada com sucesso!\n\n`;
-                    mensagemSucesso += `Pontos de Venda: ${pontosVendaSelecionados === 'ambos' ? '17308 + 24627' : pontosVendaSelecionados}\n\n`;
-                    mensagemSucesso += `Novos clientes: ${result.data.importados}\n`;
-                    mensagemSucesso += `Atualizados: ${result.data.atualizados}\n`;
-                    mensagemSucesso += `Erros: ${result.data.erros}\n`;
-                    mensagemSucesso += `Total processado: ${result.data.total_processados}`;
-
-                    alert(mensagemSucesso);
-
-                    adicionarLog('success', `Planilha importada (PV ${pontosVendaSelecionados}): ${result.data.total_processados} clientes`);
-                } else {
-                    alert('Erro ao importar planilha: ' + result.error);
-                    adicionarLog('error', 'Erro ao importar planilha');
-                }
-            } catch (error) {
-                console.error('Erro:', error);
-                alert('Erro ao conectar com o servidor');
-                adicionarLog('error', 'Erro de conexão');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Baixar do Drive e Importar';
-            }
-        });
-
-        // Atualizar planilha do Drive
-        document.getElementById('btnAtualizarPlanilhaDrive').addEventListener('click', async () => {
-            const btn = document.getElementById('btnAtualizarPlanilhaDrive');
-            const inputLinkDrive = document.getElementById('inputLinkDrive');
-
-            btn.disabled = true;
-            btn.innerHTML = '<span>🔄 Baixando do Drive...</span>';
-
-            try {
-                adicionarLog('info', '🌐 Iniciando download da planilha do Google Drive...');
-
-                // Primeiro, vamos buscar os consultores com planilhas configuradas
-                const responseConsultores = await fetch('/api/automation/consultores-planilhas');
-                const dataConsultores = await responseConsultores.json();
-
-                if (!dataConsultores.success) {
-                    throw new Error(dataConsultores.error || 'Erro ao buscar consultores');
-                }
-
-                // Procurar o consultor (Dener/Danner/Den)
-                const consultor = dataConsultores.data.consultores.find(c =>
-                    c.nome.toLowerCase().includes('dener') ||
-                    c.nome.toLowerCase().includes('danner') ||
-                    c.nome.toLowerCase().includes('den')
-                );
-
-                if (!consultor) {
-                    adicionarLog('error', '❌ Consultor não encontrado no sistema');
-                    alert('Erro: Consultor não encontrado no banco de dados.\n\nVerifique se existe um consultor cadastrado.');
-                    return;
-                }
-
-                const nomeConsultor = consultor.nome;
-
-                // Verificar se há link no input OU no banco
-                let linkDrive = inputLinkDrive.value.trim();
-
-                if (!linkDrive && !consultor.link_planilha_drive) {
-                    adicionarLog('error', '⚠️ Nenhum link do Google Drive fornecido');
-                    alert('Por favor, cole o link do Google Drive no campo acima!');
-                    inputLinkDrive.focus();
-                    return;
-                }
-
-                // Se há link no input, salvar no banco
-                if (linkDrive) {
-                    adicionarLog('info', '💾 Salvando link do Drive no banco de dados...');
-
-                    const responseConfig = await fetch(`/api/automation/consultor/${consultor.id}/configurar-planilha`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ link_drive: linkDrive })
-                    });
-
-                    const dataConfig = await responseConfig.json();
-
-                    if (!dataConfig.success) {
-                        throw new Error(dataConfig.error || 'Erro ao configurar link do Drive');
-                    }
-
-                    adicionarLog('success', '✅ Link do Google Drive salvo com sucesso!');
-                    consultor.link_planilha_drive = linkDrive;
-                } else {
-                    // Usar o link que já está no banco
-                    linkDrive = consultor.link_planilha_drive;
-                    adicionarLog('info', '📋 Usando link do Drive salvo anteriormente');
-                }
-
-                // Agora fazer o download da planilha
-                adicionarLog('info', `📥 Baixando planilha do consultor ${nomeConsultor}...`);
-
-                const responseDownload = await fetch(`/api/automation/consultor/${consultor.id}/atualizar-planilha`, {
-                    method: 'POST'
-                });
-
-                const resultDownload = await responseDownload.json();
-
-                if (resultDownload.success) {
-                    const data = resultDownload.data;
-
-                    let mensagemSucesso = `✅ Planilha atualizada com sucesso!\n\n`;
-                    mensagemSucesso += `📁 Arquivo: ${data.arquivo_nome}\n`;
-                    mensagemSucesso += `📊 Tamanho: ${(data.tamanho / 1024).toFixed(2)} KB\n`;
-                    mensagemSucesso += `💾 Local: automation/canopus/excel_files/\n\n`;
-                    mensagemSucesso += `A planilha foi baixada do Google Drive e está pronta para ser importada!`;
-
-                    alert(mensagemSucesso);
-                    adicionarLog('success', `✅ ${data.mensagem}`);
-                    adicionarLog('info', `📁 Arquivo: ${data.arquivo_nome} (${(data.tamanho / 1024).toFixed(2)} KB)`);
-
-                } else {
-                    throw new Error(resultDownload.error || 'Erro desconhecido ao baixar planilha');
-                }
-
-            } catch (error) {
-                console.error('Erro:', error);
-                adicionarLog('error', `❌ Erro ao atualizar planilha: ${error.message}`);
-                alert('Erro ao atualizar planilha do Drive:\n\n' + error.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path></svg> 🔄 Baixar Planilha do Drive';
-            }
-        });
 
         // Iniciar download
         document.getElementById('btnIniciarDownload').addEventListener('click', async () => {
@@ -1053,44 +867,59 @@
 
         // Importar boletos
         document.getElementById('btnImportarBoletos').addEventListener('click', async () => {
-            if (!confirm('Deseja importar todos os boletos baixados para o banco de dados?')) {
+            console.log('🔵 Botão Importar Boletos clicado!');
+
+            if (!confirm('Deseja importar todos os boletos baixados da tabela downloads_canopus para o banco de dados?')) {
+                console.log('⚠️ Usuário cancelou a importação');
                 return;
             }
 
+            console.log('✅ Usuário confirmou - iniciando importação...');
+
             const btn = document.getElementById('btnImportarBoletos');
             btn.disabled = true;
-            btn.innerHTML = '<span>Importando...</span>';
+            btn.innerHTML = '<span>⏳ Importando...</span>';
 
             try {
+                console.log('📡 Fazendo requisição POST para /api/automation/importar-boletos...');
+
                 const response = await fetch('/api/automation/importar-boletos', {
                     method: 'POST'
                 });
 
+                console.log(`📥 Resposta recebida - Status: ${response.status}`);
+
                 const result = await response.json();
+                console.log('📦 Resultado:', result);
 
                 if (result.success) {
-                    const msg = `Importação concluída!
+                    const msg = `✅ Importação concluída!
 
 📁 Total de PDFs: ${result.data.total_pdfs}
 ✅ Importados: ${result.data.importados}
-⏭️ Já existentes: ${result.data.ja_existentes}
-⚠️ Sem cliente: ${result.data.sem_cliente}
+👥 Clientes criados: ${result.data.clientes_criados || 0}
+👥 Clientes existentes: ${result.data.clientes_existentes || 0}
+⏭️ Já existentes: ${result.data.ja_existentes || 0}
 ❌ Erros: ${result.data.erros}
 
 Os boletos importados já estão prontos para envio via WhatsApp!`;
                     alert(msg);
+                    console.log('🔄 Recarregando lista de boletos...');
                     carregarBoletosBaixados();
                 } else {
+                    console.error('❌ Erro na importação:', result.error);
                     alert('Erro ao importar: ' + result.error);
                 }
             } catch (error) {
-                console.error('Erro:', error);
-                alert('Erro ao conectar com o servidor');
+                console.error('❌ Exceção durante importação:', error);
+                alert('Erro ao conectar com o servidor: ' + error.message);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = 'Importar Boletos';
+                btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>Importar Boletos';
+                console.log('✅ Botão restaurado');
             }
         });
+        console.log('✅ Event listener do botão Importar Boletos registrado!');
 
         function mostrarProgresso() {
             document.getElementById('progressSection').classList.add('active');
