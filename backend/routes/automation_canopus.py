@@ -1032,6 +1032,19 @@ def health_check():
             except:
                 diretorios_ok = False
 
+        # Verificar pool de conexões
+        from models.database import Database
+        pool_info = {
+            'available': 'N/A',
+            'total_size': 'N/A'
+        }
+        try:
+            if Database._connection_pool:
+                # Tentar obter informações do pool
+                pool_info['available'] = Database._connection_pool.pool.qsize() if hasattr(Database._connection_pool, 'pool') else 'N/A'
+        except:
+            pass
+
         return jsonify({
             'success': True,
             'status': 'healthy',
@@ -1039,7 +1052,8 @@ def health_check():
             'checks': {
                 'database': True,
                 'canopus_disponivel': CANOPUS_DISPONIVEL,
-                'diretorios': diretorios_ok if CANOPUS_DISPONIVEL else 'N/A'
+                'diretorios': diretorios_ok if CANOPUS_DISPONIVEL else 'N/A',
+                'connection_pool': pool_info
             }
         })
 
@@ -1048,6 +1062,45 @@ def health_check():
         return jsonify({
             'success': False,
             'status': 'unhealthy',
+            'error': str(e)
+        }), 500
+
+
+@automation_canopus_bp.route('/reset-pool', methods=['POST'])
+@handle_errors
+def reset_connection_pool():
+    """
+    Reseta o pool de conexões do PostgreSQL
+    Use quando o pool estiver esgotado ou com conexões presas
+    """
+    try:
+        from models.database import Database
+
+        logger.warning("⚠️ Resetando pool de conexões do PostgreSQL...")
+
+        # Fechar todas as conexões atuais
+        if Database._connection_pool:
+            Database.close_all_connections()
+            Database._connection_pool = None
+            logger.info("🔒 Pool de conexões fechado")
+
+        # Reinicializar pool com novos parâmetros
+        Database.initialize_pool(minconn=5, maxconn=50)
+        logger.info("✅ Pool de conexões reinicializado (min=5, max=50)")
+
+        return jsonify({
+            'success': True,
+            'message': 'Pool de conexões resetado com sucesso',
+            'pool_config': {
+                'min_connections': 5,
+                'max_connections': 50,
+                'timeout': 10.0
+            }
+        })
+    except Exception as e:
+        logger.error(f"❌ Erro ao resetar pool: {e}")
+        return jsonify({
+            'success': False,
             'error': str(e)
         }), 500
 
