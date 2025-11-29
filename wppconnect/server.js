@@ -17,27 +17,102 @@ const SECRET_KEY = process.env.SECRET_KEY || 'CHANGE_SECRET_KEY';
 
 // Configuração do banco de dados PostgreSQL (OPCIONAL)
 let pool = null;
+let dbConnectionRetries = 0;
+const MAX_DB_RETRIES = 5;
 
-if (process.env.DATABASE_URL) {
-  console.log('📊 [DB] DATABASE_URL detectado, conectando ao PostgreSQL...');
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes('render') || process.env.DATABASE_URL.includes('postgres')
-      ? { rejectUnauthorized: false }
-      : false
-  });
+/**
+ * Inicializa conexão com PostgreSQL com retry automático
+ */
+async function initializeDatabasePool() {
+  if (!process.env.DATABASE_URL) {
+    console.log('⚠️ [DB] DATABASE_URL não configurado - funcionando SEM persistência no banco');
+    return;
+  }
 
-  // Testar conexão
-  pool.query('SELECT NOW()', (err, res) => {
-    if (err) {
-      console.error('❌ [DB] Erro ao conectar ao PostgreSQL:', err.message);
-      pool = null; // Desabilitar pool se falhar
+  try {
+    console.log('📊 [DB] DATABASE_URL detectado, conectando ao PostgreSQL...');
+    console.log('📊 [DB] Tentativa:', dbConnectionRetries + 1, '/', MAX_DB_RETRIES);
+
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL.includes('render') || process.env.DATABASE_URL.includes('postgres')
+        ? { rejectUnauthorized: false }
+        : false,
+      // Configurações de reconexão
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+      max: 10,
+      min: 2,
+      // Mantém a conexão ativa
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000
+    });
+
+    // Testar conexão
+    const result = await pool.query('SELECT NOW()');
+    console.log('✅ [DB] Conectado ao PostgreSQL:', result.rows[0].now);
+
+    // Criar tabela se não existir
+    await criarTabelaWhatsAppStatus();
+
+    // Resetar contador de retries
+    dbConnectionRetries = 0;
+
+    // Adicionar handler de erro para reconexão
+    pool.on('error', (err) => {
+      console.error('❌ [DB] Erro no pool de conexão:', err.message);
+      console.log('🔄 [DB] Tentando reconectar em 5 segundos...');
+      setTimeout(() => {
+        pool = null;
+        initializeDatabasePool();
+      }, 5000);
+    });
+
+  } catch (err) {
+    console.error('❌ [DB] Erro ao conectar ao PostgreSQL:', err.message);
+
+    dbConnectionRetries++;
+
+    if (dbConnectionRetries < MAX_DB_RETRIES) {
+      const retryDelay = Math.min(5000 * dbConnectionRetries, 30000); // Max 30s
+      console.log(`⏳ [DB] Tentando novamente em ${retryDelay/1000}s...`);
+      setTimeout(() => initializeDatabasePool(), retryDelay);
     } else {
-      console.log('✅ [DB] Conectado ao PostgreSQL:', res.rows[0].now);
+      console.error('❌ [DB] Máximo de tentativas atingido. Funcionando SEM persistência no banco.');
+      pool = null;
     }
-  });
-} else {
-  console.log('⚠️ [DB] DATABASE_URL não configurado - funcionando SEM persistência no banco');
+  }
+}
+
+/**
+ * Cria tabela whatsapp_status se não existir
+ */
+async function criarTabelaWhatsAppStatus() {
+  if (!pool) return;
+
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS whatsapp_status (
+        id SERIAL PRIMARY KEY,
+        session_name VARCHAR(100) UNIQUE NOT NULL,
+        is_connected BOOLEAN DEFAULT FALSE,
+        phone_number VARCHAR(20),
+        qr_code TEXT,
+        last_connected_at TIMESTAMP,
+        last_disconnected_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('✅ [DB] Tabela whatsapp_status verificada/criada');
+  } catch (err) {
+    console.error('❌ [DB] Erro ao criar tabela whatsapp_status:', err.message);
+  }
+}
+
+// Inicializar banco de dados
+if (process.env.DATABASE_URL) {
+  initializeDatabasePool();
 }
 
 // Middlewares
@@ -715,20 +790,39 @@ function checkConnectionStatus() {
 async function initializeWhatsAppClient() {
   console.log('🚀 [INIT] Criando cliente WhatsApp...');
 
+  // Se já existe um cliente ativo, não criar outro
+  if (client) {
+    console.log('⚠️ [INIT] Cliente já existe, verificando estado...');
+    try {
+      const state = await client.getConnectionState();
+      if (state === 'CONNECTED') {
+        console.log('✅ [INIT] Cliente já conectado, não é necessário reiniciar');
+        return;
+      }
+    } catch (err) {
+      console.log('⚠️ [INIT] Erro ao verificar estado do cliente existente:', err.message);
+      console.log('🔄 [INIT] Forçando reinicialização...');
+      try {
+        await client.close();
+      } catch (e) {
+        console.log('⚠️ [INIT] Erro ao fechar cliente existente:', e.message);
+      }
+      client = null;
+    }
+  }
+
   // Verificar se há sessão salva no banco de dados
   const statusDB = await getWhatsAppStatus();
   if (statusDB && statusDB.is_connected) {
     console.log('📊 [INIT] Sessão conectada encontrada no banco!');
     console.log(`📱 [INIT] Número salvo: ${statusDB.phone_number}`);
     phoneNumber = statusDB.phone_number;
-    isConnected = true;
+    // Não setar isConnected=true aqui, aguardar confirmação real
   } else {
     console.log('🔄 [INIT] Nenhuma sessão conectada no banco, iniciando nova...');
-    if (!client) {
-      isConnected = false;
-      qrCode = null;
-      phoneNumber = null;
-    }
+    isConnected = false;
+    qrCode = null;
+    phoneNumber = null;
   }
 
   // Limpar lock files antes de tentar criar cliente
@@ -808,10 +902,13 @@ async function initializeWhatsAppClient() {
             await saveWhatsAppStatus(true, phoneNumber, null);
           }
 
-          // Se estiver conectado, parar polling
+          // Se estiver conectado, parar polling de conexão inicial
           if (state === 'CONNECTED') {
             clearInterval(pollInterval);
-            console.log('✅ [POLL] Conexão estável, polling finalizado');
+            console.log('✅ [POLL] Conexão estável, polling inicial finalizado');
+
+            // Iniciar monitoramento contínuo (heartbeat)
+            startConnectionHeartbeat();
           }
         } catch (err) {
           // Ainda não conectou, continuar polling silenciosamente
@@ -829,6 +926,123 @@ async function initializeWhatsAppClient() {
         initializeWhatsAppClient();
       }, 10000);
     });
+}
+
+/**
+ * Sistema de monitoramento contínuo (Heartbeat)
+ * Verifica a cada 30 segundos se a conexão está ativa
+ * Se desconectar, tenta reconectar automaticamente
+ */
+let heartbeatInterval = null;
+let consecutiveFailures = 0;
+const MAX_CONSECUTIVE_FAILURES = 3;
+
+function startConnectionHeartbeat() {
+  // Evitar múltiplos heartbeats
+  if (heartbeatInterval) {
+    console.log('⚠️ [HEARTBEAT] Heartbeat já está rodando');
+    return;
+  }
+
+  console.log('💓 [HEARTBEAT] Iniciando monitoramento contínuo da conexão...');
+
+  heartbeatInterval = setInterval(async () => {
+    if (!client) {
+      console.log('⚠️ [HEARTBEAT] Cliente não existe, parando heartbeat');
+      stopConnectionHeartbeat();
+      return;
+    }
+
+    try {
+      // Verificar estado da conexão
+      const state = await client.getConnectionState();
+
+      if (state === 'CONNECTED') {
+        // Conexão OK - resetar contador de falhas
+        if (consecutiveFailures > 0) {
+          console.log('✅ [HEARTBEAT] Conexão restaurada!');
+          consecutiveFailures = 0;
+        }
+
+        // Verificar se ainda temos o número do telefone
+        if (!phoneNumber || !isConnected) {
+          try {
+            const hostDevice = await client.getHostDevice();
+            phoneNumber = hostDevice.id.user;
+            isConnected = true;
+            console.log(`📱 [HEARTBEAT] Número confirmado: ${phoneNumber}`);
+            await saveWhatsAppStatus(true, phoneNumber, null);
+          } catch (err) {
+            console.log('⚠️ [HEARTBEAT] Erro ao obter hostDevice:', err.message);
+          }
+        }
+      } else {
+        // Conexão perdida
+        consecutiveFailures++;
+        console.log(`⚠️ [HEARTBEAT] Conexão perdida! Estado: ${state} (Falha ${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`);
+
+        isConnected = false;
+        await saveWhatsAppStatus(false, phoneNumber, null);
+
+        // Se teve muitas falhas consecutivas, reiniciar cliente
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          console.log('❌ [HEARTBEAT] Máximo de falhas atingido, reiniciando cliente...');
+          stopConnectionHeartbeat();
+
+          try {
+            if (client) {
+              await client.close();
+            }
+          } catch (err) {
+            console.log('⚠️ [HEARTBEAT] Erro ao fechar cliente:', err.message);
+          }
+
+          client = null;
+          consecutiveFailures = 0;
+
+          // Reiniciar cliente após 5 segundos
+          setTimeout(() => {
+            initializeWhatsAppClient();
+          }, 5000);
+        }
+      }
+    } catch (err) {
+      consecutiveFailures++;
+      console.error(`❌ [HEARTBEAT] Erro ao verificar conexão (Falha ${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}):`, err.message);
+
+      // Se teve muitas falhas consecutivas, reiniciar
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        console.log('❌ [HEARTBEAT] Máximo de falhas atingido, reiniciando cliente...');
+        stopConnectionHeartbeat();
+
+        try {
+          if (client) {
+            await client.close();
+          }
+        } catch (e) {
+          console.log('⚠️ [HEARTBEAT] Erro ao fechar cliente:', e.message);
+        }
+
+        client = null;
+        isConnected = false;
+        consecutiveFailures = 0;
+
+        setTimeout(() => {
+          initializeWhatsAppClient();
+        }, 5000);
+      }
+    }
+  }, 30000); // Verificar a cada 30 segundos
+
+  console.log('✅ [HEARTBEAT] Monitoramento ativo (verificação a cada 30s)');
+}
+
+function stopConnectionHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+    console.log('🛑 [HEARTBEAT] Monitoramento parado');
+  }
 }
 
 // Tratamento de erros
