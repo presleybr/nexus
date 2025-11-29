@@ -1459,7 +1459,10 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
 
                 legenda = f"📄 *Boleto {nome_empresa}*\nVencimento: {vencimento_str}\nValor: {valor_str}\n\n💚 {nome_empresa} - Seu parceiro de confiança!"
 
-                log_sistema('info', f"Enviando PDF para {nome_cliente}", 'disparo')
+                log_sistema('info', f"📄 Enviando PDF para {nome_cliente}", 'disparo')
+                log_sistema('info', f"📂 Caminho do PDF: {pdf_path}", 'disparo')
+                log_sistema('info', f"📄 Arquivo temporário criado: {pdf_temp_criado}", 'disparo')
+                log_sistema('info', f"📱 WhatsApp: {whatsapp}", 'disparo')
 
                 resultado_pdf = whatsapp_service.enviar_pdf(
                     whatsapp,
@@ -1468,7 +1471,12 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
                     cliente_nexus_id
                 )
 
-                if resultado_pdf.get('sucesso'):
+                log_sistema('info', f"📋 Resultado PDF completo: {resultado_pdf}", 'disparo')
+
+                # Verificar tanto 'sucesso' quanto 'success' (compatibilidade)
+                pdf_enviado = resultado_pdf.get('sucesso') or resultado_pdf.get('success')
+
+                if pdf_enviado:
                     # 5. ATUALIZAR STATUS DO BOLETO
                     db.execute_update("""
                         UPDATE boletos
@@ -1479,7 +1487,9 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
                     stats['enviados'] += 1
                     log_sistema('success', f"✅ Boleto enviado com sucesso para {nome_cliente}", 'disparo')
                 else:
-                    log_sistema('error', f"Erro ao enviar PDF para {nome_cliente}", 'disparo')
+                    erro_msg = resultado_pdf.get('error') or resultado_pdf.get('mensagem') or 'Erro desconhecido'
+                    log_sistema('error', f"❌ Erro ao enviar PDF para {nome_cliente}: {erro_msg}", 'disparo')
+                    log_sistema('error', f"📋 Detalhes do erro: {resultado_pdf}", 'disparo')
                     stats['erros'] += 1
 
                 # 6. INTERVALO ENTRE CLIENTES (segurança anti-bloqueio)

@@ -53,7 +53,7 @@ async function initializeDatabasePool() {
     console.log('✅ [DB] Conectado ao PostgreSQL:', result.rows[0].now);
 
     // Criar tabela se não existir
-    await criarTabelaWhatsAppStatus();
+    await criarTabelaWhatsAppSessions();
 
     // Resetar contador de retries
     dbConnectionRetries = 0;
@@ -85,28 +85,45 @@ async function initializeDatabasePool() {
 }
 
 /**
- * Cria tabela whatsapp_status se não existir
+ * Cria tabela whatsapp_sessions se não existir
  */
-async function criarTabelaWhatsAppStatus() {
+async function criarTabelaWhatsAppSessions() {
   if (!pool) return;
 
   try {
+    // Criar tabela whatsapp_sessions compatível com o sistema
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS whatsapp_status (
+      CREATE TABLE IF NOT EXISTS whatsapp_sessions (
         id SERIAL PRIMARY KEY,
-        session_name VARCHAR(100) UNIQUE NOT NULL,
-        is_connected BOOLEAN DEFAULT FALSE,
+        cliente_nexus_id INTEGER,
+        instance_name VARCHAR(100) UNIQUE,
         phone_number VARCHAR(20),
+        status VARCHAR(50) DEFAULT 'disconnected',
         qr_code TEXT,
-        last_connected_at TIMESTAMP,
-        last_disconnected_at TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT NOW(),
-        created_at TIMESTAMP DEFAULT NOW()
+        session_data JSONB,
+        connected_at TIMESTAMP,
+        disconnected_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ [DB] Tabela whatsapp_status verificada/criada');
+    console.log('✅ [DB] Tabela whatsapp_sessions verificada/criada');
+
+    // Garantir que existe registro para nexus-crm
+    const result = await pool.query(
+      'SELECT id FROM whatsapp_sessions WHERE instance_name = $1',
+      ['nexus-crm']
+    );
+
+    if (result.rows.length === 0) {
+      await pool.query(`
+        INSERT INTO whatsapp_sessions (instance_name, status)
+        VALUES ($1, $2)
+      `, ['nexus-crm', 'disconnected']);
+      console.log('✅ [DB] Registro nexus-crm criado em whatsapp_sessions');
+    }
   } catch (err) {
-    console.error('❌ [DB] Erro ao criar tabela whatsapp_status:', err.message);
+    console.error('❌ [DB] Erro ao criar tabela whatsapp_sessions:', err.message);
   }
 }
 
@@ -732,7 +749,7 @@ function cleanChromiumLocks() {
 /**
  * Salva o status do WhatsApp no banco de dados
  */
-async function saveWhatsAppStatus(connected, phone = null, qr = null) {
+async function saveWhatsAppStatus(connected, phone = null, qr = null, sessionData = null) {
   if (!pool) {
     console.log('⚠️ [DB] Pool de conexão não disponível');
     return;
@@ -741,29 +758,36 @@ async function saveWhatsAppStatus(connected, phone = null, qr = null) {
   try {
     console.log(`💾 [DB] Salvando status: connected=${connected}, phone=${phone ? phone.substring(0, 5) + '...' : null}`);
 
+    const status = connected ? 'connected' : (qr ? 'qrcode' : 'disconnected');
+
+    // Preparar session_data como JSON se fornecido
+    const sessionDataJson = sessionData ? JSON.stringify(sessionData) : null;
+
     const query = `
-      INSERT INTO whatsapp_status (session_name, is_connected, phone_number, qr_code, last_connected_at, last_disconnected_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, NOW())
-      ON CONFLICT (session_name)
+      INSERT INTO whatsapp_sessions (instance_name, phone_number, status, qr_code, session_data, connected_at, disconnected_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      ON CONFLICT (instance_name)
       DO UPDATE SET
-        is_connected = $2,
-        phone_number = $3,
+        phone_number = $2,
+        status = $3,
         qr_code = $4,
-        last_connected_at = CASE WHEN $2 = TRUE THEN NOW() ELSE whatsapp_status.last_connected_at END,
-        last_disconnected_at = CASE WHEN $2 = FALSE THEN NOW() ELSE whatsapp_status.last_disconnected_at END,
+        session_data = COALESCE($5, whatsapp_sessions.session_data),
+        connected_at = CASE WHEN $3 = 'connected' THEN NOW() ELSE whatsapp_sessions.connected_at END,
+        disconnected_at = CASE WHEN $3 = 'disconnected' THEN NOW() ELSE whatsapp_sessions.disconnected_at END,
         updated_at = NOW()
     `;
 
     await pool.query(query, [
       'nexus-crm',
-      connected,
       phone,
+      status,
       qr,
+      sessionDataJson,
       connected ? new Date() : null,
       !connected ? new Date() : null
     ]);
 
-    console.log('✅ [DB] Status salvo no banco');
+    console.log('✅ [DB] Status salvo em whatsapp_sessions');
   } catch (err) {
     console.error('❌ [DB] Erro ao salvar status:', err.message);
   }
@@ -780,12 +804,18 @@ async function getWhatsAppStatus() {
 
   try {
     const result = await pool.query(
-      'SELECT * FROM whatsapp_status WHERE session_name = $1',
+      'SELECT * FROM whatsapp_sessions WHERE instance_name = $1',
       ['nexus-crm']
     );
 
     if (result.rows.length > 0) {
-      return result.rows[0];
+      const session = result.rows[0];
+      console.log('📊 [DB] Sessão recuperada:', {
+        status: session.status,
+        phone: session.phone_number ? session.phone_number.substring(0, 5) + '...' : null,
+        has_session_data: !!session.session_data
+      });
+      return session;
     }
 
     return null;
