@@ -90,7 +90,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Iniciar sessão
+// Iniciar sessão (modo assíncrono - não bloqueia)
 app.post('/start', async (req, res) => {
   try {
     if (client && isConnected) {
@@ -101,27 +101,48 @@ app.post('/start', async (req, res) => {
       });
     }
 
-    console.log('🚀 Iniciando cliente WhatsApp...');
-
-    client = await wppconnect.create(clientOptions);
-
-    // Obter informações do número
-    try {
-      const hostDevice = await client.getHostDevice();
-      phoneNumber = hostDevice.id.user;
-      console.log(`📱 Conectado como: ${phoneNumber}`);
-    } catch (err) {
-      console.log('ℹ️ Não foi possível obter número:', err.message);
+    if (client) {
+      return res.json({
+        success: true,
+        message: 'Sessão já está sendo iniciada. Use /qr para obter o QR Code.',
+        connected: false,
+        initializing: true
+      });
     }
 
+    console.log('🚀 Iniciando cliente WhatsApp de forma assíncrona...');
+
+    // Responde IMEDIATAMENTE (não aguarda o Chromium iniciar)
     res.json({
       success: true,
-      message: 'Sessão iniciada',
-      connected: isConnected
+      message: 'Iniciando sessão... Use /qr para obter o QR Code.',
+      connected: false,
+      initializing: true
     });
 
+    // Inicializa em background (não bloqueia a resposta)
+    wppconnect.create(clientOptions)
+      .then(createdClient => {
+        client = createdClient;
+        console.log('✅ Cliente WhatsApp criado com sucesso!');
+
+        // Obter informações do número (se já conectado)
+        client.getHostDevice()
+          .then(hostDevice => {
+            phoneNumber = hostDevice.id.user;
+            console.log(`📱 Conectado como: ${phoneNumber}`);
+          })
+          .catch(err => {
+            console.log('ℹ️ Aguardando conexão via QR Code...');
+          });
+      })
+      .catch(error => {
+        console.error('❌ Erro ao iniciar cliente WhatsApp:', error);
+        client = null;
+      });
+
   } catch (error) {
-    console.error('❌ Erro ao iniciar sessão:', error);
+    console.error('❌ Erro ao processar requisição /start:', error);
     res.status(500).json({
       success: false,
       error: error.message
