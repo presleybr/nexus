@@ -91,8 +91,11 @@ services:
     plan: starter
     rootDir: wppconnect
     buildCommand: |
-      npm install
-      npx puppeteer browsers install chrome
+      echo "📦 Instalando dependências WPPConnect..."
+      npm install --no-audit --no-fund --loglevel=error
+      echo "🌐 Instalando Chrome..."
+      npx puppeteer browsers install chrome --path /opt/render/.cache/puppeteer || echo "⚠️ Chrome install failed, continuing..."
+      echo "✅ Build WPPConnect concluído!"
     startCommand: npm start
     envVars:
       - key: PORT
