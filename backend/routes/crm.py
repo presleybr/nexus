@@ -1424,6 +1424,8 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
                     log_sistema('success', f"✅ Dados extraídos do PDF - Venc: {dados_pdf.get('vencimento_str')}, Valor: R$ {dados_pdf.get('valor', 0):.2f}", 'disparo')
 
                 # 1. GERAR MENSAGEM PERSONALIZADA COM DADOS DO PDF
+                log_sistema('info', f"📝 Gerando mensagem personalizada para {nome_cliente}", 'disparo')
+
                 mensagem_personalizada = mensagens_service.gerar_mensagem_boleto(
                     dados_cliente={
                         'nome_completo': nome_cliente,
@@ -1436,7 +1438,8 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
                     nome_empresa='Cred MS Consorcios'
                 )
 
-                log_sistema('info', f"Enviando mensagem personalizada para {nome_cliente}", 'disparo')
+                log_sistema('success', f"✅ Mensagem gerada. Tamanho: {len(mensagem_personalizada)} caracteres", 'disparo')
+                log_sistema('info', f"📱 Enviando mensagem de texto para {whatsapp}", 'disparo')
 
                 # 2. ENVIAR MENSAGEM PERSONALIZADA
                 resultado_msg = whatsapp_service.enviar_mensagem(
@@ -1445,24 +1448,46 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
                     cliente_nexus_id
                 )
 
+                log_sistema('info', f"📋 Resultado envio mensagem: {resultado_msg}", 'disparo')
+
                 if not resultado_msg.get('sucesso'):
-                    log_sistema('error', f"Erro ao enviar mensagem para {nome_cliente}", 'disparo')
+                    log_sistema('error', f"❌ FALHA ao enviar mensagem para {nome_cliente}: {resultado_msg.get('error', 'Erro desconhecido')}", 'disparo')
                     stats['erros'] += 1
                     continue
 
+                log_sistema('success', f"✅ Mensagem de texto enviada com sucesso!", 'disparo')
+
                 # 3. AGUARDAR 2-3 SEGUNDOS ANTES DE ENVIAR O BOLETO
-                time.sleep(random.randint(2, 3))
+                intervalo_msg_pdf = random.randint(2, 3)
+                log_sistema('info', f"⏳ Aguardando {intervalo_msg_pdf}s antes de enviar PDF...", 'disparo')
+                time.sleep(intervalo_msg_pdf)
 
                 # 4. ENVIAR PDF DO BOLETO COM DADOS REAIS DO PDF
+                log_sistema('info', f"🔄 INICIANDO ENVIO DE PDF para {nome_cliente}", 'disparo')
+
                 vencimento_str = dados_pdf.get('vencimento_str') if dados_pdf.get('sucesso') else boleto['data_vencimento'].strftime('%d/%m/%Y')
                 valor_str = f"R$ {dados_pdf.get('valor', 0):.2f}" if dados_pdf.get('sucesso') else f"R$ {boleto['valor_original']:.2f}"
 
                 legenda = f"📄 *Boleto {nome_empresa}*\nVencimento: {vencimento_str}\nValor: {valor_str}\n\n💚 {nome_empresa} - Seu parceiro de confiança!"
 
-                log_sistema('info', f"📄 Enviando PDF para {nome_cliente}", 'disparo')
-                log_sistema('info', f"📂 Caminho do PDF: {pdf_path}", 'disparo')
-                log_sistema('info', f"📄 Arquivo temporário criado: {pdf_temp_criado}", 'disparo')
-                log_sistema('info', f"📱 WhatsApp: {whatsapp}", 'disparo')
+                log_sistema('info', f"📄 Preparando envio de PDF:", 'disparo')
+                log_sistema('info', f"  ├─ Cliente: {nome_cliente}", 'disparo')
+                log_sistema('info', f"  ├─ WhatsApp: {whatsapp}", 'disparo')
+                log_sistema('info', f"  ├─ Arquivo: {pdf_path}", 'disparo')
+                log_sistema('info', f"  ├─ Temporário: {pdf_temp_criado}", 'disparo')
+                log_sistema('info', f"  └─ Legenda: {legenda[:50]}...", 'disparo')
+
+                # Verificar se arquivo existe antes de tentar enviar
+                import os
+                if not os.path.exists(pdf_path):
+                    log_sistema('error', f"❌ ARQUIVO PDF NÃO EXISTE: {pdf_path}", 'disparo')
+                    stats['erros'] += 1
+                    continue
+
+                tamanho_pdf = os.path.getsize(pdf_path)
+                log_sistema('info', f"✅ Arquivo PDF existe. Tamanho: {tamanho_pdf} bytes", 'disparo')
+
+                log_sistema('info', f"📤 Chamando whatsapp_service.enviar_pdf()...", 'disparo')
 
                 resultado_pdf = whatsapp_service.enviar_pdf(
                     whatsapp,
@@ -1471,7 +1496,7 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
                     cliente_nexus_id
                 )
 
-                log_sistema('info', f"📋 Resultado PDF completo: {resultado_pdf}", 'disparo')
+                log_sistema('info', f"📋 Resultado PDF recebido: {resultado_pdf}", 'disparo')
 
                 # Verificar tanto 'sucesso' quanto 'success' (compatibilidade)
                 pdf_enviado = resultado_pdf.get('sucesso') or resultado_pdf.get('success')
