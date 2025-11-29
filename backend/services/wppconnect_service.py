@@ -96,6 +96,7 @@ class WPPConnectService:
             Dicionário com resultado da operação
         """
         try:
+            # Chamar /start do servidor Express
             resultado = self._fazer_requisicao('POST', '/start')
 
             if resultado.get('success'):
