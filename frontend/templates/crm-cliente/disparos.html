@@ -312,32 +312,6 @@
                     Configure o disparo automático mensal entre <strong style="color: #39FF14;">08:00-18:00</strong> (MS)
                 </p>
 
-                <div class="config-grid">
-                    <div class="config-item">
-                        <label>Status da Automação</label>
-                        <div class="toggle-container">
-                            <button id="toggleAutomacao" onclick="toggleAutomacao()">
-                                <span id="statusText">Carregando...</span>
-                            </button>
-                            <span id="statusBadge" class="badge"></span>
-                        </div>
-                    </div>
-
-                    <div class="config-item">
-                        <label>Dia do Mês para Disparo</label>
-                        <select id="diaDoMes" onchange="salvarDiaDoMes()">
-                            <!-- Options serão preenchidas via JavaScript -->
-                        </select>
-                        <small style="display: block; margin-top: 0.5rem; color: var(--cor-texto-secundario, #888);">
-                            ⏰ Horário: 08:00 - 18:00 (MS)
-                        </small>
-                    </div>
-                </div>
-
-                <div id="proximoDisparo" class="proximo-disparo" style="display: none;">
-                    <strong>📌 Próximo disparo:</strong> <span id="dataProximoDisparo"></span>
-                </div>
-
                 <div class="test-section">
                     <button class="btn-secondary" onclick="testarAutomacaoAgora()">
                         🧪 Testar Agora
