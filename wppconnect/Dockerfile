@@ -16,15 +16,19 @@ RUN apk add --no-cache \
     udev \
     && rm -rf /var/cache/apk/*
 
+# Verificar e configurar Chromium
+RUN which chromium-browser || which chromium || echo "Chromium not found" \
+    && chmod +x /usr/bin/chromium-browser 2>/dev/null || true \
+    && ln -sf /usr/bin/chromium-browser /usr/bin/chromium 2>/dev/null || true
+
 # Configurar Puppeteer para usar Chromium do Alpine
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
     CHROME_BIN=/usr/bin/chromium-browser \
-    CHROME_PATH=/usr/lib/chromium/ \
     NODE_ENV=production
 
-# Criar pasta para tokens/sessões do WhatsApp
-RUN mkdir -p /app/tokens && chmod 777 /app/tokens
+# Criar pasta para tokens/sessões do WhatsApp com permissões corretas
+RUN mkdir -p /app/tokens && chmod -R 777 /app/tokens
 
 WORKDIR /app
 
@@ -36,6 +40,9 @@ RUN npm ci --omit=dev --ignore-scripts 2>&1 | grep -v "deprecated" || true
 
 # Copiar código do servidor
 COPY . .
+
+# Executar script de detecção do Chromium e salvar path
+RUN node detect-chromium.js || echo "Chromium detection script failed"
 
 # Expor porta
 EXPOSE 10000
