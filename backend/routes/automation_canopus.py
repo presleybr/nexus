@@ -2508,12 +2508,15 @@ def importar_boletos():
 
                 numero_boleto = contrato or f"CANOPUS-{cpf}-{mes_ref:02d}{ano_ref}"
 
+                # Usar base64 ou temp path (preferir não salvar path temporário)
+                pdf_path_salvar = None  # Não salvar path temporário, usar base64 de downloads_canopus
+
                 cur.execute("""
                     INSERT INTO boletos
                     (cliente_nexus_id, cliente_final_id, numero_boleto, valor_original,
                      data_vencimento, data_emissao, mes_referencia, ano_referencia,
-                     numero_parcela, pdf_path, pdf_filename, status, status_envio, gerado_por)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     numero_parcela, pdf_path, pdf_filename, pdf_size, status, status_envio, gerado_por)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """, (
                     cliente_nexus_id,
@@ -2525,8 +2528,9 @@ def importar_boletos():
                     mes_ref,
                     ano_ref,
                     1,
-                    pdf_path,
+                    pdf_path_salvar,
                     pdf_filename,
+                    pdf_row['tamanho_bytes'],
                     'pendente',
                     'nao_enviado',
                     'importacao_canopus'
