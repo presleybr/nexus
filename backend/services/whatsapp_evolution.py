@@ -169,10 +169,12 @@ class WhatsAppEvolution:
     def verificar_status(self):
         """Verifica status da conexão"""
         try:
+            print(f"[WHATSAPP_EVOLUTION] 🔍 verificar_status() CHAMADO!", flush=True)
             logger.info(f"🔍 Verificando status da instância: {self.instance_name}")
             endpoint = f'/instance/connectionState/{self.instance_name}'
             result = self._make_request('GET', endpoint)
 
+            print(f"[WHATSAPP_EVOLUTION] 📥 Resposta bruta: {result}", flush=True)
             logger.info(f"📥 Resposta /instance/connectionState: {result}")
 
             if 'error' in result:
@@ -191,6 +193,7 @@ class WhatsAppEvolution:
             state_instance = result.get('instance', {}).get('state') if result.get('instance') else None
             state = state_direto or state_instance or 'close'
 
+            print(f"[WHATSAPP_EVOLUTION] 📊 state_direto={state_direto}, state_instance={state_instance}, final={state}", flush=True)
             logger.info(f"📊 state_direto: {state_direto}")
             logger.info(f"📊 state_instance: {state_instance}")
             logger.info(f"📊 Estado final: {state}")
@@ -221,6 +224,7 @@ class WhatsAppEvolution:
                 'phone': phone
             }
 
+            print(f"[WHATSAPP_EVOLUTION] ✅ RETORNANDO: {status_result}", flush=True)
             logger.info(f"✅ Status final: {status_result}")
             return status_result
 
