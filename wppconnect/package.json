@@ -1,18 +1,18 @@
 {
-  "name": "nexus-wppconnect",
-  "version": "1.0.0",
-  "description": "WPPConnect Server para Nexus CRM",
+  "name": "nexus-whatsapp-evolution",
+  "version": "2.0.0",
+  "description": "WhatsApp Server com Evolution API para Nexus CRM",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "@wppconnect-team/wppconnect": "^1.37.8",
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "body-parser": "^1.20.2",
-    "pg": "^8.11.3"
+    "pg": "^8.11.3",
+    "axios": "^1.6.7"
   },
   "engines": {
     "node": ">=18.0.0",
