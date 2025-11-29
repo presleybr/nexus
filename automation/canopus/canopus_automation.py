@@ -582,11 +582,33 @@ class CanopusAutomation:
             # Garantir que estamos na página de busca avançada
             await self.navegar_busca_avancada()
 
-            # 1. Selecionar "CPF" no dropdown
+            # 1. Selecionar "CPF" no dropdown (com retry se falhar)
             logger.info("Selecionando tipo de busca: CPF")
             sys.stdout.flush()
             select_tipo = self.config.SELECTORS['busca']['select_tipo_busca']
-            await self.page.select_option(select_tipo, value='F')  # F = CPF
+
+            # RETRY: Tentar até 3 vezes se o seletor não aparecer
+            for tentativa_select in range(3):
+                try:
+                    # Aguardar seletor com timeout maior (60s ao invés de 30s)
+                    await self.page.wait_for_selector(select_tipo, timeout=60000, state='visible')
+                    await self.page.select_option(select_tipo, value='F')  # F = CPF
+                    logger.info(f"✅ Dropdown selecionado (tentativa {tentativa_select + 1})")
+                    sys.stdout.flush()
+                    break
+                except PlaywrightTimeoutError:
+                    if tentativa_select < 2:
+                        logger.warning(f"⚠️ Timeout ao selecionar dropdown (tentativa {tentativa_select + 1}/3). Navegando novamente...")
+                        sys.stdout.flush()
+                        # Tentar navegar novamente
+                        await self.navegar_busca_avancada()
+                        await asyncio.sleep(2)
+                    else:
+                        # Última tentativa falhou
+                        logger.error(f"❌ Timeout final ao selecionar dropdown após 3 tentativas")
+                        sys.stdout.flush()
+                        raise
+
             await self._delay_humanizado(0.5, 1.0)
             await self.screenshot("apos_selecionar_cpf")
 
@@ -1061,6 +1083,7 @@ class CanopusAutomation:
 
                 # Capturar a nova aba que será aberta
                 nova_aba_pdf = None
+                route_handler_registrado = False  # Flag para controlar registro
 
                 # ESTRATÉGIA CRÍTICA: Registrar route handler NO CONTEXTO ANTES de clicar
                 # Isso garante que interceptamos o PDF desde o INÍCIO do carregamento
@@ -1129,9 +1152,16 @@ class CanopusAutomation:
                         await route.continue_()
 
                 # Registrar route handler NO CONTEXTO (intercepta TODAS as abas)
-                await self.context.route('**/*', route_pdf_context)
-                logger.info("🎯 Context route handler registrado ANTES de clicar (filtra apenas PDFs)")
-                sys.stdout.flush()
+                # Usar try/finally para GARANTIR remoção do handler
+                try:
+                    await self.context.route('**/*', route_pdf_context)
+                    route_handler_registrado = True
+                    logger.info("🎯 Context route handler registrado ANTES de clicar (filtra apenas PDFs)")
+                    sys.stdout.flush()
+                except Exception as e_route_reg:
+                    logger.error(f"❌ Erro ao registrar route handler: {e_route_reg}")
+                    sys.stdout.flush()
+                    raise
 
                 async def capturar_nova_aba(page):
                     nonlocal nova_aba_pdf
@@ -1213,16 +1243,7 @@ class CanopusAutomation:
                             logger.info(f"✅ PDF REAL INTERCEPTADO: {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
                             logger.info(f"   URL: {pdf_url_interceptado[:80] if pdf_url_interceptado else 'N/A'}")
                             sys.stdout.flush()
-
-                            # IMPORTANTE: Remover route handler do contexto após capturar
-                            try:
-                                await self.context.unroute('**/*', route_pdf_context)
-                                logger.info("🗑️  Context route handler removido após captura")
-                                sys.stdout.flush()
-                            except Exception as e_unroute:
-                                logger.warning(f"⚠️ Erro ao remover route handler: {e_unroute}")
-                                sys.stdout.flush()
-
+                            # Nota: route handler será removido no bloco finally
                             break
 
                         # Log a cada 5 segundos mostrando o que capturou
@@ -1251,15 +1272,7 @@ class CanopusAutomation:
                         logger.info(f"📊 Respostas capturadas: {len(todas_respostas_pdf)}")
                         sys.stdout.flush()
 
-                    # Remover route handler se ainda não foi removido (caso timeout)
-                    if not pdf_bytes:
-                        try:
-                            await self.context.unroute('**/*', route_pdf_context)
-                            logger.info("🗑️  Context route handler removido (timeout)")
-                            sys.stdout.flush()
-                        except Exception as e_unroute:
-                            logger.warning(f"⚠️ Erro ao remover route handler: {e_unroute}")
-                            sys.stdout.flush()
+                    # Nota: route handler será removido no bloco finally (sempre executado)
 
                     # Se não foi interceptado, tentar JavaScript (se a aba ainda estiver aberta)
                     if not pdf_bytes:
@@ -1670,6 +1683,18 @@ class CanopusAutomation:
             self.stats['downloads_erro'] += 1
             await self.screenshot("erro_boleto")
             return None
+
+        finally:
+            # CRÍTICO: Garantir que route handler seja SEMPRE removido
+            # Isso evita acúmulo de handlers que causam timeout em downloads futuros
+            if route_handler_registrado:
+                try:
+                    await self.context.unroute('**/*', route_pdf_context)
+                    logger.info("🗑️  [FINALLY] Context route handler removido (limpeza garantida)")
+                    sys.stdout.flush()
+                except Exception as e_unroute_finally:
+                    logger.warning(f"⚠️ [FINALLY] Erro ao remover route handler: {e_unroute_finally}")
+                    sys.stdout.flush()
 
     async def _extrair_dados_boleto(self) -> Dict[str, Any]:
         """Extrai dados do boleto da página"""
