@@ -91,15 +91,20 @@ class WhatsAppPlaywrightService:
         """
         try:
             if not self.page:
+                logger.error("❌ Página não inicializada")
                 return {
                     'success': False,
                     'error': 'WhatsApp não foi iniciado. Chame iniciar() primeiro.'
                 }
 
+            logger.info("🔍 Verificando estado do WhatsApp Web...")
+
             # Verificar se já está conectado
             try:
                 await self.page.wait_for_selector('div[data-testid="conversation-panel"]', timeout=2000)
                 self.is_connected = True
+
+                logger.info("✅ WhatsApp já está conectado!")
 
                 # Tentar obter número de telefone
                 try:
@@ -116,35 +121,61 @@ class WhatsAppPlaywrightService:
                     'message': 'WhatsApp já está conectado!'
                 }
             except:
-                pass  # Não está conectado ainda
+                logger.info("ℹ️ WhatsApp não conectado ainda, procurando QR Code...")
 
-            # Tentar capturar QR Code
+            # Tentar múltiplos seletores para o QR Code (WhatsApp muda frequentemente)
+            qr_selectors = [
+                'canvas[aria-label="Scan me!"]',
+                'canvas[role="img"]',
+                'div[data-ref] canvas',
+                'canvas'
+            ]
+
+            for selector in qr_selectors:
+                try:
+                    logger.info(f"🔍 Tentando seletor: {selector}")
+                    qr_element = await self.page.wait_for_selector(selector, timeout=3000)
+
+                    if qr_element:
+                        logger.info(f"✅ QR Code encontrado com seletor: {selector}")
+
+                        # Capturar screenshot do QR Code
+                        qr_bytes = await qr_element.screenshot()
+                        qr_base64 = base64.b64encode(qr_bytes).decode('utf-8')
+                        self.qr_code = f"data:image/png;base64,{qr_base64}"
+
+                        logger.info(f"📱 QR Code capturado! Tamanho: {len(qr_base64)} chars")
+
+                        return {
+                            'success': True,
+                            'qr': self.qr_code,
+                            'connected': False
+                        }
+                except Exception as e:
+                    logger.warning(f"⚠️ Seletor '{selector}' não encontrou QR Code: {e}")
+                    continue
+
+            # Se chegou aqui, nenhum seletor funcionou
+            logger.warning("⚠️ QR Code ainda não apareceu em nenhum seletor")
+
+            # Tentar capturar screenshot da página inteira para debug
             try:
-                qr_element = await self.page.wait_for_selector('canvas[aria-label="Scan me!"]', timeout=5000)
-
-                if qr_element:
-                    # Capturar screenshot do QR Code
-                    qr_bytes = await qr_element.screenshot()
-                    qr_base64 = base64.b64encode(qr_bytes).decode('utf-8')
-                    self.qr_code = f"data:image/png;base64,{qr_base64}"
-
-                    logger.info("📱 QR Code capturado!")
-
-                    return {
-                        'success': True,
-                        'qr': self.qr_code,
-                        'connected': False
-                    }
+                page_screenshot = await self.page.screenshot()
+                screenshot_base64 = base64.b64encode(page_screenshot).decode('utf-8')
+                logger.info("📸 Screenshot da página capturado para debug")
             except:
-                # QR Code ainda não apareceu
-                return {
-                    'success': True,
-                    'connected': False,
-                    'message': 'Aguardando QR Code aparecer...'
-                }
+                pass
+
+            return {
+                'success': True,
+                'connected': False,
+                'message': 'Aguardando QR Code aparecer... (recarregue em alguns segundos)'
+            }
 
         except Exception as e:
             logger.error(f"❌ Erro ao obter QR Code: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return {
                 'success': False,
                 'error': f'Erro ao obter QR Code: {str(e)}'
