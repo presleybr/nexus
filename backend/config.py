@@ -58,6 +58,7 @@ class Config:
 
     # Configurações WhatsApp
     WHATSAPP_SESSION_DIR = os.getenv('WHATSAPP_SESSION_DIR', 'whatsapp_sessions')
+    WPPCONNECT_URL = os.getenv('WPPCONNECT_URL', 'http://localhost:3001')
 
     # Diretórios do projeto
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -6,27 +6,15 @@ from flask import Blueprint, request, jsonify, session
 from datetime import datetime
 import sys
 import os
-import asyncio
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.wppconnect_service import wppconnect_service
 from services.whatsapp_service import whatsapp_service
-from services.whatsapp_playwright import whatsapp_playwright_service
 from routes.auth import login_required
 from models import log_sistema
 
 whatsapp_wppconnect_bp = Blueprint('whatsapp_wppconnect', __name__, url_prefix='/api/whatsapp/wppconnect')
-
-
-def run_async(coro):
-    """Helper para rodar código async"""
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(coro)
 
 
 @whatsapp_wppconnect_bp.route('/status-servidor', methods=['GET'])
@@ -58,7 +46,7 @@ def verificar_servidor():
 @login_required
 def iniciar_conexao():
     """
-    Inicia a conexão com WhatsApp via Playwright (roda no mesmo servidor)
+    Inicia a conexão com WhatsApp via WPPConnect Server
     """
     try:
         cliente_nexus_id = session.get('cliente_nexus_id')
@@ -66,11 +54,11 @@ def iniciar_conexao():
         if not cliente_nexus_id:
             return jsonify({'erro': 'Cliente não encontrado'}), 404
 
-        # Inicia WhatsApp via Playwright
-        resultado = run_async(whatsapp_playwright_service.iniciar())
+        # Inicia conexão via WPPConnect
+        resultado = wppconnect_service.iniciar_conexao()
 
         if resultado.get('success'):
-            log_sistema('info', 'WhatsApp iniciado via Playwright',
+            log_sistema('info', 'WhatsApp iniciado via WPPConnect',
                        'whatsapp', {'cliente_nexus_id': cliente_nexus_id})
 
         return jsonify(resultado), 200
@@ -85,7 +73,7 @@ def iniciar_conexao():
 @login_required
 def obter_qr_code():
     """
-    Obtém o QR Code para conexão via Playwright
+    Obtém o QR Code para conexão via WPPConnect
     """
     try:
         cliente_nexus_id = session.get('cliente_nexus_id')
@@ -93,7 +81,7 @@ def obter_qr_code():
         if not cliente_nexus_id:
             return jsonify({'erro': 'Cliente não encontrado'}), 404
 
-        resultado = run_async(whatsapp_playwright_service.obter_qr_code())
+        resultado = wppconnect_service.obter_qr_code()
 
         return jsonify(resultado), 200
 
@@ -107,10 +95,10 @@ def obter_qr_code():
 @login_required
 def verificar_status():
     """
-    Verifica o status da conexão WhatsApp via Playwright
+    Verifica o status da conexão WhatsApp via WPPConnect
     """
     try:
-        resultado = run_async(whatsapp_playwright_service.verificar_conexao())
+        resultado = wppconnect_service.verificar_status()
         return jsonify(resultado), 200
 
     except Exception as e:

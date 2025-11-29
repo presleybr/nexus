@@ -19,14 +19,14 @@ from models import log_sistema
 class WPPConnectService:
     """Serviço de integração com WPPConnect Server"""
 
-    def __init__(self, base_url: str = "http://localhost:3001"):
+    def __init__(self, base_url: str = None):
         """
         Inicializa o serviço WPPConnect
 
         Args:
-            base_url: URL do servidor WPPConnect (padrão: http://localhost:3001)
+            base_url: URL do servidor WPPConnect (padrão: Config.WPPCONNECT_URL)
         """
-        self.base_url = base_url
+        self.base_url = base_url or Config.WPPCONNECT_URL
         self.timeout = 120  # 2 minutos para inicialização do navegador
 
     def _fazer_requisicao(self, method: str, endpoint: str, data: dict = None) -> Dict:

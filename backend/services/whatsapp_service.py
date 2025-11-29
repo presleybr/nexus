@@ -1,12 +1,11 @@
 """
 Serviço de WhatsApp - Integração para envio de mensagens e PDFs
-INTEGRADO COM PLAYWRIGHT - Roda no mesmo servidor, sem dependências externas
+INTEGRADO COM WPPCONNECT - Conecta a servidor WPPConnect externo
 """
 
 import os
 import time
 import json
-import asyncio
 from datetime import datetime
 from typing import Dict, Optional, List
 import sys
@@ -15,40 +14,29 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import Config
 from models import log_sistema, ClienteNexus
-from services.whatsapp_playwright import whatsapp_playwright_service
+from services.wppconnect_service import wppconnect_service
 
 
 class WhatsAppService:
-    """Serviço de integração com WhatsApp via Playwright"""
+    """Serviço de integração com WhatsApp via WPPConnect"""
 
     def __init__(self):
         self.session_dir = Config.WHATSAPP_PATH
-        self.wpp = whatsapp_playwright_service
+        self.wpp = wppconnect_service
         self.session_data = {}
-        self.loop = None
-
-    def _run_async(self, coro):
-        """Helper para rodar código async de forma síncrona"""
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        return loop.run_until_complete(coro)
 
     def conectar(self) -> Dict:
         """
-        Inicia conexão com WhatsApp Web via Playwright
+        Inicia conexão com WhatsApp Web via WPPConnect
 
         Returns:
             Dict com status da operação
         """
         try:
-            resultado = self._run_async(self.wpp.iniciar())
+            resultado = self.wpp.iniciar_conexao()
 
             if resultado.get('success'):
-                log_sistema('info', 'WhatsApp iniciado via Playwright', 'whatsapp', {})
+                log_sistema('info', 'WhatsApp iniciado via WPPConnect', 'whatsapp', {})
 
             return resultado
 
@@ -60,7 +48,7 @@ class WhatsAppService:
 
     def gerar_qr_code(self, cliente_nexus_id: int) -> Dict:
         """
-        Gera QR Code para conexão WhatsApp via Playwright
+        Gera QR Code para conexão WhatsApp via WPPConnect
 
         Args:
             cliente_nexus_id: ID do cliente Nexus
@@ -70,7 +58,7 @@ class WhatsAppService:
         """
         try:
             # Obtém o QR Code
-            resultado_qr = self._run_async(self.wpp.obter_qr_code())
+            resultado_qr = self.wpp.obter_qr_code()
 
             if resultado_qr.get('connected'):
                 # Já está conectado
@@ -89,7 +77,7 @@ class WhatsAppService:
 
             if resultado_qr.get('qr'):
                 # QR Code disponível
-                log_sistema('info', 'QR Code gerado via Playwright',
+                log_sistema('info', 'QR Code gerado via WPPConnect',
                            'whatsapp', {'cliente_nexus_id': cliente_nexus_id})
 
                 return {
