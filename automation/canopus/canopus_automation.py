@@ -956,28 +956,9 @@ class CanopusAutomation:
                         logger.info(f"   Status: {response.status}")
                         sys.stdout.flush()
 
-                        # CRÍTICO: Ignorar redirects (302, 301, etc) - não têm body disponível
-                        if response.status in [301, 302, 303, 307, 308]:
-                            logger.info(f"⏭️ Ignorando redirect {response.status} - aguardando resposta final")
-                            sys.stdout.flush()
-                            return
-
-                        # IMPORTANTE: Só processar respostas com status 200 OK
-                        if response.status != 200:
-                            logger.warning(f"⚠️ Status não é 200, ignorando: {response.status}")
-                            sys.stdout.flush()
-                            return
-
-                        # IMPORTANTE: Aguardar a resposta completar antes de acessar body
-                        # Isso evita erros de "Response body is unavailable"
-                        try:
-                            await response.finished()
-                            logger.info("✅ Resposta finalizada, acessando body...")
-                            sys.stdout.flush()
-                        except Exception as e_finish:
-                            logger.warning(f"⚠️ Erro ao aguardar finish: {e_finish}")
-                            sys.stdout.flush()
-
+                        # VOLTAR AO CÓDIGO SIMPLES QUE FUNCIONAVA (cc634c0)
+                        # NÃO verificar redirects - apenas tentar capturar
+                        # Se der erro, o try/catch externo pega
                         body = await response.body()
                         tamanho = len(body)
                         logger.info(f"📦 Corpo recebido: {tamanho} bytes ({tamanho/1024:.1f} KB)")
@@ -1113,17 +1094,22 @@ class CanopusAutomation:
                         logger.info(f"🔀 [ROUTE] Content-Type: {content_type}, Status: {response.status}")
                         sys.stdout.flush()
 
-                        # CRÍTICO: Só processar respostas 200 OK (ignorar redirects)
-                        if response.status == 200 and ('pdf' in content_type or 'frmConCmImpressao' in url):
-                            body = await response.body()
-                            logger.info(f"🔀 [ROUTE] PDF CAPTURADO: {len(body)} bytes ({len(body)/1024:.1f} KB)")
-                            sys.stdout.flush()
+                        # VOLTAR AO CÓDIGO SIMPLES QUE FUNCIONAVA (cc634c0)
+                        # Tentar capturar QUALQUER resposta de PDF, sem filtrar por status
+                        if 'pdf' in content_type or 'frmConCmImpressao' in url:
+                            try:
+                                body = await response.body()
+                                logger.info(f"🔀 [ROUTE] PDF CAPTURADO: {len(body)} bytes ({len(body)/1024:.1f} KB)")
+                                sys.stdout.flush()
 
-                            # Verificar se é PDF real
-                            if body.startswith(b'%PDF'):
-                                pdf_bytes_interceptado = body
-                                pdf_url_interceptado = url
-                                logger.info(f"✅ [ROUTE] PDF REAL confirmado!")
+                                # Verificar se é PDF real
+                                if body.startswith(b'%PDF'):
+                                    pdf_bytes_interceptado = body
+                                    pdf_url_interceptado = url
+                                    logger.info(f"✅ [ROUTE] PDF REAL confirmado!")
+                                    sys.stdout.flush()
+                            except Exception as e_route_body:
+                                logger.warning(f"⚠️ [ROUTE] Erro ao ler body: {e_route_body}")
                                 sys.stdout.flush()
 
                         # Passar resposta pro navegador
