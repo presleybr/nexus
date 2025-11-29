@@ -15,13 +15,30 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const SECRET_KEY = process.env.SECRET_KEY || 'CHANGE_SECRET_KEY';
 
-// Configuração do banco de dados PostgreSQL
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('render')
-    ? { rejectUnauthorized: false }
-    : false
-});
+// Configuração do banco de dados PostgreSQL (OPCIONAL)
+let pool = null;
+
+if (process.env.DATABASE_URL) {
+  console.log('📊 [DB] DATABASE_URL detectado, conectando ao PostgreSQL...');
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL.includes('render') || process.env.DATABASE_URL.includes('postgres')
+      ? { rejectUnauthorized: false }
+      : false
+  });
+
+  // Testar conexão
+  pool.query('SELECT NOW()', (err, res) => {
+    if (err) {
+      console.error('❌ [DB] Erro ao conectar ao PostgreSQL:', err.message);
+      pool = null; // Desabilitar pool se falhar
+    } else {
+      console.log('✅ [DB] Conectado ao PostgreSQL:', res.rows[0].now);
+    }
+  });
+} else {
+  console.log('⚠️ [DB] DATABASE_URL não configurado - funcionando SEM persistência no banco');
+}
 
 // Middlewares
 app.use(cors());
@@ -745,10 +762,43 @@ function initializeWhatsAppClient() {
           isConnected = true;
           qrCode = null;
           console.log(`📱 [INIT] Conectado como: ${phoneNumber}`);
+          console.log('💾 [INIT] Salvando status no banco...');
+          saveWhatsAppStatus(true, phoneNumber, null);
         })
         .catch(err => {
           console.log('ℹ️ [INIT] Aguardando conexão via QR Code...');
         });
+
+      // Polling ativo para detectar conexão
+      console.log('🔄 [INIT] Iniciando polling para detectar conexão...');
+      const pollInterval = setInterval(async () => {
+        if (!client) {
+          console.log('⚠️ [POLL] Cliente não existe mais, parando polling');
+          clearInterval(pollInterval);
+          return;
+        }
+
+        try {
+          const state = await client.getConnectionState();
+          console.log(`🔍 [POLL] Estado: ${state}, isConnected: ${isConnected}`);
+
+          if (state === 'CONNECTED' && !isConnected) {
+            console.log('🎉🎉🎉 [POLL] CONEXÃO DETECTADA!');
+            const hostDevice = await client.getHostDevice();
+            phoneNumber = hostDevice.id.user;
+            isConnected = true;
+            qrCode = null;
+            console.log(`📱 [POLL] Número conectado: ${phoneNumber}`);
+            await saveWhatsAppStatus(true, phoneNumber, null);
+            clearInterval(pollInterval);
+          } else if (state === 'CONNECTED' && isConnected) {
+            // Já conectado, parar polling
+            clearInterval(pollInterval);
+          }
+        } catch (err) {
+          // Ainda não conectou, continuar polling
+        }
+      }, 3000); // Verificar a cada 3 segundos
     })
     .catch(error => {
       console.error('❌ [INIT-CATCH] ERRO ao criar cliente:', error.message);
