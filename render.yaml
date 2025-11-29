@@ -33,6 +33,8 @@ services:
         value: INFO
       - key: DOWNLOAD_BASE_DIR
         value: /app/automation/canopus/downloads
+      - key: WPPCONNECT_URL
+        sync: false  # Definir manualmente: https://nexus-wppconnect.onrender.com
       # Forçar logs em tempo real (unbuffered)
       - key: PYTHONUNBUFFERED
         value: 1
@@ -78,6 +80,31 @@ services:
       - type: rewrite
         source: /api/*
         destination: https://nexus-crm-backend.onrender.com/api/*
+
+  # ---------------------------------------------------------------------------
+  # WPPConnect Server (WhatsApp Integration)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: nexus-wppconnect
+    env: node
+    region: oregon
+    plan: starter
+    rootDir: wppconnect
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: SECRET_KEY
+        generateValue: true
+      - key: NODE_VERSION
+        value: 18.17.0
+      - key: HOST
+        sync: false  # Definir manualmente: https://nexus-wppconnect.onrender.com
+      - key: BASE_URL
+        sync: false  # Definir manualmente: https://nexus-wppconnect.onrender.com
+    healthCheckPath: /
+    autoDeploy: true
 
 # =============================================================================
 # Database Configuration

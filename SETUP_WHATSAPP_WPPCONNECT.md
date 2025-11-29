@@ -202,6 +202,7 @@ O WPPConnect Server usa `SECRET_KEY` para autenticação. Configure uma chave fo
 SECRET_KEY=$(openssl rand -hex 32)
 ```
 
+
 ### HTTPS
 Em produção, SEMPRE use HTTPS:
 - Railway e Heroku fornecem HTTPS automaticamente
