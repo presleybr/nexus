@@ -2,18 +2,29 @@
 # Baseado no iniciar.bat do localhost
 FROM node:18-alpine
 
-# Instalar apenas dependências essenciais para WPPConnect
+# Instalar dependências essenciais para WPPConnect + Chromium
 RUN apk add --no-cache \
     chromium \
     nss \
     freetype \
+    freetype-dev \
     harfbuzz \
     ca-certificates \
-    ttf-freefont
+    ttf-freefont \
+    font-noto-emoji \
+    dbus \
+    udev \
+    && rm -rf /var/cache/apk/*
 
 # Configurar Puppeteer para usar Chromium do Alpine
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    CHROME_BIN=/usr/bin/chromium-browser \
+    CHROME_PATH=/usr/lib/chromium/ \
+    NODE_ENV=production
+
+# Criar pasta para tokens/sessões do WhatsApp
+RUN mkdir -p /app/tokens && chmod 777 /app/tokens
 
 WORKDIR /app
 
