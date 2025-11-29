@@ -1359,16 +1359,55 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
             try:
                 whatsapp = boleto['whatsapp']
                 nome_cliente = boleto['nome_completo']
+                cpf_cliente = boleto['cliente_final_cpf']
 
                 log_sistema('info', f"[{idx+1}/{len(boletos_reais)}] Processando cliente: {nome_cliente}", 'disparo')
 
                 # Obter caminho do PDF do banco de dados
                 pdf_path = boleto.get('pdf_path')
+                pdf_temp_criado = False  # Flag para deletar depois
 
+                # Se não tiver pdf_path válido, buscar de downloads_canopus
                 if not pdf_path or not Path(pdf_path).exists():
-                    log_sistema('warning', f"PDF não encontrado para {nome_cliente}: {pdf_path}", 'disparo')
-                    stats['erros'] += 1
-                    continue
+                    log_sistema('info', f"PDF não encontrado em pdf_path, buscando em downloads_canopus para {nome_cliente}", 'disparo')
+
+                    # Buscar PDF mais recente deste CPF em downloads_canopus
+                    pdf_canopus = db.execute_query("""
+                        SELECT caminho_arquivo, nome_arquivo
+                        FROM downloads_canopus
+                        WHERE cpf = %s
+                        AND status = 'sucesso'
+                        AND caminho_arquivo IS NOT NULL
+                        AND caminho_arquivo != ''
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    """, (cpf_cliente,))
+
+                    if not pdf_canopus or not pdf_canopus[0].get('caminho_arquivo'):
+                        log_sistema('warning', f"PDF não encontrado em downloads_canopus para {nome_cliente} (CPF: {cpf_cliente})", 'disparo')
+                        stats['erros'] += 1
+                        continue
+
+                    # Decodificar base64 e criar arquivo temporário
+                    import base64
+                    import tempfile
+                    import os
+
+                    try:
+                        pdf_base64 = pdf_canopus[0]['caminho_arquivo']
+                        pdf_bytes = base64.b64decode(pdf_base64)
+
+                        # Criar arquivo temporário
+                        temp_fd, pdf_path = tempfile.mkstemp(suffix='.pdf', prefix='boleto_')
+                        os.write(temp_fd, pdf_bytes)
+                        os.close(temp_fd)
+
+                        pdf_temp_criado = True
+                        log_sistema('success', f"✅ PDF temporário criado para {nome_cliente}: {pdf_path}", 'disparo')
+                    except Exception as e:
+                        log_sistema('error', f"Erro ao decodificar PDF de downloads_canopus para {nome_cliente}: {str(e)}", 'disparo')
+                        stats['erros'] += 1
+                        continue
 
                 # EXTRAIR DADOS REAIS DO PDF usando nosso extrator
                 from services.pdf_extractor import extrair_dados_boleto
@@ -1452,6 +1491,14 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
             except Exception as e:
                 log_sistema('error', f"Erro ao processar {nome_cliente}: {str(e)}", 'disparo')
                 stats['erros'] += 1
+            finally:
+                # Limpar arquivo temporário se foi criado
+                if pdf_temp_criado and pdf_path and os.path.exists(pdf_path):
+                    try:
+                        os.remove(pdf_path)
+                        log_sistema('info', f"Arquivo temporário removido: {pdf_path}", 'disparo')
+                    except Exception as e:
+                        log_sistema('warning', f"Erro ao remover arquivo temporário {pdf_path}: {str(e)}", 'disparo')
 
         # Calcular tempo total
         tempo_total = time.time() - stats['inicio']
