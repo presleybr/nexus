@@ -939,6 +939,18 @@ class CanopusAutomation:
                         logger.info(f"   Status: {response.status}")
                         sys.stdout.flush()
 
+                        # CRÍTICO: Ignorar redirects (302, 301, etc) - não têm body disponível
+                        if response.status in [301, 302, 303, 307, 308]:
+                            logger.info(f"⏭️ Ignorando redirect {response.status} - aguardando resposta final")
+                            sys.stdout.flush()
+                            return
+
+                        # IMPORTANTE: Só processar respostas com status 200 OK
+                        if response.status != 200:
+                            logger.warning(f"⚠️ Status não é 200, ignorando: {response.status}")
+                            sys.stdout.flush()
+                            return
+
                         # IMPORTANTE: Aguardar a resposta completar antes de acessar body
                         # Isso evita erros de "Response body is unavailable"
                         try:
@@ -1080,8 +1092,8 @@ class CanopusAutomation:
                         logger.info(f"🔀 [ROUTE] Content-Type: {content_type}, Status: {response.status}")
                         sys.stdout.flush()
 
-                        # Se for PDF, capturar o body ANTES de passar pro navegador
-                        if 'pdf' in content_type or 'frmConCmImpressao' in url:
+                        # CRÍTICO: Só processar respostas 200 OK (ignorar redirects)
+                        if response.status == 200 and ('pdf' in content_type or 'frmConCmImpressao' in url):
                             body = await response.body()
                             logger.info(f"🔀 [ROUTE] PDF CAPTURADO: {len(body)} bytes ({len(body)/1024:.1f} KB)")
                             sys.stdout.flush()
@@ -1180,7 +1192,22 @@ class CanopusAutomation:
                             # Aguardar mais tempo no Render para garantir que a aba carregou
                             logger.info("⏳ Aguardando aba carregar completamente...")
                             sys.stdout.flush()
-                            await asyncio.sleep(5)  # Aumentado de 2 para 5 segundos
+
+                            # CRÍTICO: Aguardar a aba navegar de about:blank para URL real
+                            # Tentar até 10 segundos
+                            for i in range(50):  # 50 x 200ms = 10 segundos
+                                url_atual = nova_aba_pdf.url
+                                if url_atual and url_atual != 'about:blank':
+                                    logger.info(f"✅ Aba navegou para: {url_atual[:100]}")
+                                    sys.stdout.flush()
+                                    break
+                                if i % 10 == 0 and i > 0:
+                                    logger.info(f"⏳ Ainda em about:blank... ({i*0.2:.1f}s)")
+                                    sys.stdout.flush()
+                                await asyncio.sleep(0.2)
+
+                            # Aguardar mais um pouco após navegação
+                            await asyncio.sleep(2)
 
                             # Verificar a URL atual da aba
                             url_atual = nova_aba_pdf.url
