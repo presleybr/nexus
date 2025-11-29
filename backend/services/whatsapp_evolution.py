@@ -187,9 +187,13 @@ class WhatsAppEvolution:
             logger.info(f"🔑 Chaves da resposta status: {list(result.keys())}")
 
             # Evolution API v2 pode retornar state de várias formas
-            state = result.get('state') or result.get('instance', {}).get('state') or 'close'
+            state_direto = result.get('state')
+            state_instance = result.get('instance', {}).get('state') if result.get('instance') else None
+            state = state_direto or state_instance or 'close'
 
-            logger.info(f"📊 Estado retornado: {state}")
+            logger.info(f"📊 state_direto: {state_direto}")
+            logger.info(f"📊 state_instance: {state_instance}")
+            logger.info(f"📊 Estado final: {state}")
 
             # Estados possíveis: open, connecting, close
             is_connected = state == 'open'
