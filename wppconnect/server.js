@@ -133,6 +133,31 @@ app.post('/start', async (req, res) => {
         client = createdClient;
         console.log('✅ Cliente WhatsApp criado com sucesso!');
 
+        // Tentar capturar QR Code diretamente do cliente
+        setTimeout(() => {
+          if (client && client.page) {
+            console.log('🔍 Tentando capturar QR Code diretamente da página...');
+
+            // Método 1: Via seletor da página
+            client.page.evaluate(() => {
+              const qrElement = document.querySelector('canvas');
+              if (qrElement) {
+                return qrElement.toDataURL();
+              }
+              return null;
+            }).then(qrDataUrl => {
+              if (qrDataUrl) {
+                console.log('📱 QR Code capturado via canvas! Length:', qrDataUrl.length);
+                qrCode = qrDataUrl;
+              } else {
+                console.log('⚠️ Canvas QR Code não encontrado, aguardando callback...');
+              }
+            }).catch(err => {
+              console.log('⚠️ Erro ao capturar QR via canvas:', err.message);
+            });
+          }
+        }, 5000); // Aguardar 5s para página carregar
+
         // Adicionar listener para QR Code (fallback)
         if (client.onStateChange) {
           client.onStateChange(state => {
