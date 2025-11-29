@@ -169,17 +169,27 @@ class WhatsAppEvolution:
     def verificar_status(self):
         """Verifica status da conexão"""
         try:
+            logger.info(f"🔍 Verificando status da instância: {self.instance_name}")
             endpoint = f'/instance/connectionState/{self.instance_name}'
             result = self._make_request('GET', endpoint)
 
+            logger.info(f"📥 Resposta /instance/connectionState: {result}")
+
             if 'error' in result:
+                logger.error(f"❌ Erro ao verificar status: {result['error']}")
                 return {
                     'connected': False,
                     'status': 'disconnected',
                     'phone': None
                 }
 
-            state = result.get('state', 'close')
+            # Logar estrutura da resposta para debug
+            logger.info(f"🔑 Chaves da resposta status: {list(result.keys())}")
+
+            # Evolution API v2 pode retornar state de várias formas
+            state = result.get('state') or result.get('instance', {}).get('state') or 'close'
+
+            logger.info(f"📊 Estado retornado: {state}")
 
             # Estados possíveis: open, connecting, close
             is_connected = state == 'open'
@@ -190,11 +200,25 @@ class WhatsAppEvolution:
                 'close': 'disconnected'
             }
 
-            return {
+            # Tentar obter telefone de várias formas possíveis
+            phone = None
+            if is_connected:
+                phone = (
+                    result.get('instance', {}).get('owner') or
+                    result.get('instance', {}).get('wuid') or
+                    result.get('owner') or
+                    result.get('wuid')
+                )
+                logger.info(f"📞 Telefone detectado: {phone}")
+
+            status_result = {
                 'connected': is_connected,
                 'status': status_map.get(state, 'disconnected'),
-                'phone': result.get('instance', {}).get('owner') if is_connected else None
+                'phone': phone
             }
+
+            logger.info(f"✅ Status final: {status_result}")
+            return status_result
 
         except Exception as e:
             logger.error(f"❌ Erro ao verificar status: {str(e)}")
