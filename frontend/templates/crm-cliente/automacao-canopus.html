@@ -98,11 +98,6 @@
             margin-right: 0.75rem;
         }
 
-        .step-google-drive { border-left-color: #4285f4; }
-        .step-google-drive::before { color: rgba(66, 133, 244, 0.1); }
-        .step-google-drive .step-indicator { background: #4285f4; color: #fff; }
-        .step-google-drive h3 { color: #4285f4; }
-
         .step-import { border-left-color: #34a853; }
         .step-import::before { color: rgba(52, 168, 83, 0.1); }
         .step-import .step-indicator { background: #34a853; color: #fff; }
@@ -123,22 +118,6 @@
         .step-dispatch .step-indicator { background: #9333ea; color: #fff; }
         .step-dispatch h3 { color: #9333ea; }
 
-        .drive-link-input {
-            width: 100%;
-            padding: 0.75rem;
-            background: #1a1a1a;
-            color: #fff;
-            border: 2px solid #4285f4;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-        }
-
-        .drive-link-input:focus {
-            outline: none;
-            border-color: #34a853;
-            box-shadow: 0 0 0 3px rgba(52, 168, 83, 0.2);
-        }
 
         .action-card p {
             color: #888;
@@ -472,41 +451,10 @@
 
             <!-- Cards de Ação - Reorganizados em Etapas -->
             <div class="action-cards">
-                <!-- ETAPA 1: Google Drive -->
-                <div class="action-card step-google-drive" data-step="1">
+                <!-- ETAPA 1: Importar Planilha -->
+                <div class="action-card step-import" data-step="1">
                     <h3>
                         <span class="step-indicator">1</span>
-                        Configurar Planilha do Google Drive
-                    </h3>
-                    <p>📂 Cole o link da planilha do Google Drive e faça o download automático</p>
-
-                    <!-- Input para Link do Drive -->
-                    <div style="margin-bottom: 1rem;">
-                        <label style="display: block; margin-bottom: 0.5rem; color: #4285f4; font-weight: 600; position: relative; z-index: 1;">
-                            🔗 Link do Google Drive:
-                        </label>
-                        <input
-                            type="text"
-                            id="inputLinkDrive"
-                            class="drive-link-input"
-                            placeholder="https://docs.google.com/spreadsheets/d/..."
-                            style="position: relative; z-index: 1;"
-                        />
-                    </div>
-
-                    <!-- Botão Atualizar/Baixar Planilha do Drive -->
-                    <button class="btn-canopus" id="btnAtualizarPlanilhaDrive" style="margin-bottom: 0; background: linear-gradient(135deg, #4285f4 0%, #34a853 100%); position: relative; z-index: 1;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path>
-                        </svg>
-                        🔄 Baixar Planilha do Drive
-                    </button>
-                </div>
-
-                <!-- ETAPA 2: Importar Planilha -->
-                <div class="action-card step-import" data-step="2">
-                    <h3>
-                        <span class="step-indicator">2</span>
                         Importar Planilha para o Banco
                     </h3>
                     <p>📊 Faça upload da planilha baixada do Drive e importe para o banco de dados</p>
@@ -546,10 +494,10 @@
                     </div>
                 </div>
 
-                <!-- ETAPA 3: Baixar Boletos -->
-                <div class="action-card step-download" data-step="3">
+                <!-- ETAPA 2: Baixar Boletos -->
+                <div class="action-card step-download" data-step="2">
                     <h3>
-                        <span class="step-indicator">3</span>
+                        <span class="step-indicator">2</span>
                         Baixar Boletos do Sistema
                     </h3>
                     <p>📥 Baixa automaticamente os boletos dos clientes importados</p>
@@ -569,16 +517,6 @@
                         </div>
                     </div>
 
-                    <!-- Indicador de Progresso -->
-                    <div id="downloadProgress" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px; display: none; position: relative; z-index: 1;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <span style="color: #888; font-size: 0.9rem;">Progresso:</span>
-                            <span id="downloadProgressText" style="color: #39FF14; font-weight: 600;">0 de 0</span>
-                        </div>
-                        <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
-                            <div id="downloadProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #39FF14, #2ecc71); transition: width 0.3s ease;"></div>
-                        </div>
-                    </div>
 
                     <button class="btn-canopus" id="btnIniciarDownload" style="background: #fbbc04; color: #000; position: relative; z-index: 1;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -636,10 +574,10 @@
                     </div>
                 </div>
 
-                <!-- ETAPA 4: Importar Boletos -->
-                <div class="action-card step-crm" data-step="4">
+                <!-- ETAPA 3: Importar Boletos -->
+                <div class="action-card step-crm" data-step="3">
                     <h3>
-                        <span class="step-indicator">4</span>
+                        <span class="step-indicator">3</span>
                         Importar Boletos para o CRM
                     </h3>
                     <p>💾 Importa os PDFs baixados para o banco de dados do Nexus CRM</p>
@@ -653,10 +591,10 @@
                     </button>
                 </div>
 
-                <!-- ETAPA 5: Disparar -->
-                <div class="action-card step-dispatch" data-step="5">
+                <!-- ETAPA 4: Disparar -->
+                <div class="action-card step-dispatch" data-step="4">
                     <h3>
-                        <span class="step-indicator">5</span>
+                        <span class="step-indicator">4</span>
                         Disparar via WhatsApp
                     </h3>
                     <p>📱 Envie os boletos via WhatsApp para os clientes automaticamente</p>

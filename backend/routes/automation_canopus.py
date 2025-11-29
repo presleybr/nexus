@@ -2201,25 +2201,25 @@ def importar_planilha_dener():
 @handle_errors
 def importar_boletos():
     """
-    Importa todos os PDFs da pasta Canopus para o banco de dados
-    Lê cada PDF, extrai dados e cria clientes + boletos
+    Importa todos os PDFs da tabela downloads_canopus para o banco de dados
+    Lê cada PDF (base64), extrai dados e cria clientes + boletos
     """
+    import base64
+    import tempfile
     import os
-    from pathlib import Path
     from datetime import datetime
+    from psycopg2.extras import RealDictCursor
 
-    logger.info("📥 Iniciando importação de boletos da pasta Canopus...")
+    logger.info("📥 Iniciando importação de boletos da tabela downloads_canopus...")
 
     # Importar a função de extração de PDF
     sys.path.insert(0, str(backend_path))
     from services.pdf_extractor import extrair_dados_boleto
 
-    pasta_canopus = Path(r'D:\Nexus\automation\canopus\downloads\Danner')
-
     # Buscar cliente_nexus_id do usuário logado (não mais hardcoded)
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # Buscar o primeiro (e único) cliente_nexus ativo
                 cur.execute("""
                     SELECT id FROM clientes_nexus
@@ -2245,25 +2245,54 @@ def importar_boletos():
             'error': f'Erro ao buscar cliente Nexus: {str(e)}'
         }), 500
 
-    if not pasta_canopus.exists():
+    # Buscar PDFs da tabela downloads_canopus que ainda não foram importados
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT
+                        dc.id,
+                        dc.cpf,
+                        dc.nome_arquivo,
+                        dc.caminho_arquivo,
+                        dc.tamanho_bytes
+                    FROM downloads_canopus dc
+                    WHERE dc.status = 'sucesso'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM boletos b
+                        WHERE b.pdf_filename = dc.nome_arquivo
+                    )
+                    ORDER BY dc.created_at DESC
+                """)
+                pdfs_db = cur.fetchall()
+    except Exception as e:
+        logger.error(f"❌ Erro ao buscar PDFs do banco: {e}")
         return jsonify({
             'success': False,
-            'error': f'Pasta não encontrada: {pasta_canopus}'
-        }), 404
+            'error': f'Erro ao buscar PDFs: {str(e)}'
+        }), 500
 
-    # Buscar todos os PDFs
-    pdfs = [f for f in os.listdir(pasta_canopus) if f.endswith('.pdf')]
-
-    if not pdfs:
+    if not pdfs_db:
+        logger.info("ℹ️  Nenhum PDF novo para importar")
         return jsonify({
-            'success': False,
-            'error': f'Nenhum PDF encontrado em: {pasta_canopus}'
-        }), 404
+            'success': True,
+            'message': 'Nenhum PDF novo para importar',
+            'data': {
+                'total_pdfs': 0,
+                'importados': 0,
+                'clientes_criados': 0,
+                'clientes_existentes': 0,
+                'ja_existentes': 0,
+                'sem_cliente': 0,
+                'erros': 0,
+                'pdfs_sem_dados': 0
+            }
+        })
 
-    logger.info(f"📄 Encontrados {len(pdfs)} PDFs para processar")
+    logger.info(f"📄 Encontrados {len(pdfs_db)} PDFs para processar")
 
     stats = {
-        'total_pdfs': len(pdfs),
+        'total_pdfs': len(pdfs_db),
         'clientes_criados': 0,
         'clientes_existentes': 0,
         'boletos_criados': 0,
@@ -2272,15 +2301,35 @@ def importar_boletos():
     }
 
     # Processar cada PDF
-    for idx, pdf_filename in enumerate(pdfs, 1):
-        pdf_path = os.path.join(pasta_canopus, pdf_filename)
+    for idx, pdf_row in enumerate(pdfs_db, 1):
+        pdf_filename = pdf_row['nome_arquivo']
+        pdf_base64 = pdf_row['caminho_arquivo']
+        cpf_original = pdf_row['cpf']
         conn = None
+        temp_pdf_path = None
 
-        logger.info(f"[{idx}/{len(pdfs)}] Processando: {pdf_filename[:50]}")
+        logger.info(f"[{idx}/{len(pdfs_db)}] Processando: {pdf_filename[:50]}")
 
         try:
+            # Decodificar PDF base64 e salvar em arquivo temporário
+            try:
+                pdf_bytes = base64.b64decode(pdf_base64)
+
+                # Criar arquivo temporário
+                temp_fd, temp_pdf_path = tempfile.mkstemp(suffix='.pdf')
+                os.close(temp_fd)  # Fechar file descriptor
+
+                with open(temp_pdf_path, 'wb') as f:
+                    f.write(pdf_bytes)
+
+                logger.info(f"   📄 PDF decodificado e salvo temporariamente")
+            except Exception as e:
+                logger.error(f"   ❌ Erro ao decodificar PDF base64: {e}")
+                stats['erros'] += 1
+                continue
+
             # Extrair dados do PDF
-            dados_pdf = extrair_dados_boleto(pdf_path)
+            dados_pdf = extrair_dados_boleto(temp_pdf_path)
 
             if not dados_pdf.get('sucesso'):
                 logger.warning(f"   ⚠️  Não foi possível extrair dados do PDF")
@@ -2438,6 +2487,14 @@ def importar_boletos():
             stats['erros'] += 1
 
         finally:
+            # Limpar arquivo temporário
+            if temp_pdf_path and os.path.exists(temp_pdf_path):
+                try:
+                    os.remove(temp_pdf_path)
+                    logger.debug(f"   🗑️  Arquivo temporário removido")
+                except:
+                    pass
+
             # Garantir fechamento da conexão
             if conn:
                 try:
