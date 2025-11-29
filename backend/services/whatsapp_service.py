@@ -234,36 +234,149 @@ class WhatsAppService:
 
     def enviar_com_antibloqueio(self, numero_destino: str, pdf_path: str,
                                mensagem_antibloqueio: str,
-                               intervalo_segundos: int = 5,
-                               cliente_nexus_id: int = None) -> Dict:
+                               intervalo: int = 5,
+                               cliente_nexus_id: int = None,
+                               enviar_mensagens_mock: bool = True,
+                               total_mensagens_mock: int = 10) -> Dict:
         """
-        Envia mensagem anti-bloqueio seguida do PDF via WPPConnect
+        Envia mensagens mock (anti-bloqueio) + mensagem personalizada + PDF do boleto
 
         Args:
             numero_destino: Número do destinatário
             pdf_path: Caminho do PDF
-            mensagem_antibloqueio: Mensagem a enviar antes do PDF
-            intervalo_segundos: Intervalo entre mensagem e PDF
+            mensagem_antibloqueio: Mensagem personalizada (será a última antes do PDF)
+            intervalo: Intervalo entre mensagens em segundos (padrão: 5s)
             cliente_nexus_id: ID do cliente
+            enviar_mensagens_mock: Se True, envia as 10 mensagens mock antes (padrão: True)
+            total_mensagens_mock: Quantas mensagens mock enviar (padrão: 10)
 
         Returns:
-            Dicionário com resultados
+            Dicionário com resultados detalhados
         """
-        resultado = self.wpp.enviar_com_antibloqueio(
-            numero=numero_destino,
-            pdf_path=pdf_path,
-            mensagem_antibloqueio=mensagem_antibloqueio,
-            intervalo_segundos=intervalo_segundos,
-            cliente_nexus_id=cliente_nexus_id
-        )
+        import time
+        from services.mensagens_personalizadas import mensagens_service
 
-        # Converte o formato de resposta para manter compatibilidade
-        return {
-            'mensagem_antibloqueio': resultado.get('mensagem_antibloqueio'),
-            'pdf': resultado.get('pdf'),
-            'sucesso_total': resultado.get('sucesso_total', False),
-            'erro': resultado.get('erro')
+        log_sistema('info',
+                   f'📤 Iniciando disparo com anti-bloqueio para {numero_destino}',
+                   'whatsapp',
+                   {
+                       'mock_habilitado': enviar_mensagens_mock,
+                       'total_mock': total_mensagens_mock,
+                       'intervalo': intervalo
+                   })
+
+        resultados = {
+            'mensagens_mock': [],
+            'mensagem_antibloqueio': None,
+            'pdf': None,
+            'sucesso_total': False,
+            'total_enviado': 0,
+            'total_erro': 0
         }
+
+        try:
+            # 1. Enviar mensagens mock (anti-bloqueio)
+            if enviar_mensagens_mock and total_mensagens_mock > 0:
+                log_sistema('info', f'📨 Enviando {total_mensagens_mock} mensagens mock...', 'whatsapp')
+
+                # Pegar todas as 10 mensagens base
+                mensagens_mock = mensagens_service.mensagens_base[:total_mensagens_mock]
+
+                for idx, mensagem_template in enumerate(mensagens_mock, 1):
+                    try:
+                        # Personaliza mensagem mock (apenas com {nome})
+                        # Extrai primeiro nome do destinatário se possível
+                        mensagem_mock = mensagem_template.replace('{nome}', 'Cliente')
+
+                        log_sistema('info', f'[{idx}/{total_mensagens_mock}] Enviando mensagem mock...', 'whatsapp')
+
+                        resultado_mock = self.wpp.enviar_mensagem(
+                            numero=numero_destino,
+                            mensagem=mensagem_mock,
+                            cliente_nexus_id=cliente_nexus_id
+                        )
+
+                        resultados['mensagens_mock'].append(resultado_mock)
+
+                        if resultado_mock.get('success'):
+                            resultados['total_enviado'] += 1
+                            log_sistema('success', f'✅ Mensagem mock {idx} enviada', 'whatsapp')
+                        else:
+                            resultados['total_erro'] += 1
+                            log_sistema('error', f'❌ Erro ao enviar mensagem mock {idx}', 'whatsapp')
+
+                        # Aguarda intervalo antes da próxima mensagem
+                        if idx < total_mensagens_mock:
+                            log_sistema('info', f'⏳ Aguardando {intervalo}s...', 'whatsapp')
+                            time.sleep(intervalo)
+
+                    except Exception as e:
+                        resultados['total_erro'] += 1
+                        log_sistema('error', f'❌ Exceção na mensagem mock {idx}: {str(e)}', 'whatsapp')
+
+            # 2. Enviar mensagem personalizada (antibloqueio)
+            log_sistema('info', '📝 Enviando mensagem personalizada do boleto...', 'whatsapp')
+            time.sleep(intervalo)
+
+            resultado_msg = self.wpp.enviar_mensagem(
+                numero=numero_destino,
+                mensagem=mensagem_antibloqueio,
+                cliente_nexus_id=cliente_nexus_id
+            )
+            resultados['mensagem_antibloqueio'] = resultado_msg
+
+            if resultado_msg.get('success'):
+                resultados['total_enviado'] += 1
+                log_sistema('success', '✅ Mensagem personalizada enviada', 'whatsapp')
+            else:
+                resultados['total_erro'] += 1
+                log_sistema('error', '❌ Erro ao enviar mensagem personalizada', 'whatsapp')
+                # Não continua se a mensagem principal falhou
+                return resultados
+
+            # 3. Aguarda intervalo antes do PDF
+            log_sistema('info', f'⏳ Aguardando {intervalo}s antes de enviar PDF...', 'whatsapp')
+            time.sleep(intervalo)
+
+            # 4. Enviar PDF
+            log_sistema('info', '📎 Enviando PDF do boleto...', 'whatsapp')
+            resultado_pdf = self.wpp.enviar_pdf(
+                numero=numero_destino,
+                pdf_path=pdf_path,
+                legenda="Segue seu boleto em anexo",
+                cliente_nexus_id=cliente_nexus_id
+            )
+            resultados['pdf'] = resultado_pdf
+
+            if resultado_pdf.get('success'):
+                resultados['total_enviado'] += 1
+                log_sistema('success', '✅ PDF enviado com sucesso', 'whatsapp')
+            else:
+                resultados['total_erro'] += 1
+                log_sistema('error', f'❌ Erro ao enviar PDF: {resultado_pdf.get("error")}', 'whatsapp')
+
+            # 5. Verifica sucesso total
+            resultados['sucesso_total'] = (
+                resultado_msg.get('success') and resultado_pdf.get('success')
+            )
+
+            if resultados['sucesso_total']:
+                log_sistema('success',
+                           f'🎉 Disparo completo! {resultados["total_enviado"]} mensagens enviadas',
+                           'whatsapp',
+                           {'total_enviado': resultados['total_enviado']})
+            else:
+                log_sistema('warning',
+                           f'⚠️ Disparo parcial. Enviado: {resultados["total_enviado"]}, Erros: {resultados["total_erro"]}',
+                           'whatsapp',
+                           resultados)
+
+            return resultados
+
+        except Exception as e:
+            log_sistema('error', f'❌ Erro crítico no disparo: {str(e)}', 'whatsapp')
+            resultados['erro'] = str(e)
+            return resultados
 
     def enviar_em_massa(self, destinatarios: List[Dict],
                        cliente_nexus_id: int) -> Dict:
