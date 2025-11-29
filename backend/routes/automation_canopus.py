@@ -2467,90 +2467,94 @@ def importar_boletos():
 @handle_errors
 def listar_boletos_baixados():
     """
-    Lista todos os boletos que já foram baixados (da pasta de downloads)
-    AGORA com dados REAIS extraídos do PDF usando o extrator
+    Lista todos os boletos baixados DO BANCO DE DADOS (PostgreSQL)
+    Agora funciona no Render! Busca de downloads_canopus E boletos
     """
-    import os
-    from pathlib import Path
-    from services.pdf_extractor import extrair_dados_boleto
+    from models.database import get_db_connection
+    import logging
 
-    # Pasta de downloads (mesma usada na automação)
-    downloads_dir = Path(r"D:\Nexus\automation\canopus\downloads\Danner")
-
-    if not downloads_dir.exists():
-        return jsonify({
-            'success': True,
-            'data': [],
-            'message': 'Pasta de downloads não encontrada'
-        })
-
+    logger = logging.getLogger(__name__)
     boletos = []
 
-    # Listar todos os PDFs
-    for pdf_file in downloads_dir.glob("**/*.pdf"):
-        try:
-            stat = pdf_file.stat()
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # BUSCAR DA TABELA downloads_canopus (que registra os downloads)
+                # JOIN com clientes_finais para pegar dados completos
+                cur.execute("""
+                    SELECT
+                        dc.id,
+                        dc.cpf,
+                        dc.nome_arquivo,
+                        dc.caminho_arquivo,
+                        dc.tamanho_bytes,
+                        dc.status,
+                        dc.data_download,
+                        dc.created_at,
+                        cf.nome_completo as cliente_nome,
+                        cf.whatsapp,
+                        b.valor_original,
+                        b.data_vencimento,
+                        b.numero_boleto as grupo_cota,
+                        b.status as status_boleto
+                    FROM downloads_canopus dc
+                    LEFT JOIN clientes_finais cf ON dc.cpf = cf.cpf
+                    LEFT JOIN boletos b ON dc.cpf = cf.cpf
+                        AND DATE(b.created_at) = DATE(dc.created_at)
+                    WHERE dc.status = 'sucesso'
+                    ORDER BY dc.created_at DESC
+                    LIMIT 1000
+                """)
 
-            # Extrair informações do nome do arquivo (fallback)
-            nome_arquivo = pdf_file.stem
-            partes = nome_arquivo.split('_')
-            mes_nome_arquivo = partes[-1] if partes else 'DESCONHECIDO'
-            cliente_nome_arquivo = '_'.join(partes[:-1]) if len(partes) > 1 else nome_arquivo
+                rows = cur.fetchall()
 
-            # Tentar extrair dados REAIS do PDF usando o extrator
-            dados_pdf = None
-            try:
-                dados_pdf = extrair_dados_boleto(str(pdf_file))
-                logger.debug(f"✅ Dados extraídos do PDF: {pdf_file.name}")
-            except Exception as e:
-                logger.warning(f"⚠️ Não foi possível extrair dados do PDF {pdf_file.name}: {e}")
-                dados_pdf = None
+                for row in rows:
+                    try:
+                        # Formatar valor
+                        valor_original = row.get('valor_original', 0) or 0
+                        valor_str = f"R$ {valor_original:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
-            # Se conseguiu extrair dados, usa eles; senão usa fallback do nome
-            if dados_pdf and dados_pdf.get('sucesso'):
-                boleto_info = {
-                    'arquivo_nome': pdf_file.name,
-                    'caminho': str(pdf_file),
-                    'cliente_nome': dados_pdf.get('nome_pagador', cliente_nome_arquivo.replace('_', ' ').title()),
-                    'cpf': dados_pdf.get('cpf', 'N/A'),
-                    'valor': dados_pdf.get('valor', 0),
-                    'valor_str': dados_pdf.get('valor_str', 'R$ 0,00'),
-                    'vencimento': dados_pdf.get('vencimento_str', 'N/A'),
-                    'grupo_cota': dados_pdf.get('grupo_cota', 'N/A'),
-                    'nosso_numero': dados_pdf.get('nosso_numero', 'N/A'),
-                    'mes': dados_pdf.get('vencimento_str', mes_nome_arquivo.capitalize()).split('/')[1] if dados_pdf.get('vencimento_str') else mes_nome_arquivo.capitalize(),
-                    'tamanho': stat.st_size,
-                    'data_download': stat.st_mtime,
-                    'status': 'processado',
-                    'dados_extraidos': True
-                }
-            else:
-                # Fallback: usa dados do nome do arquivo
-                boleto_info = {
-                    'arquivo_nome': pdf_file.name,
-                    'caminho': str(pdf_file),
-                    'cliente_nome': cliente_nome_arquivo.replace('_', ' ').title(),
-                    'cpf': 'N/A',
-                    'valor': 0,
-                    'valor_str': 'N/A',
-                    'vencimento': 'N/A',
-                    'grupo_cota': 'N/A',
-                    'nosso_numero': 'N/A',
-                    'mes': mes_nome_arquivo.capitalize(),
-                    'tamanho': stat.st_size,
-                    'data_download': stat.st_mtime,
-                    'status': 'baixado',
-                    'dados_extraidos': False
-                }
+                        # Formatar vencimento
+                        vencimento_obj = row.get('data_vencimento')
+                        vencimento_str = vencimento_obj.strftime('%d/%m/%Y') if vencimento_obj else 'N/A'
 
-            boletos.append(boleto_info)
+                        # Data de download
+                        data_download_obj = row.get('data_download') or row.get('created_at')
+                        data_download_timestamp = data_download_obj.timestamp() if data_download_obj else 0
 
-        except Exception as e:
-            logger.error(f"Erro ao processar {pdf_file}: {e}")
-            continue
+                        boleto_info = {
+                            'arquivo_nome': row.get('nome_arquivo', 'N/A'),
+                            'caminho': row.get('caminho_arquivo', 'N/A'),
+                            'cliente_nome': row.get('cliente_nome', 'N/A'),
+                            'cpf': row.get('cpf', 'N/A'),
+                            'valor': valor_original,
+                            'valor_str': valor_str,
+                            'vencimento': vencimento_str,
+                            'grupo_cota': row.get('grupo_cota', 'N/A'),
+                            'nosso_numero': row.get('grupo_cota', 'N/A'),
+                            'mes': vencimento_str.split('/')[1] if vencimento_str != 'N/A' else 'N/A',
+                            'tamanho': row.get('tamanho_bytes', 0),
+                            'data_download': data_download_timestamp,
+                            'status': row.get('status_boleto', 'processado'),
+                            'dados_extraidos': True,
+                            'whatsapp': row.get('whatsapp', 'N/A')
+                        }
 
-    # Ordenar por data de download (mais recente primeiro)
-    boletos.sort(key=lambda x: x['data_download'], reverse=True)
+                        boletos.append(boleto_info)
+
+                    except Exception as e:
+                        logger.error(f"Erro ao processar row do banco: {e}")
+                        continue
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar boletos do banco: {e}")
+        return jsonify({
+            'success': False,
+            'data': [],
+            'error': str(e)
+        })
+
+    # Já vem ordenado do banco (ORDER BY created_at DESC)
 
     response = jsonify({
         'success': True,
