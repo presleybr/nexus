@@ -1658,24 +1658,40 @@ def baixar_boletos_ponto_venda():
                                     logger.info("🔍 DEBUG: Iniciando processo de registro no banco...")
                                     sys.stdout.flush()
 
-                                    arquivo_pdf = resultado.get('dados_boleto', {}).get('arquivo_caminho')
+                                    arquivo_caminho = resultado.get('dados_boleto', {}).get('arquivo_caminho')
                                     arquivo_nome = resultado.get('dados_boleto', {}).get('arquivo_nome')
                                     arquivo_tamanho = resultado.get('dados_boleto', {}).get('arquivo_tamanho', 0)
 
-                                    logger.info(f"🔍 DEBUG: arquivo_pdf={arquivo_pdf}")
+                                    logger.info(f"🔍 DEBUG: arquivo_caminho={arquivo_caminho}")
                                     logger.info(f"🔍 DEBUG: arquivo_nome={arquivo_nome}")
                                     logger.info(f"🔍 DEBUG: arquivo_tamanho={arquivo_tamanho}")
                                     sys.stdout.flush()
 
-                                    if not arquivo_pdf:
-                                        logger.error("❌ DEBUG: arquivo_pdf está None!")
+                                    if not arquivo_caminho:
+                                        logger.error("❌ DEBUG: arquivo_caminho está None!")
                                         sys.stdout.flush()
-                                    elif not Path(arquivo_pdf).exists():
-                                        logger.error(f"❌ DEBUG: Arquivo não existe: {arquivo_pdf}")
+                                    elif not Path(arquivo_caminho).exists():
+                                        logger.error(f"❌ DEBUG: Arquivo não existe: {arquivo_caminho}")
                                         sys.stdout.flush()
                                     else:
-                                        logger.info(f"✅ DEBUG: Arquivo existe: {arquivo_pdf}")
+                                        logger.info(f"✅ DEBUG: Arquivo existe: {arquivo_caminho}")
                                         sys.stdout.flush()
+
+                                        atualizar_status(etapa=f'Convertendo PDF para base64... ({idx}/{len(cpfs)})')
+
+                                        # CONVERTER PDF PARA BASE64
+                                        import base64
+                                        try:
+                                            with open(arquivo_caminho, 'rb') as pdf_file:
+                                                pdf_bytes = pdf_file.read()
+                                                pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+
+                                            logger.info(f"✅ PDF convertido para base64: {len(pdf_base64)} caracteres")
+                                            sys.stdout.flush()
+                                        except Exception as e_base64:
+                                            logger.error(f"❌ Erro ao converter PDF para base64: {e_base64}")
+                                            sys.stdout.flush()
+                                            continue
 
                                         atualizar_status(etapa=f'Registrando download no banco... ({idx}/{len(cpfs)})')
 
@@ -1718,11 +1734,11 @@ def baixar_boletos_ponto_venda():
                                                     logger.info(f"   CPF: {cpf}")
                                                     logger.info(f"   Consultor ID: {consultor_id}")
                                                     logger.info(f"   Nome arquivo: {arquivo_nome}")
-                                                    logger.info(f"   Caminho: {arquivo_pdf}")
-                                                    logger.info(f"   Tamanho: {arquivo_tamanho}")
+                                                    logger.info(f"   Tamanho base64: {len(pdf_base64)} caracteres")
+                                                    logger.info(f"   Tamanho bytes: {arquivo_tamanho}")
                                                     sys.stdout.flush()
 
-                                                    # Inserir registro de download
+                                                    # Inserir registro de download COM BASE64
                                                     cur_import.execute("""
                                                         INSERT INTO downloads_canopus (
                                                             consultor_id,
@@ -1740,7 +1756,7 @@ def baixar_boletos_ponto_venda():
                                                         consultor_id,
                                                         cpf,
                                                         arquivo_nome,
-                                                        str(arquivo_pdf),
+                                                        pdf_base64,  # SALVANDO BASE64 ao invés do caminho
                                                         arquivo_tamanho
                                                     ))
 
