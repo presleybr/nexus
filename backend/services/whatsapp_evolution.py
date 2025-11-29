@@ -20,12 +20,21 @@ class WhatsAppEvolution:
             'apikey': self.api_key
         }
 
-        logger.info(f"✅ WhatsApp Evolution Service inicializado: {self.base_url}")
+        # Logs detalhados de inicialização (mascarando API Key)
+        api_key_masked = self.api_key[:4] + '***' + self.api_key[-4:] if len(self.api_key) > 8 else '***'
+        logger.info(f"✅ WhatsApp Evolution Service inicializado")
+        logger.info(f"   📍 URL: {self.base_url}")
+        logger.info(f"   🔑 API Key: {api_key_masked}")
+        logger.info(f"   📱 Instance: {self.instance_name}")
 
     def _make_request(self, method, endpoint, data=None):
         """Faz requisição HTTP para Evolution API"""
         try:
             url = f"{self.base_url}{endpoint}"
+
+            logger.info(f"🌐 Requisição: {method} {url}")
+            if data:
+                logger.info(f"📦 Payload: {data}")
 
             if method == 'GET':
                 response = requests.get(url, headers=self.headers, timeout=10)
@@ -36,11 +45,21 @@ class WhatsAppEvolution:
             elif method == 'DELETE':
                 response = requests.delete(url, headers=self.headers, timeout=10)
 
+            logger.info(f"📊 Status HTTP: {response.status_code}")
+
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            logger.info(f"✅ Resposta: {result}")
+            return result
 
         except requests.exceptions.RequestException as e:
             logger.error(f"❌ Erro na requisição para Evolution API: {str(e)}")
+            # Tentar logar resposta mesmo em caso de erro
+            try:
+                if hasattr(e, 'response') and e.response is not None:
+                    logger.error(f"📄 Resposta de erro: {e.response.text}")
+            except:
+                pass
             return {'error': str(e)}
 
     def criar_instancia(self):
@@ -93,28 +112,54 @@ class WhatsAppEvolution:
     def obter_qr(self):
         """Obtém QR Code da instância"""
         try:
+            logger.info(f"🔍 Obtendo QR Code da instância: {self.instance_name}")
             endpoint = f'/instance/connect/{self.instance_name}'
             result = self._make_request('GET', endpoint)
 
+            logger.info(f"📥 Resposta /instance/connect: {result}")
+
             if 'error' in result:
+                logger.error(f"❌ Erro ao obter QR: {result['error']}")
                 return {'success': False, 'error': result['error']}
 
-            # Evolution API retorna QR Code em base64
+            # Evolution API v2 pode retornar QR Code de várias formas
+            # Vamos logar a estrutura completa para debug
+            logger.info(f"🔑 Chaves da resposta: {list(result.keys())}")
+
+            # Tentar obter QR Code (várias possibilidades)
+            qr_base64 = None
+
             if result.get('qrcode'):
-                qr_base64 = result['qrcode'].get('base64')
-                if qr_base64:
-                    logger.info(f"📱 QR Code obtido")
-                    return {
-                        'success': True,
-                        'connected': False,
-                        'qr': qr_base64 if qr_base64.startswith('data:image') else f'data:image/png;base64,{qr_base64}'
-                    }
+                logger.info(f"📱 Campo 'qrcode' encontrado")
+                if isinstance(result['qrcode'], dict) and result['qrcode'].get('base64'):
+                    qr_base64 = result['qrcode']['base64']
+                elif isinstance(result['qrcode'], str):
+                    qr_base64 = result['qrcode']
+
+            elif result.get('base64'):
+                logger.info(f"📱 Campo 'base64' encontrado")
+                qr_base64 = result['base64']
+
+            elif result.get('code'):
+                logger.info(f"📱 Campo 'code' encontrado")
+                qr_base64 = result['code']
+
+            if qr_base64:
+                logger.info(f"✅ QR Code obtido com sucesso (tamanho: {len(qr_base64)} chars)")
+                return {
+                    'success': True,
+                    'connected': False,
+                    'qr': qr_base64 if qr_base64.startswith('data:image') else f'data:image/png;base64,{qr_base64}'
+                }
 
             # Se não tem QR, verificar se já está conectado
+            logger.info(f"⚠️ QR Code não encontrado, verificando status...")
             status = self.verificar_status()
             if status.get('connected'):
+                logger.info(f"✅ Já está conectado")
                 return {'success': True, 'connected': True, 'qr': None}
 
+            logger.warning(f"⚠️ QR Code não disponível e não está conectado")
             return {'success': False, 'message': 'QR Code não disponível'}
 
         except Exception as e:
