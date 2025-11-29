@@ -256,75 +256,74 @@ def upload_planilha():
         erros = 0
         erros_detalhes = []
 
-        conn = get_db_connection()
-        cur = conn.cursor()
+        with get_db_connection() as conn:
+            cur = conn.cursor()
 
-        for idx, cliente in enumerate(clientes, 1):
-            try:
-                cpf = cliente['cpf']
-                nome = cliente['nome']
-                pv = cliente['ponto_venda']
+            for idx, cliente in enumerate(clientes, 1):
+                try:
+                    cpf = cliente['cpf']
+                    nome = cliente['nome']
+                    pv = cliente['ponto_venda']
 
-                # Verificar se cliente já existe
-                cur.execute("""
-                    SELECT id FROM clientes_finais
-                    WHERE cpf = %s AND ponto_venda = %s
-                """, (cpf, pv))
-
-                existing = cur.fetchone()
-
-                if existing:
-                    # Atualizar
+                    # Verificar se cliente já existe
                     cur.execute("""
-                        UPDATE clientes_finais
-                        SET nome_completo = %s,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
-                    """, (nome, existing['id']))
-                    atualizados += 1
-                else:
-                    # Buscar cliente_nexus
-                    cur.execute("SELECT id FROM clientes_nexus ORDER BY id LIMIT 1")
-                    cliente_nexus_row = cur.fetchone()
-                    cliente_nexus_id = cliente_nexus_row['id'] if cliente_nexus_row else None
+                        SELECT id FROM clientes_finais
+                        WHERE cpf = %s AND ponto_venda = %s
+                    """, (cpf, pv))
 
-                    # Inserir novo
-                    numero_contrato = f"CANOPUS-{pv}-{cpf}"
-                    whatsapp = '5567999999999'  # Placeholder
+                    existing = cur.fetchone()
 
-                    cur.execute("""
-                        INSERT INTO clientes_finais (
-                            cliente_nexus_id,
-                            nome_completo,
-                            cpf,
-                            telefone_celular,
-                            whatsapp,
-                            ponto_venda,
-                            numero_contrato,
-                            ativo,
-                            created_at,
-                            updated_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    """, (cliente_nexus_id, nome, cpf, whatsapp, whatsapp, pv, numero_contrato))
+                    if existing:
+                        # Atualizar
+                        cur.execute("""
+                            UPDATE clientes_finais
+                            SET nome_completo = %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        """, (nome, existing['id']))
+                        atualizados += 1
+                    else:
+                        # Buscar cliente_nexus
+                        cur.execute("SELECT id FROM clientes_nexus ORDER BY id LIMIT 1")
+                        cliente_nexus_row = cur.fetchone()
+                        cliente_nexus_id = cliente_nexus_row['id'] if cliente_nexus_row else None
 
-                    importados += 1
+                        # Inserir novo
+                        numero_contrato = f"CANOPUS-{pv}-{cpf}"
+                        whatsapp = '5567999999999'  # Placeholder
 
-                # Commit a cada 100
-                if idx % 100 == 0:
-                    conn.commit()
-                    logger.info(f"   Checkpoint: {idx}/{len(clientes)} processados")
+                        cur.execute("""
+                            INSERT INTO clientes_finais (
+                                cliente_nexus_id,
+                                nome_completo,
+                                cpf,
+                                telefone_celular,
+                                whatsapp,
+                                ponto_venda,
+                                numero_contrato,
+                                ativo,
+                                created_at,
+                                updated_at
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        """, (cliente_nexus_id, nome, cpf, whatsapp, whatsapp, pv, numero_contrato))
 
-            except Exception as e:
-                erros += 1
-                erro_msg = f"Erro ao processar {nome} (CPF: {cpf}): {str(e)}"
-                erros_detalhes.append(erro_msg)
-                logger.error(erro_msg)
-                continue
+                        importados += 1
 
-        # Commit final
-        conn.commit()
-        cur.close()
-        conn.close()
+                    # Commit a cada 100
+                    if idx % 100 == 0:
+                        conn.commit()
+                        logger.info(f"   Checkpoint: {idx}/{len(clientes)} processados")
+
+                except Exception as e:
+                    erros += 1
+                    erro_msg = f"Erro ao processar {nome} (CPF: {cpf}): {str(e)}"
+                    erros_detalhes.append(erro_msg)
+                    logger.error(erro_msg)
+                    continue
+
+            # Commit final
+            conn.commit()
+            cur.close()
 
         logger.info(f"✅ Importação concluída!")
         logger.info(f"   Novos: {importados}, Atualizados: {atualizados}, Erros: {erros}")
