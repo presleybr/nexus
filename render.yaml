@@ -86,32 +86,20 @@ services:
   # ---------------------------------------------------------------------------
   - type: web
     name: nexus-wppconnect
-    env: node
+    env: docker
+    dockerfilePath: ./wppconnect/Dockerfile
+    dockerContext: ./wppconnect
     region: oregon
     plan: starter
-    rootDir: wppconnect
-    buildCommand: |
-      echo "📦 Instalando dependências WPPConnect..."
-      npm install --no-audit --no-fund --loglevel=error
-      echo "🌐 Instalando Chrome..."
-      npx puppeteer browsers install chrome --path /opt/render/.cache/puppeteer || echo "⚠️ Chrome install failed, continuing..."
-      echo "✅ Build WPPConnect concluído!"
-    startCommand: npm start
     envVars:
       - key: PORT
         value: 10000
       - key: SECRET_KEY
-        generateValue: true
-      - key: NODE_VERSION
-        value: 18.17.0
+        sync: false  # Use o mesmo valor que você já configurou
       - key: HOST
-        sync: false  # Definir manualmente: https://nexus-wppconnect.onrender.com
+        value: https://nexus-wppconnect.onrender.com
       - key: BASE_URL
-        sync: false  # Definir manualmente: https://nexus-wppconnect.onrender.com
-      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: false
-      - key: PUPPETEER_CACHE_DIR
-        value: /opt/render/.cache/puppeteer
+        value: https://nexus-wppconnect.onrender.com
     healthCheckPath: /
     autoDeploy: true
 
