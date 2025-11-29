@@ -2261,7 +2261,7 @@ def importar_boletos():
     import tempfile
     import os
     from datetime import datetime
-    from psycopg2.extras import RealDictCursor
+    from psycopg.rows import dict_row
 
     logger.info("📥 Iniciando importação de boletos da tabela downloads_canopus...")
 
@@ -2272,7 +2272,7 @@ def importar_boletos():
     # Buscar cliente_nexus_id do usuário logado (não mais hardcoded)
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 # Buscar o primeiro (e único) cliente_nexus ativo
                 cur.execute("""
                     SELECT id FROM clientes_nexus
@@ -2301,7 +2301,7 @@ def importar_boletos():
     # Buscar PDFs da tabela downloads_canopus que ainda não foram importados
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("""
                     SELECT
                         dc.id,
@@ -2581,7 +2581,7 @@ def listar_boletos_baixados():
     Agora funciona no Render! Busca de downloads_canopus E boletos
     """
     from models.database import get_db_connection
-    from psycopg2.extras import RealDictCursor
+    from psycopg.rows import dict_row
     import logging
 
     logger = logging.getLogger(__name__)
@@ -2589,7 +2589,7 @@ def listar_boletos_baixados():
 
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 # BUSCAR DA TABELA downloads_canopus (que registra os downloads)
                 # JOIN com clientes_finais para pegar dados completos
                 cur.execute("""
