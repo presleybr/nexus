@@ -1773,9 +1773,9 @@ def baixar_boletos_ponto_venda():
                                                         logger.info("📄 Extraindo dados do PDF para tabela boletos...")
                                                         sys.stdout.flush()
 
-                                                        from backend.services.pdf_extractor import extrair_dados_boleto
+                                                        from services.pdf_extractor import extrair_dados_boleto
 
-                                                        dados_pdf = extrair_dados_boleto(str(arquivo_pdf))
+                                                        dados_pdf = extrair_dados_boleto(arquivo_caminho)
 
                                                         if dados_pdf.get('sucesso'):
                                                             logger.info(f"✅ Dados extraídos: venc={dados_pdf.get('vencimento_str')}, valor=R$ {dados_pdf.get('valor', 0):.2f}")
@@ -1864,7 +1864,7 @@ def baixar_boletos_ponto_venda():
                                                                         ano_ref,
                                                                         f"Boleto {dados_pdf.get('grupo_cota', '')}",
                                                                         arquivo_nome,
-                                                                        str(arquivo_pdf),
+                                                                        arquivo_caminho,
                                                                         arquivo_tamanho
                                                                     ))
 
