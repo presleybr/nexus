@@ -175,20 +175,8 @@ const clientOptions = {
       console.log('🔄 [STATUS-CALLBACK] AutoClose chamado');
     } else if (statusSession === 'desconnectedMobile' || statusSession === 'disconnectedMobile') {
       isConnected = false;
-      console.log('📱 [STATUS-CALLBACK] Desconectado do celular - Tentando reconectar...');
-      saveWhatsAppStatus(false, phoneNumber, null);
-
-      // Não fechar o cliente, apenas aguardar reconexão
-      setTimeout(() => {
-        if (!isConnected) {
-          console.log('🔄 [STATUS-CALLBACK] Ainda desconectado, tentando reiniciar cliente...');
-          if (client) {
-            client.close().catch(e => console.log('⚠️ Erro ao fechar:', e.message));
-          }
-          client = null;
-          setTimeout(() => initializeWhatsAppClient(), 5000);
-        }
-      }, 30000); // Aguardar 30s para reconexão natural antes de forçar
+      console.log('📱 [STATUS-CALLBACK] Desconectado do celular');
+      saveWhatsAppStatus(false, null, null);
     } else if (statusSession === 'browserClose') {
       console.log('🌐 [STATUS-CALLBACK] Browser fechado');
     } else {
@@ -417,11 +405,28 @@ app.get('/qr', async (req, res) => {
       console.log('⚠️ [/qr] Cliente não disponível ainda');
     }
 
+    // Verificar se existem tokens salvos localmente
+    const tokensPath = path.join(process.cwd(), 'tokens', 'nexus-crm');
+    const hasLocalTokens = fs.existsSync(tokensPath) && fs.readdirSync(tokensPath).length > 0;
+
     console.log('⏳ [/qr] Aguardando QR Code...');
+
+    if (hasLocalTokens && !client) {
+      return res.json({
+        success: true,
+        connected: false,
+        hasLocalTokens: true,
+        message: 'Há tokens salvos. Chame /start para tentar reconectar automaticamente.'
+      });
+    }
+
     res.json({
       success: true,
       connected: false,
-      message: 'Aguardando QR Code... Chame /start primeiro.'
+      hasLocalTokens: hasLocalTokens,
+      message: client
+        ? 'Cliente inicializado. Aguardando QR Code ou restauração de sessão...'
+        : 'Cliente não inicializado. Chame /start primeiro.'
     });
 
   } catch (error) {
@@ -441,6 +446,11 @@ app.get('/status', async (req, res) => {
     console.log('🔍 [/status] client exists:', !!client);
     console.log('🔍 [/status] phoneNumber:', phoneNumber);
 
+    // Verificar se existem tokens salvos localmente
+    const tokensPath = path.join(process.cwd(), 'tokens', 'nexus-crm');
+    const hasLocalTokens = fs.existsSync(tokensPath) && fs.readdirSync(tokensPath).length > 0;
+    console.log('🔍 [/status] hasLocalTokens:', hasLocalTokens);
+
     if (!client) {
       console.log('⚠️ [/status] Cliente não inicializado, consultando banco...');
 
@@ -448,14 +458,15 @@ app.get('/status', async (req, res) => {
       const dbStatus = await getWhatsAppStatus();
       if (dbStatus) {
         console.log('📊 [/status] Status do banco:', {
-          connected: dbStatus.is_connected,
+          connected: dbStatus.status === 'connected',
           phone: dbStatus.phone_number
         });
 
         return res.json({
           success: true,
-          connected: dbStatus.is_connected,
+          connected: dbStatus.status === 'connected',
           phone: dbStatus.phone_number,
+          hasLocalTokens: hasLocalTokens,
           message: 'Status do banco de dados (cliente não inicializado)'
         });
       }
@@ -463,7 +474,10 @@ app.get('/status', async (req, res) => {
       return res.json({
         success: true,
         connected: false,
-        message: 'Cliente não inicializado'
+        hasLocalTokens: hasLocalTokens,
+        message: hasLocalTokens
+          ? 'Cliente não inicializado mas há tokens salvos - inicie para reconectar'
+          : 'Cliente não inicializado'
       });
     }
 
@@ -492,7 +506,8 @@ app.get('/status', async (req, res) => {
       connected: finalConnected,
       phone: phoneNumber,
       state: connectionState,
-      hasQR: !!qrCode
+      hasQR: !!qrCode,
+      hasLocalTokens: hasLocalTokens
     });
 
   } catch (error) {
@@ -709,6 +724,11 @@ async function startServer() {
       logQR: clientOptions.logQR,
       autoClose: clientOptions.autoClose
     });
+    console.log('ℹ️  [AUTO-START] O sistema tentará restaurar sessão anterior se disponível');
+    console.log('ℹ️  [AUTO-START] QR Code será gerado apenas se necessário');
+
+    // Garantir que a pasta de tokens existe
+    ensureTokensDirectory();
 
     // Limpar lock files antes de iniciar
     cleanChromiumLocks();
@@ -722,6 +742,30 @@ startServer().catch(err => {
   console.error('❌ Erro ao iniciar servidor:', err);
   process.exit(1);
 });
+
+/**
+ * Garante que a pasta de tokens existe e tem permissões corretas
+ */
+function ensureTokensDirectory() {
+  const tokensBaseDir = path.join(process.cwd(), 'tokens');
+  const tokensDir = path.join(tokensBaseDir, 'nexus-crm');
+
+  try {
+    if (!fs.existsSync(tokensBaseDir)) {
+      fs.mkdirSync(tokensBaseDir, { recursive: true });
+      console.log('✅ [TOKENS] Pasta tokens/ criada');
+    }
+
+    if (!fs.existsSync(tokensDir)) {
+      fs.mkdirSync(tokensDir, { recursive: true });
+      console.log('✅ [TOKENS] Pasta tokens/nexus-crm/ criada');
+    }
+
+    console.log('✅ [TOKENS] Diretórios de tokens verificados');
+  } catch (err) {
+    console.error('❌ [TOKENS] Erro ao criar diretórios:', err.message);
+  }
+}
 
 /**
  * Limpa lock files do Chromium para evitar erros de "browser já rodando"
@@ -913,7 +957,7 @@ async function initializeWhatsAppClient() {
 
   // Verificar se há sessão salva no banco de dados
   const statusDB = await getWhatsAppStatus();
-  if (statusDB && statusDB.is_connected) {
+  if (statusDB && statusDB.status === 'connected') {
     console.log('📊 [INIT] Sessão conectada encontrada no banco!');
     console.log(`📱 [INIT] Número salvo: ${statusDB.phone_number}`);
     phoneNumber = statusDB.phone_number;
@@ -924,6 +968,21 @@ async function initializeWhatsAppClient() {
     qrCode = null;
     phoneNumber = null;
   }
+
+  // Verificar se existem tokens salvos localmente
+  const tokensPath = path.join(process.cwd(), 'tokens', 'nexus-crm');
+  const hasLocalTokens = fs.existsSync(tokensPath) && fs.readdirSync(tokensPath).length > 0;
+
+  if (hasLocalTokens) {
+    console.log('🔑 [INIT] Tokens locais encontrados! Tentando restaurar sessão...');
+    console.log('📂 [INIT] Caminho dos tokens:', tokensPath);
+    console.log('📁 [INIT] Arquivos encontrados:', fs.readdirSync(tokensPath).length);
+  } else {
+    console.log('⚠️ [INIT] Nenhum token local encontrado - será necessário QR Code');
+  }
+
+  // Garantir que a pasta de tokens existe
+  ensureTokensDirectory();
 
   // Limpar lock files antes de tentar criar cliente
   cleanChromiumLocks();
@@ -947,6 +1006,11 @@ async function initializeWhatsAppClient() {
             isConnected = true;
             qrCode = null;
             console.log('✅ [EVENT] Conectado via onStateChange!');
+            saveWhatsAppStatus(true, phoneNumber, null);
+          } else if (state === 'CONFLICT' || state === 'UNPAIRED' || state === 'UNLAUNCHED') {
+            console.log('⚠️ [EVENT] Desconectado via onStateChange:', state);
+            isConnected = false;
+            saveWhatsAppStatus(false, phoneNumber, null);
           }
         });
       }
@@ -961,9 +1025,25 @@ async function initializeWhatsAppClient() {
         });
       }
 
-      // Iniciar captura agressiva de QR Code
-      console.log('🎯 [INIT] Iniciando captura de QR Code...');
-      startQRCodeCapture();
+      // Listener para quando desconectar
+      if (client.onStreamChange) {
+        client.onStreamChange((state) => {
+          console.log('🔔 [EVENT] onStreamChange:', state);
+        });
+      }
+
+      // Listener para quando o celular desconectar
+      if (client.onIncomingCall) {
+        // Apenas registrar para manter compatibilidade
+      }
+
+      // Só iniciar captura de QR Code se não houver tokens locais
+      if (!hasLocalTokens) {
+        console.log('🎯 [INIT] Nenhuma sessão salva - Iniciando captura de QR Code...');
+        startQRCodeCapture();
+      } else {
+        console.log('🔄 [INIT] Tentando restaurar sessão existente, QR Code só se necessário...');
+      }
 
       // Tentar obter informações (se já conectado)
       client.getHostDevice()
@@ -981,12 +1061,15 @@ async function initializeWhatsAppClient() {
 
       // Polling ativo para detectar conexão
       console.log('🔄 [INIT] Iniciando polling para detectar conexão...');
+      let pollAttempts = 0;
       const pollInterval = setInterval(async () => {
         if (!client) {
           console.log('⚠️ [POLL] Cliente não existe mais, parando polling');
           clearInterval(pollInterval);
           return;
         }
+
+        pollAttempts++;
 
         try {
           const state = await client.getConnectionState();
@@ -1009,9 +1092,18 @@ async function initializeWhatsAppClient() {
 
             // Iniciar monitoramento contínuo (heartbeat)
             startConnectionHeartbeat();
+          } else if (hasLocalTokens && pollAttempts > 10 && !qrCode) {
+            // Se tinha tokens mas após 30s não conectou, pode precisar de QR Code
+            console.log('⚠️ [POLL] Restauração de sessão pode ter falhado, iniciando captura de QR Code...');
+            startQRCodeCapture();
           }
         } catch (err) {
           // Ainda não conectou, continuar polling silenciosamente
+          // Após várias tentativas sem sucesso, iniciar QR Code
+          if (hasLocalTokens && pollAttempts > 10 && !qrCode) {
+            console.log('⚠️ [POLL] Erro ao verificar conexão, iniciando captura de QR Code...');
+            startQRCodeCapture();
+          }
         }
       }, 3000); // Verificar a cada 3 segundos
     })
