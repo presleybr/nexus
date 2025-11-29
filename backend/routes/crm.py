@@ -1269,6 +1269,29 @@ def ativar_disparo_completo():
     try:
         cliente_nexus_id = session.get('cliente_nexus_id')
 
+        # VERIFICAR SE JÁ TEM DISPARO RODANDO (evita duplicação)
+        disparo_em_andamento = db.execute_query("""
+            SELECT COUNT(*) as count
+            FROM historico_disparos
+            WHERE cliente_nexus_id = %s
+            AND status = 'em_andamento'
+            AND horario_execucao > NOW() - INTERVAL '2 hours'
+        """, (cliente_nexus_id,))
+
+        if disparo_em_andamento and disparo_em_andamento[0]['count'] > 0:
+            log_sistema('warning', '⚠️ JÁ EXISTE UM DISPARO EM ANDAMENTO! Aguarde a conclusão.', 'disparo')
+            return jsonify({
+                'success': False,
+                'message': 'Já existe um disparo em andamento. Aguarde a conclusão ou cancele o disparo anterior.'
+            }), 409  # Conflict
+
+        # REGISTRAR INÍCIO DO DISPARO
+        db.execute_update("""
+            INSERT INTO historico_disparos
+            (cliente_nexus_id, tipo_disparo, horario_execucao, executado_por, status)
+            VALUES (%s, %s, NOW(), %s, %s)
+        """, (cliente_nexus_id, 'manual_completo', 'usuario_web', 'em_andamento'))
+
         # Buscar boletos REAIS do banco (importados do Canopus)
         # FILTRA PLACEHOLDERS: só envia para números REAIS (não 55679999999999)
         boletos_reais = db.execute_query("""
@@ -1457,9 +1480,9 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
 
                 log_sistema('success', f"✅ Mensagem de texto enviada com sucesso!", 'disparo')
 
-                # 3. AGUARDAR 2-3 SEGUNDOS ANTES DE ENVIAR O BOLETO
-                intervalo_msg_pdf = random.randint(2, 3)
-                log_sistema('info', f"⏳ Aguardando {intervalo_msg_pdf}s antes de enviar PDF...", 'disparo')
+                # 3. AGUARDAR VARIÁVEL ANTES DE ENVIAR O BOLETO (simulando comportamento humano)
+                intervalo_msg_pdf = random.uniform(8, 15)  # Entre 8-15s (mais natural)
+                log_sistema('info', f"⏳ Aguardando {intervalo_msg_pdf:.1f}s antes de enviar PDF (simulando digitação humana)...", 'disparo')
                 time.sleep(intervalo_msg_pdf)
 
                 # 4. ENVIAR PDF DO BOLETO COM DADOS REAIS DO PDF
@@ -1517,11 +1540,19 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
                     log_sistema('error', f"📋 Detalhes do erro: {resultado_pdf}", 'disparo')
                     stats['erros'] += 1
 
-                # 6. INTERVALO ENTRE CLIENTES (segurança anti-bloqueio)
+                # 6. INTERVALO ENTRE CLIENTES (segurança anti-bloqueio HUMANIZADO)
                 if idx < len(boletos_reais) - 1:
-                    intervalo = random.randint(intervalo_min, intervalo_max)
-                    log_sistema('info', f"Aguardando {intervalo}s antes do próximo disparo...", 'disparo')
-                    time.sleep(intervalo)
+                    # Aumenta intervalo progressivamente a cada 10 disparos
+                    # A cada 10 mensagens, pausa maior (simula descanso humano)
+                    if (idx + 1) % 10 == 0:
+                        pausa_longa = random.uniform(45, 90)  # Pausa de 45-90s a cada 10 disparos
+                        log_sistema('info', f"⏸️ Pausa estratégica após 10 disparos: {pausa_longa:.1f}s (simula comportamento humano)", 'disparo')
+                        time.sleep(pausa_longa)
+                    else:
+                        # Intervalo normal entre disparos (mais longo para evitar bloqueio)
+                        intervalo = random.uniform(15, 30)  # 15-30s entre cada cliente
+                        log_sistema('info', f"⏳ Aguardando {intervalo:.1f}s antes do próximo disparo (anti-bloqueio)...", 'disparo')
+                        time.sleep(intervalo)
 
             except Exception as e:
                 log_sistema('error', f"Erro ao processar {nome_cliente}: {str(e)}", 'disparo')
@@ -1574,6 +1605,23 @@ Obrigado por confiar em nossos serviços."""
         except:
             pass
 
+        # ATUALIZAR STATUS DO DISPARO PARA CONCLUÍDO
+        db.execute_update("""
+            UPDATE historico_disparos
+            SET status = 'concluido',
+                total_envios = %s,
+                envios_sucesso = %s,
+                envios_erro = %s,
+                detalhes = %s::jsonb
+            WHERE cliente_nexus_id = %s
+            AND tipo_disparo = 'manual_completo'
+            AND status = 'em_andamento'
+            ORDER BY horario_execucao DESC
+            LIMIT 1
+        """, (stats['total'], stats['enviados'], stats['erros'],
+              json.dumps({'tempo_minutos': tempo_minutos, 'taxa_sucesso': taxa_sucesso}),
+              cliente_nexus_id))
+
         return jsonify({
             'success': True,
             'message': f'Disparo completo finalizado: {stats["enviados"]} enviados, {stats["erros"]} erros',
@@ -1584,6 +1632,22 @@ Obrigado por confiar em nossos serviços."""
     except Exception as e:
         import traceback
         traceback.print_exc()
+
+        # MARCAR DISPARO COMO ERRO
+        try:
+            db.execute_update("""
+                UPDATE historico_disparos
+                SET status = 'erro',
+                    detalhes = %s::jsonb
+                WHERE cliente_nexus_id = %s
+                AND tipo_disparo = 'manual_completo'
+                AND status = 'em_andamento'
+                ORDER BY horario_execucao DESC
+                LIMIT 1
+            """, (json.dumps({'erro': str(e)}), session.get('cliente_nexus_id')))
+        except:
+            pass
+
         return jsonify({'erro': str(e)}), 500
 
 
