@@ -260,7 +260,8 @@ class CanopusAutomation:
             # Argumentos para FORÇAR logs do Chromium
             chromium_log_args = [
                 '--enable-logging=stderr',  # Logs para stderr
-                '--v=1',  # Verbose level 1
+                '--v=2',  # Verbose level 2 (mais detalhado)
+                '--log-level=0',  # Log level 0 = INFO
             ]
 
             # Lançar navegador
@@ -322,6 +323,25 @@ class CanopusAutomation:
             sys.stdout.flush()
             self.page = await self.context.new_page()
             logger.info("✅ Página criada")
+            sys.stdout.flush()
+
+            # Configurar listeners para capturar logs do navegador em TEMPO REAL
+            logger.info("🔧 Configurando listeners de console e erros...")
+            sys.stdout.flush()
+
+            # Listener de console - captura TODOS os console.log, console.warn, console.error da página
+            self.page.on("console", lambda msg: logger.info(f"🖥️  [BROWSER CONSOLE] [{msg.type}] {msg.text}"))
+
+            # Listener de erros de página - captura erros JavaScript e outros
+            self.page.on("pageerror", lambda exc: logger.error(f"❌ [BROWSER ERROR] {exc}"))
+
+            # Listener de requests - útil para debug de chamadas de rede
+            self.page.on("request", lambda req: logger.debug(f"📤 [REQUEST] {req.method} {req.url}"))
+
+            # Listener de responses - útil para debug de respostas
+            self.page.on("response", lambda res: logger.debug(f"📥 [RESPONSE] {res.status} {res.url}"))
+
+            logger.info("✅ Listeners configurados para logging em tempo real")
             sys.stdout.flush()
 
             # Configurar timeouts
@@ -539,6 +559,7 @@ class CanopusAutomation:
         cpf_formatado = self.config.formatar_cpf(cpf_limpo)
 
         logger.info(f"🔍 Buscando cliente: {cpf_formatado}")
+        sys.stdout.flush()
 
         try:
             # Garantir que estamos na página de busca avançada
@@ -546,6 +567,7 @@ class CanopusAutomation:
 
             # 1. Selecionar "CPF" no dropdown
             logger.info("Selecionando tipo de busca: CPF")
+            sys.stdout.flush()
             select_tipo = self.config.SELECTORS['busca']['select_tipo_busca']
             await self.page.select_option(select_tipo, value='F')  # F = CPF
             await self._delay_humanizado(0.5, 1.0)
@@ -553,6 +575,7 @@ class CanopusAutomation:
 
             # 2. Preencher CPF no campo de busca
             logger.info(f"Preenchendo CPF: {cpf_formatado}")
+            sys.stdout.flush()
             cpf_input = self.config.SELECTORS['busca']['cpf_input']
 
             # Limpar campo antes
@@ -566,10 +589,13 @@ class CanopusAutomation:
 
             # 3. Clicar em buscar
             logger.info("Clicando em Buscar...")
+            sys.stdout.flush()
             botao_buscar = self.config.SELECTORS['busca']['botao_buscar']
             await self.page.click(botao_buscar)
 
             # Aguardar resultados
+            logger.info("Aguardando resultados da busca...")
+            sys.stdout.flush()
             await asyncio.sleep(self.config.DELAYS['apos_busca'])
             await self.screenshot("resultado_busca")
 
@@ -578,6 +604,8 @@ class CanopusAutomation:
             try:
                 cliente_link_selector = self.config.SELECTORS['busca']['cliente_link']
 
+                logger.info("Aguardando link do cliente aparecer...")
+                sys.stdout.flush()
                 # Aguardar o link aparecer
                 await self.page.wait_for_selector(
                     cliente_link_selector,
@@ -587,6 +615,7 @@ class CanopusAutomation:
                 # Buscar todos os links
                 links = await self.page.query_selector_all(cliente_link_selector)
                 logger.info(f"Encontrados {len(links)} resultado(s)")
+                sys.stdout.flush()
 
                 # Clicar no SEGUNDO link (índice 1) - o primeiro sempre está vazio
                 if len(links) >= 2:
@@ -725,10 +754,12 @@ class CanopusAutomation:
             Dicionário com informações do boleto ou None se falhar
         """
         logger.info("📥 Emitindo e baixando boleto...")
+        sys.stdout.flush()
 
         try:
             # 1. Aguardar a página de emissão carregar
             logger.info("Aguardando página de emissão carregar...")
+            sys.stdout.flush()
             await asyncio.sleep(2)
             await self.screenshot("tela_emissao")
 
@@ -739,6 +770,7 @@ class CanopusAutomation:
             # Buscar nome do cliente no banco de dados baseado no CPF
             if cpf:
                 logger.info(f"📋 Buscando dados do cliente no banco para CPF: {cpf}...")
+                sys.stdout.flush()
                 dados_cliente = buscar_cliente_banco(cpf)
 
                 if dados_cliente:
@@ -751,8 +783,10 @@ class CanopusAutomation:
                     nome_cliente = re.sub(r'\s*-?\s*\d+\s*$', '', nome_cliente).strip()
 
                     logger.info(f"👤 Nome do cliente (banco): {nome_cliente}")
+                    sys.stdout.flush()
                 else:
                     logger.warning(f"⚠️ Cliente não encontrado no banco de dados")
+                    sys.stdout.flush()
 
             # Extrair mês do boleto da página (da tabela) - SEMPRE DA ÚLTIMA LINHA
             info_boleto = await self.page.evaluate("""
@@ -810,8 +844,10 @@ class CanopusAutomation:
                 mes_atual = datetime.now().month
                 mes_boleto = obter_nome_mes(mes_atual)
                 logger.warning(f"⚠️ Mês não encontrado na página, usando mês atual: {mes_boleto}")
+                sys.stdout.flush()
             else:
                 logger.info(f"📅 Mês do boleto (página): {mes_boleto}")
+                sys.stdout.flush()
 
             # Se nome_arquivo não foi fornecido, gerar automaticamente
             if not nome_arquivo:
@@ -822,22 +858,27 @@ class CanopusAutomation:
 
                     nome_arquivo = f"{nome_limpo}_{mes_boleto}.pdf"
                     logger.info(f"📝 Nome do arquivo gerado: {nome_arquivo}")
+                    sys.stdout.flush()
                 else:
                     # Fallback para nome padrão (datetime já importado no topo)
                     nome_arquivo = f"boleto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
                     logger.warning(f"⚠️ Usando nome padrão: {nome_arquivo}")
+                    sys.stdout.flush()
 
             # 1. AGUARDAR e clicar nos checkboxes dos boletos
             checkbox_selector = self.config.SELECTORS['emissao']['checkbox_boleto']
 
             logger.info(f"Aguardando checkboxes aparecerem: {checkbox_selector}")
+            sys.stdout.flush()
 
             try:
                 # Aguardar o primeiro checkbox aparecer (timeout 10s)
                 await self.page.wait_for_selector(checkbox_selector, timeout=10000)
                 logger.info("✅ Checkboxes detectados na página!")
+                sys.stdout.flush()
             except Exception as e:
                 logger.error(f"❌ Timeout aguardando checkboxes: {e}")
+                sys.stdout.flush()
                 await self.screenshot("timeout_checkboxes")
                 raise Exception("Checkboxes não apareceram na página")
 
@@ -845,8 +886,10 @@ class CanopusAutomation:
             await asyncio.sleep(1)
 
             logger.info(f"Buscando checkboxes: {checkbox_selector}")
+            sys.stdout.flush()
             checkboxes = await self.page.query_selector_all(checkbox_selector)
             logger.info(f"Encontrados {len(checkboxes)} checkbox(es)")
+            sys.stdout.flush()
 
             if len(checkboxes) > 0:
                 # SEMPRE selecionar a ÚLTIMA checkbox (última cobrança/parcela)
