@@ -152,45 +152,6 @@
             margin-top: 1rem;
         }
 
-        /* Grid compacto para cards de ação */
-        .cards-grid {
-            display: grid !important;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
-            gap: 1.5rem !important;
-            margin-top: 2rem !important;
-        }
-
-        /* Cards de ações - mais compactos */
-        .cards-grid .card {
-            padding: 1.5rem !important;
-            min-height: 200px !important;
-            max-height: 240px !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: space-between !important;
-            transition: transform 0.3s ease, box-shadow 0.3s ease !important;
-        }
-
-        .cards-grid .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-        }
-
-        .cards-grid .card p {
-            flex-grow: 1;
-            margin: 0.75rem 0 1rem 0;
-            font-size: 0.9rem;
-            line-height: 1.5;
-        }
-
-        .cards-grid .card .btn-primary,
-        .cards-grid .card .btn-secondary {
-            width: 100%;
-            margin-top: auto;
-            padding: 0.75rem;
-            margin-bottom: 0;
-        }
-
         .card-header {
             display: flex;
             justify-content: space-between;
@@ -430,26 +391,6 @@
             </div>
 
             </div><!-- Fecha cards-principais-grid -->
-
-            <div class="cards-grid">
-                <div class="card">
-                    <div class="card-header"><span class="card-title">Automação Completa</span><span class="card-icon">🤖</span></div>
-                    <p style="color: var(--cor-texto-secundario);">Gera e envia boletos para todos os clientes</p>
-                    <button class="btn-primary" onclick="executarAutomacaoCompleta()">Iniciar Automação</button>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><span class="card-title">Gerar Boletos</span><span class="card-icon">📄</span></div>
-                    <p style="color: var(--cor-texto-secundario);">Gera boletos sem enviar via WhatsApp</p>
-                    <button class="btn-primary" onclick="apenasGerarBoletos()">Gerar Boletos</button>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><span class="card-title">Boleto Modelo</span><span class="card-icon">📋</span></div>
-                    <p style="color: var(--cor-texto-secundario);">Envia modelo-boleto.pdf para todos os clientes</p>
-                    <button class="btn-secondary" onclick="enviarBoletoModelo()">Enviar Modelo</button>
-                </div>
-            </div>
 
             <div class="table-container">
                 <h3 style="margin-bottom: 1rem; color: var(--cor-destaque);">📊 Histórico de Automações</h3>
