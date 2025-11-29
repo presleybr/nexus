@@ -30,8 +30,12 @@ WORKDIR /app
 # Copiar package.json e package-lock.json
 COPY package*.json ./
 
-# Instalar dependências
-RUN npm ci --only=production --no-audit --no-fund
+# Instalar dependências (usar npm ci se tiver lock file, senão npm install)
+RUN if [ -f package-lock.json ]; then \
+      npm ci --only=production --no-audit --no-fund; \
+    else \
+      npm install --only=production --no-audit --no-fund; \
+    fi
 
 # Copiar código
 COPY . .
