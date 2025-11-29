@@ -36,7 +36,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instalar dependências (production only)
-RUN npm ci --omit=dev --ignore-scripts 2>&1 | grep -v "deprecated" || true
+# Usar npm install ao invés de npm ci pois package-lock pode estar desatualizado
+RUN npm install --omit=dev --ignore-scripts 2>&1 | grep -v "deprecated" || true
 
 # Copiar código do servidor
 COPY . .
