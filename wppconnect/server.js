@@ -193,7 +193,7 @@ app.post('/start', async (req, res) => {
   }
 });
 
-// Obter QR Code
+// Obter QR Code (com captura via screenshot se callback falhar)
 app.get('/qr', async (req, res) => {
   try {
     if (isConnected) {
@@ -205,12 +205,45 @@ app.get('/qr', async (req, res) => {
       });
     }
 
+    // Se já temos QR Code do callback, retorna
     if (qrCode) {
       return res.json({
         success: true,
         qr: qrCode,
-        connected: false
+        connected: false,
+        source: 'callback'
       });
+    }
+
+    // FALLBACK: Tentar capturar via screenshot se cliente existe
+    if (client && client.page) {
+      console.log('🔍 Tentando capturar QR Code via screenshot...');
+
+      try {
+        // Capturar screenshot do QR Code
+        const qrElement = await client.page.$('canvas');
+
+        if (qrElement) {
+          const screenshot = await qrElement.screenshot({ encoding: 'base64' });
+          const qrDataUrl = `data:image/png;base64,${screenshot}`;
+
+          console.log('📱 QR Code capturado via screenshot! Length:', qrDataUrl.length);
+
+          // Salvar para próximas requisições
+          qrCode = qrDataUrl;
+
+          return res.json({
+            success: true,
+            qr: qrDataUrl,
+            connected: false,
+            source: 'screenshot'
+          });
+        } else {
+          console.log('⚠️ Elemento canvas não encontrado na página');
+        }
+      } catch (screenshotError) {
+        console.log('⚠️ Erro ao capturar screenshot:', screenshotError.message);
+      }
     }
 
     res.json({
