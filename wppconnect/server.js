@@ -45,7 +45,7 @@ const clientOptions = {
   headless: true,
   devtools: false,
   useChrome: true,
-  logQR: false,
+  logQR: true,  // Habilitar geração de QR Code
   disableWelcome: true,
   updatesLog: false,
   autoClose: 60000,
