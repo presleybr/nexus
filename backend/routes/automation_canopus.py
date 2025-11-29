@@ -2622,9 +2622,10 @@ def listar_boletos_baixados():
             with conn.cursor(row_factory=dict_row) as cur:
                 # BUSCAR DA TABELA downloads_canopus (que registra os downloads)
                 # JOIN com clientes_finais para pegar dados completos
-                # Usar DISTINCT ON para evitar duplicação quando um cliente tem múltiplos boletos
+                # Usar DISTINCT ON para evitar duplicação do MESMO boleto (CPF + arquivo)
+                # Isso garante que cada boleto único apareça apenas uma vez, pegando o download mais recente
                 cur.execute("""
-                    SELECT DISTINCT ON (dc.id)
+                    SELECT DISTINCT ON (dc.cpf, dc.nome_arquivo)
                         dc.id,
                         dc.cpf,
                         dc.nome_arquivo,
@@ -2649,8 +2650,8 @@ def listar_boletos_baixados():
                         LIMIT 1
                     ) b ON true
                     WHERE dc.status = 'sucesso'
-                    ORDER BY dc.id, dc.created_at DESC
-                    LIMIT 1000
+                    ORDER BY dc.cpf, dc.nome_arquivo, dc.created_at DESC
+                    LIMIT 200
                 """)
 
                 rows = cur.fetchall()
