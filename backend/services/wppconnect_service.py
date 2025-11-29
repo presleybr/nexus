@@ -251,16 +251,20 @@ class WPPConnectService:
                 }
 
             # Prepara dados para envio
+            # Garantir que filename seja sempre válido
+            final_filename = filename if filename else os.path.basename(arquivo_path)
+            if not final_filename or final_filename == '':
+                final_filename = f"boleto_{int(time.time())}.pdf"
+
             data = {
                 'phone': numero_limpo,
                 'filePath': arquivo_path,
-                'caption': legenda
+                'caption': legenda,
+                'filename': final_filename
             }
 
-            if filename:
-                data['filename'] = filename
-            else:
-                data['filename'] = os.path.basename(arquivo_path)
+            log_sistema('info', f'📤 Enviando arquivo: phone={numero_limpo}, file={arquivo_path}, filename={final_filename}',
+                       'whatsapp', {'servico': 'wppconnect'})
 
             # Faz a requisição
             resultado = self._fazer_requisicao('POST', '/send-file', data)

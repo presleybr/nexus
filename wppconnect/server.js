@@ -594,10 +594,22 @@ app.post('/send-file', async (req, res) => {
     const formattedNumber = phone.includes('@c.us') ? phone : `${phone}@c.us`;
     console.log('📞 [/send-file] Enviando para:', formattedNumber);
 
+    // Garantir que filename seja sempre válido
+    let finalFilename = filename;
+    if (!finalFilename || finalFilename === 'null' || finalFilename === 'undefined') {
+      finalFilename = path.basename(filePath);
+    }
+    if (!finalFilename || finalFilename === 'null' || finalFilename === 'undefined') {
+      finalFilename = `boleto_${Date.now()}.pdf`;
+    }
+
+    console.log('📄 [/send-file] Filename final:', finalFilename);
+    console.log('📤 [/send-file] Chamando client.sendFile...');
+
     const result = await client.sendFile(
       formattedNumber,
       filePath,
-      filename || path.basename(filePath),
+      finalFilename,
       caption || ''
     );
 
