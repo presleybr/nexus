@@ -496,15 +496,23 @@ app.post('/send-file', async (req, res) => {
 // Desconectar
 app.post('/logout', async (req, res) => {
   try {
+    console.log('🔒 [LOGOUT] Desconectando WhatsApp...');
+
     if (client) {
       await client.logout();
       client = null;
-      isConnected = false;
-      qrCode = null;
-      phoneNumber = null;
-
-      console.log('🔒 WhatsApp desconectado');
     }
+
+    // Atualizar estado
+    isConnected = false;
+    qrCode = null;
+    const oldPhone = phoneNumber;
+    phoneNumber = null;
+
+    // Salvar desconexão no banco de dados
+    await saveWhatsAppStatus(false, null, null);
+    console.log(`🔒 [LOGOUT] WhatsApp desconectado (era: ${oldPhone})`);
+    console.log('💾 [LOGOUT] Status atualizado no banco de dados');
 
     res.json({
       success: true,
@@ -512,7 +520,7 @@ app.post('/logout', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erro ao desconectar:', error);
+    console.error('❌ [LOGOUT] Erro ao desconectar:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -704,15 +712,23 @@ function checkConnectionStatus() {
 }
 
 // Função para inicializar cliente WhatsApp
-function initializeWhatsAppClient() {
+async function initializeWhatsAppClient() {
   console.log('🚀 [INIT] Criando cliente WhatsApp...');
 
-  // Resetar estado antes de tentar reconectar
-  if (!client) {
-    console.log('🔄 [INIT] Resetando estado...');
-    isConnected = false;
-    qrCode = null;
-    phoneNumber = null;
+  // Verificar se há sessão salva no banco de dados
+  const statusDB = await getWhatsAppStatus();
+  if (statusDB && statusDB.is_connected) {
+    console.log('📊 [INIT] Sessão conectada encontrada no banco!');
+    console.log(`📱 [INIT] Número salvo: ${statusDB.phone_number}`);
+    phoneNumber = statusDB.phone_number;
+    isConnected = true;
+  } else {
+    console.log('🔄 [INIT] Nenhuma sessão conectada no banco, iniciando nova...');
+    if (!client) {
+      isConnected = false;
+      qrCode = null;
+      phoneNumber = null;
+    }
   }
 
   // Limpar lock files antes de tentar criar cliente
@@ -780,8 +796,8 @@ function initializeWhatsAppClient() {
 
         try {
           const state = await client.getConnectionState();
-          console.log(`🔍 [POLL] Estado: ${state}, isConnected: ${isConnected}`);
 
+          // Só logar se houver mudança de estado
           if (state === 'CONNECTED' && !isConnected) {
             console.log('🎉🎉🎉 [POLL] CONEXÃO DETECTADA!');
             const hostDevice = await client.getHostDevice();
@@ -790,13 +806,15 @@ function initializeWhatsAppClient() {
             qrCode = null;
             console.log(`📱 [POLL] Número conectado: ${phoneNumber}`);
             await saveWhatsAppStatus(true, phoneNumber, null);
+          }
+
+          // Se estiver conectado, parar polling
+          if (state === 'CONNECTED') {
             clearInterval(pollInterval);
-          } else if (state === 'CONNECTED' && isConnected) {
-            // Já conectado, parar polling
-            clearInterval(pollInterval);
+            console.log('✅ [POLL] Conexão estável, polling finalizado');
           }
         } catch (err) {
-          // Ainda não conectou, continuar polling
+          // Ainda não conectou, continuar polling silenciosamente
         }
       }, 3000); // Verificar a cada 3 segundos
     })
