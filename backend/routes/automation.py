@@ -98,13 +98,14 @@ def get_historico():
                 (
                     SELECT json_agg(
                         json_build_object(
-                            'cliente_nome', b.cliente_final_nome,
+                            'cliente_nome', cf.nome_completo,
                             'valor', b.valor_original,
                             'vencimento', b.data_vencimento,
                             'status_envio', b.status_envio
                         )
                     )
                     FROM boletos b
+                    LEFT JOIN clientes_finais cf ON b.cliente_final_id = cf.id
                     WHERE b.id = ANY(hd.boletos_ids)
                     LIMIT 5
                 ) as ultimos_boletos
