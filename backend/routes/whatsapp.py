@@ -264,6 +264,53 @@ def desconectar():
         }), 500
 
 
+@whatsapp_bp.route('/debug-evolution', methods=['GET'])
+@login_required
+def debug_evolution():
+    """
+    Endpoint de debug para ver resposta RAW da Evolution API
+    """
+    try:
+        import requests
+        import os
+
+        base_url = os.getenv('EVOLUTION_API_URL', 'http://localhost:8080')
+        api_key = os.getenv('EVOLUTION_API_KEY', 'nexus-evolution-key-2025-secure')
+        instance_name = os.getenv('EVOLUTION_INSTANCE_NAME', 'nexus_whatsapp')
+
+        logger.info(f"[DEBUG] Testando Evolution API: {base_url}")
+        logger.info(f"[DEBUG] Instance: {instance_name}")
+
+        headers = {
+            'Content-Type': 'application/json',
+            'apikey': api_key
+        }
+
+        # Testar connectionState
+        url = f"{base_url}/instance/connectionState/{instance_name}"
+        logger.info(f"[DEBUG] URL: {url}")
+
+        response = requests.get(url, headers=headers, timeout=10)
+
+        logger.info(f"[DEBUG] Status HTTP: {response.status_code}")
+        logger.info(f"[DEBUG] Resposta RAW: {response.text}")
+
+        return jsonify({
+            'success': True,
+            'url': url,
+            'status_code': response.status_code,
+            'response_raw': response.text,
+            'response_json': response.json() if response.status_code == 200 else None
+        })
+
+    except Exception as e:
+        logger.error(f"[DEBUG] Erro: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @whatsapp_bp.route('/teste', methods=['POST'])
 @login_required
 def testar_envio():
