@@ -2685,45 +2685,67 @@ def listar_boletos_baixados():
 @handle_errors
 def download_boleto():
     """
-    Faz download de um boleto específico
+    Faz download de um boleto específico DO BANCO DE DADOS (base64)
+    Compatível com Render - não depende de filesystem
     """
-    # Pode receber nome do arquivo OU caminho completo
-    nome_arquivo = request.args.get('nome')
-    caminho = request.args.get('caminho')
-
-    from pathlib import Path
+    import base64
+    from io import BytesIO
     from flask import send_file
+    from psycopg.rows import dict_row
 
-    # Pasta de downloads
-    downloads_dir = Path(r"D:\Nexus\automation\canopus\downloads\Danner")
+    nome_arquivo = request.args.get('nome')
 
-    # Se veio nome do arquivo, construir caminho
-    if nome_arquivo:
-        arquivo = downloads_dir / nome_arquivo
-    # Se veio caminho, usar diretamente
-    elif caminho:
-        arquivo = Path(caminho)
-    else:
-        return jsonify({'error': 'Nome do arquivo ou caminho não fornecido'}), 400
+    if not nome_arquivo:
+        return jsonify({'error': 'Nome do arquivo não fornecido'}), 400
 
-    # Verificar se arquivo existe
-    if not arquivo.exists():
-        logger.error(f"Arquivo não encontrado: {arquivo}")
-        return jsonify({'error': f'Arquivo não encontrado: {arquivo.name}'}), 404
+    logger.info(f"📥 Buscando PDF no banco: {nome_arquivo}")
 
-    # Verificar se arquivo está dentro da pasta permitida (segurança)
     try:
-        arquivo.resolve().relative_to(downloads_dir.resolve())
-    except ValueError:
-        # Arquivo está fora da pasta permitida
-        return jsonify({'error': 'Acesso negado'}), 403
+        # Buscar PDF da tabela downloads_canopus
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute("""
+                    SELECT
+                        nome_arquivo,
+                        caminho_arquivo,
+                        tamanho_bytes
+                    FROM downloads_canopus
+                    WHERE nome_arquivo = %s
+                    LIMIT 1
+                """, (nome_arquivo,))
 
-    return send_file(
-        arquivo,
-        as_attachment=True,
-        download_name=arquivo.name,
-        mimetype='application/pdf'
-    )
+                row = cur.fetchone()
+
+                if not row:
+                    logger.error(f"❌ PDF não encontrado no banco: {nome_arquivo}")
+                    return jsonify({'error': f'Arquivo não encontrado: {nome_arquivo}'}), 404
+
+                # Decodificar base64
+                pdf_base64 = row['caminho_arquivo']
+
+                try:
+                    pdf_bytes = base64.b64decode(pdf_base64)
+                    logger.info(f"✅ PDF decodificado: {len(pdf_bytes)} bytes")
+                except Exception as e:
+                    logger.error(f"❌ Erro ao decodificar base64: {e}")
+                    return jsonify({'error': 'Erro ao decodificar PDF'}), 500
+
+                # Criar BytesIO para enviar
+                pdf_io = BytesIO(pdf_bytes)
+                pdf_io.seek(0)
+
+                logger.info(f"📤 Enviando PDF: {nome_arquivo}")
+
+                return send_file(
+                    pdf_io,
+                    as_attachment=True,
+                    download_name=nome_arquivo,
+                    mimetype='application/pdf'
+                )
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao buscar PDF: {e}")
+        return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 500
 
 
 # ============================================================================
