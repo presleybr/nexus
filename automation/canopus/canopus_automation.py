@@ -1062,8 +1062,57 @@ class CanopusAutomation:
                 # Capturar a nova aba que será aberta
                 nova_aba_pdf = None
 
+                # ESTRATÉGIA CRÍTICA: Registrar route handler NO CONTEXTO ANTES de clicar
+                # Isso garante que interceptamos o PDF desde o INÍCIO do carregamento
+                async def route_pdf_context(route):
+                    nonlocal pdf_bytes_interceptado, pdf_url_interceptado
+                    request = route.request
+                    url = request.url
+
+                    logger.info(f"🔀 [CONTEXT ROUTE] Interceptando: {url[:100]}")
+                    sys.stdout.flush()
+
+                    # Continuar com a requisição normalmente
+                    response = await route.fetch()
+
+                    # Verificar se é PDF
+                    headers = response.headers
+                    content_type = headers.get('content-type', '').lower()
+
+                    logger.info(f"🔀 [CONTEXT ROUTE] Content-Type: {content_type}, Status: {response.status}")
+                    sys.stdout.flush()
+
+                    # Tentar capturar QUALQUER resposta de PDF
+                    if 'pdf' in content_type or 'frmConCmImpressao' in url:
+                        try:
+                            body = await response.body()
+                            logger.info(f"🔀 [CONTEXT ROUTE] PDF CAPTURADO: {len(body)} bytes ({len(body)/1024:.1f} KB)")
+                            sys.stdout.flush()
+
+                            # Verificar se é PDF real (começa com %PDF)
+                            if body.startswith(b'%PDF'):
+                                pdf_bytes_interceptado = body
+                                pdf_url_interceptado = url
+                                logger.info(f"✅ [CONTEXT ROUTE] PDF REAL confirmado!")
+                                sys.stdout.flush()
+                            else:
+                                preview = body[:100].decode('latin-1', errors='ignore')
+                                logger.warning(f"⚠️ [CONTEXT ROUTE] Não é PDF real: {preview}")
+                                sys.stdout.flush()
+                        except Exception as e_route_body:
+                            logger.warning(f"⚠️ [CONTEXT ROUTE] Erro ao ler body: {e_route_body}")
+                            sys.stdout.flush()
+
+                    # Passar resposta pro navegador
+                    await route.fulfill(response=response)
+
+                # Registrar route handler NO CONTEXTO (intercepta TODAS as abas)
+                await self.context.route('**/*', route_pdf_context)
+                logger.info("🎯 Context route handler registrado ANTES de clicar")
+                sys.stdout.flush()
+
                 async def capturar_nova_aba(page):
-                    nonlocal nova_aba_pdf, pdf_bytes_interceptado, pdf_url_interceptado
+                    nonlocal nova_aba_pdf
                     nova_aba_pdf = page
                     logger.info(f"📄 Nova aba detectada: {page.url}")
                     sys.stdout.flush()
@@ -1075,64 +1124,13 @@ class CanopusAutomation:
 
                     page.on('console', log_console_popup)
 
-                    # ESTRATÉGIA AGRESSIVA: Usar page.route() para interceptar PDF ANTES do navegador processar
-                    async def route_pdf(route):
-                        nonlocal pdf_bytes_interceptado, pdf_url_interceptado
-                        request = route.request
-                        url = request.url
-
-                        logger.info(f"🔀 [ROUTE] Interceptando: {url[:100]}")
-                        sys.stdout.flush()
-
-                        # Continuar com a requisição normalmente
-                        response = await route.fetch()
-
-                        # Verificar se é PDF
-                        headers = response.headers
-                        content_type = headers.get('content-type', '').lower()
-
-                        logger.info(f"🔀 [ROUTE] Content-Type: {content_type}, Status: {response.status}")
-                        sys.stdout.flush()
-
-                        # VOLTAR AO CÓDIGO SIMPLES QUE FUNCIONAVA (cc634c0)
-                        # Tentar capturar QUALQUER resposta de PDF, sem filtrar por status
-                        if 'pdf' in content_type or 'frmConCmImpressao' in url:
-                            try:
-                                body = await response.body()
-                                logger.info(f"🔀 [ROUTE] PDF CAPTURADO: {len(body)} bytes ({len(body)/1024:.1f} KB)")
-                                sys.stdout.flush()
-
-                                # Verificar se é PDF real
-                                if body.startswith(b'%PDF'):
-                                    pdf_bytes_interceptado = body
-                                    pdf_url_interceptado = url
-                                    logger.info(f"✅ [ROUTE] PDF REAL confirmado!")
-                                    sys.stdout.flush()
-                            except Exception as e_route_body:
-                                logger.warning(f"⚠️ [ROUTE] Erro ao ler body: {e_route_body}")
-                                sys.stdout.flush()
-
-                        # Passar resposta pro navegador
-                        await route.fulfill(response=response)
-
-                    # Registrar route handler para TODAS as requisições
-                    await page.route('**/*', route_pdf)
-                    logger.info("🎯 Route handler registrado para captura agressiva")
-                    sys.stdout.flush()
-
-                    # IMPORTANTE: Registrar handler de response NESTA aba específica (fallback)
-                    # Isso garante que capturamos o PDF antes do browser processar
-                    page.on('response', interceptar_pdf)
-                    logger.info("🎯 Handler de PDF registrado na nova aba")
-                    sys.stdout.flush()
-
                     # Log de navegação COM FLUSH
                     def log_frame_nav(frame):
                         logger.info(f"🧭 [NAV] Frame navegou: {frame.url[:100]}")
                         sys.stdout.flush()
 
                     page.on('framenavigated', log_frame_nav)
-                    logger.info("🎯 Listeners de navegação registrados")
+                    logger.info("🎯 Listeners de navegação registrados na nova aba")
                     sys.stdout.flush()
 
                 self.context.on('page', capturar_nova_aba)
@@ -1193,6 +1191,16 @@ class CanopusAutomation:
                             logger.info(f"✅ PDF REAL INTERCEPTADO: {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
                             logger.info(f"   URL: {pdf_url_interceptado[:80] if pdf_url_interceptado else 'N/A'}")
                             sys.stdout.flush()
+
+                            # IMPORTANTE: Remover route handler do contexto após capturar
+                            try:
+                                await self.context.unroute('**/*', route_pdf_context)
+                                logger.info("🗑️  Context route handler removido após captura")
+                                sys.stdout.flush()
+                            except Exception as e_unroute:
+                                logger.warning(f"⚠️ Erro ao remover route handler: {e_unroute}")
+                                sys.stdout.flush()
+
                             break
 
                         # Log a cada 5 segundos mostrando o que capturou
@@ -1220,6 +1228,16 @@ class CanopusAutomation:
                         logger.warning(f"⚠️ Nenhum PDF foi interceptado após 20s de espera")
                         logger.info(f"📊 Respostas capturadas: {len(todas_respostas_pdf)}")
                         sys.stdout.flush()
+
+                    # Remover route handler se ainda não foi removido (caso timeout)
+                    if not pdf_bytes:
+                        try:
+                            await self.context.unroute('**/*', route_pdf_context)
+                            logger.info("🗑️  Context route handler removido (timeout)")
+                            sys.stdout.flush()
+                        except Exception as e_unroute:
+                            logger.warning(f"⚠️ Erro ao remover route handler: {e_unroute}")
+                            sys.stdout.flush()
 
                     # Se não foi interceptado, tentar JavaScript (se a aba ainda estiver aberta)
                     if not pdf_bytes:
