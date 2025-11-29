@@ -100,7 +100,10 @@ app.get('/', (req, res) => {
 // Iniciar sessão (modo assíncrono - não bloqueia)
 app.post('/start', async (req, res) => {
   try {
+    console.log('📥 [START] Requisição recebida');
+
     if (client && isConnected) {
+      console.log('✅ [START] Já conectado');
       return res.json({
         success: true,
         message: 'WhatsApp já está conectado',
@@ -109,6 +112,7 @@ app.post('/start', async (req, res) => {
     }
 
     if (client) {
+      console.log('⏳ [START] Cliente já está inicializando');
       return res.json({
         success: true,
         message: 'Sessão já está sendo iniciada. Use /qr para obter o QR Code.',
@@ -117,7 +121,13 @@ app.post('/start', async (req, res) => {
       });
     }
 
-    console.log('🚀 Iniciando cliente WhatsApp de forma assíncrona...');
+    console.log('🚀 [START] Iniciando cliente WhatsApp de forma assíncrona...');
+    console.log('🔧 [START] Opções do cliente:', {
+      session: clientOptions.session,
+      headless: clientOptions.headless,
+      logQR: clientOptions.logQR,
+      autoClose: clientOptions.autoClose
+    });
 
     // Responde IMEDIATAMENTE (não aguarda o Chromium iniciar)
     res.json({
@@ -128,45 +138,19 @@ app.post('/start', async (req, res) => {
     });
 
     // Inicializa em background (não bloqueia a resposta)
+    console.log('🔄 [START] Chamando wppconnect.create()...');
+
     wppconnect.create(clientOptions)
       .then(createdClient => {
+        console.log('✅ [THEN] wppconnect.create() resolvido!');
+        console.log('📦 [THEN] Tipo do cliente:', typeof createdClient);
+        console.log('🔍 [THEN] Cliente tem página?', !!createdClient.page);
+
         client = createdClient;
         console.log('✅ Cliente WhatsApp criado com sucesso!');
 
-        // Tentar capturar QR Code diretamente do cliente
-        setTimeout(() => {
-          if (client && client.page) {
-            console.log('🔍 Tentando capturar QR Code diretamente da página...');
-
-            // Método 1: Via seletor da página
-            client.page.evaluate(() => {
-              const qrElement = document.querySelector('canvas');
-              if (qrElement) {
-                return qrElement.toDataURL();
-              }
-              return null;
-            }).then(qrDataUrl => {
-              if (qrDataUrl) {
-                console.log('📱 QR Code capturado via canvas! Length:', qrDataUrl.length);
-                qrCode = qrDataUrl;
-              } else {
-                console.log('⚠️ Canvas QR Code não encontrado, aguardando callback...');
-              }
-            }).catch(err => {
-              console.log('⚠️ Erro ao capturar QR via canvas:', err.message);
-            });
-          }
-        }, 5000); // Aguardar 5s para página carregar
-
-        // Adicionar listener para QR Code (fallback)
-        if (client.onStateChange) {
-          client.onStateChange(state => {
-            console.log('🔄 Estado mudou:', state);
-          });
-        }
-
-        // Verificar se há método alternativo para QR Code
-        console.log('🔍 Métodos disponíveis no cliente:', Object.keys(client).filter(k => k.toLowerCase().includes('qr')));
+        // Iniciar captura agressiva de QR Code
+        startQRCodeCapture();
 
         // Obter informações do número (se já conectado)
         client.getHostDevice()
@@ -179,13 +163,13 @@ app.post('/start', async (req, res) => {
           });
       })
       .catch(error => {
-        console.error('❌ Erro ao iniciar cliente WhatsApp:', error);
-        console.error('Stack:', error.stack);
+        console.error('❌ [CATCH] Erro ao iniciar cliente WhatsApp:', error);
+        console.error('📋 [CATCH] Stack:', error.stack);
         client = null;
       });
 
   } catch (error) {
-    console.error('❌ Erro ao processar requisição /start:', error);
+    console.error('❌ [ERROR] Erro ao processar requisição /start:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -193,10 +177,81 @@ app.post('/start', async (req, res) => {
   }
 });
 
+// Função para capturar QR Code agressivamente
+function startQRCodeCapture() {
+  console.log('🎯 [QR-CAPTURE] Iniciando captura agressiva de QR Code...');
+
+  let attempts = 0;
+  const maxAttempts = 20; // 20 tentativas = ~60 segundos
+
+  const captureInterval = setInterval(async () => {
+    attempts++;
+    console.log(`🔄 [QR-CAPTURE] Tentativa ${attempts}/${maxAttempts}...`);
+
+    if (qrCode) {
+      console.log('✅ [QR-CAPTURE] QR Code já capturado! Parando...');
+      clearInterval(captureInterval);
+      return;
+    }
+
+    if (isConnected) {
+      console.log('✅ [QR-CAPTURE] WhatsApp conectado! Parando...');
+      clearInterval(captureInterval);
+      return;
+    }
+
+    if (!client || !client.page) {
+      console.log('⚠️ [QR-CAPTURE] Cliente ou página não disponível ainda');
+      return;
+    }
+
+    try {
+      // Tentar capturar canvas
+      console.log('📸 [QR-CAPTURE] Procurando elemento canvas...');
+      const qrElement = await client.page.$('canvas');
+
+      if (qrElement) {
+        console.log('✅ [QR-CAPTURE] Canvas encontrado! Tirando screenshot...');
+        const screenshot = await qrElement.screenshot({ encoding: 'base64' });
+        const qrDataUrl = `data:image/png;base64,${screenshot}`;
+
+        console.log('📱 [QR-CAPTURE] QR Code capturado! Length:', qrDataUrl.length);
+        console.log('🎉 [QR-CAPTURE] QR Code salvo com sucesso!');
+
+        qrCode = qrDataUrl;
+        clearInterval(captureInterval);
+
+        // Tentar exibir QR Code no console (opcional)
+        try {
+          const qrcode = require('qrcode-terminal');
+          console.log('\n📱 QR CODE GERADO:');
+          // Aqui você poderia decodificar o QR e exibir, mas é complexo
+          console.log('✅ QR Code disponível em /qr\n');
+        } catch (e) {
+          console.log('✅ QR Code disponível em /qr');
+        }
+      } else {
+        console.log('⚠️ [QR-CAPTURE] Canvas não encontrado na tentativa', attempts);
+      }
+    } catch (err) {
+      console.error(`❌ [QR-CAPTURE] Erro na tentativa ${attempts}:`, err.message);
+    }
+
+    if (attempts >= maxAttempts) {
+      console.error('❌ [QR-CAPTURE] Máximo de tentativas atingido. Parando...');
+      clearInterval(captureInterval);
+    }
+  }, 3000); // A cada 3 segundos
+}
+
 // Obter QR Code (com captura via screenshot se callback falhar)
 app.get('/qr', async (req, res) => {
   try {
+    console.log('📥 [/qr] Requisição recebida');
+    console.log('📊 [/qr] Estado:', { isConnected, hasQR: !!qrCode, hasClient: !!client, hasPage: !!(client && client.page) });
+
     if (isConnected) {
+      console.log('✅ [/qr] Já conectado');
       return res.json({
         success: true,
         connected: true,
@@ -205,29 +260,32 @@ app.get('/qr', async (req, res) => {
       });
     }
 
-    // Se já temos QR Code do callback, retorna
+    // Se já temos QR Code, retorna
     if (qrCode) {
+      console.log('✅ [/qr] Retornando QR Code existente (length:', qrCode.length, ')');
       return res.json({
         success: true,
         qr: qrCode,
         connected: false,
-        source: 'callback'
+        source: 'cached'
       });
     }
 
     // FALLBACK: Tentar capturar via screenshot se cliente existe
     if (client && client.page) {
-      console.log('🔍 Tentando capturar QR Code via screenshot...');
+      console.log('🔍 [/qr] Cliente disponível, tentando capturar screenshot...');
 
       try {
         // Capturar screenshot do QR Code
+        console.log('📸 [/qr] Procurando elemento canvas...');
         const qrElement = await client.page.$('canvas');
 
         if (qrElement) {
+          console.log('✅ [/qr] Canvas encontrado! Tirando screenshot...');
           const screenshot = await qrElement.screenshot({ encoding: 'base64' });
           const qrDataUrl = `data:image/png;base64,${screenshot}`;
 
-          console.log('📱 QR Code capturado via screenshot! Length:', qrDataUrl.length);
+          console.log('📱 [/qr] QR Code capturado via screenshot! Length:', qrDataUrl.length);
 
           // Salvar para próximas requisições
           qrCode = qrDataUrl;
@@ -239,13 +297,16 @@ app.get('/qr', async (req, res) => {
             source: 'screenshot'
           });
         } else {
-          console.log('⚠️ Elemento canvas não encontrado na página');
+          console.log('⚠️ [/qr] Elemento canvas não encontrado na página');
         }
       } catch (screenshotError) {
-        console.log('⚠️ Erro ao capturar screenshot:', screenshotError.message);
+        console.error('❌ [/qr] Erro ao capturar screenshot:', screenshotError.message);
       }
+    } else {
+      console.log('⚠️ [/qr] Cliente não disponível ainda');
     }
 
+    console.log('⏳ [/qr] Aguardando QR Code...');
     res.json({
       success: true,
       connected: false,
@@ -253,7 +314,7 @@ app.get('/qr', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erro ao obter QR Code:', error);
+    console.error('❌ [/qr] Erro:', error);
     res.status(500).json({
       success: false,
       error: error.message
