@@ -26,10 +26,13 @@ let phoneNumber = null;
 // Configurações do WhatsApp otimizadas para Render/Alpine
 const clientOptions = {
   session: 'nexus-crm',
+  // Callback para capturar QR Code
   catchQR: (base64Qr, asciiQR, attempt, urlCode) => {
-    console.log('📱 QR Code gerado! Tentativa:', attempt);
+    console.log('📱 QR Code gerado via catchQR! Tentativa:', attempt);
+    console.log('📱 Base64 length:', base64Qr ? base64Qr.length : 0);
     qrCode = base64Qr;
   },
+  // Callback de status da sessão
   statusFind: (statusSession, session) => {
     console.log('📊 Status da sessão:', statusSession, session);
 
@@ -40,15 +43,19 @@ const clientOptions = {
     } else if (statusSession === 'notLogged') {
       isConnected = false;
       console.log('⚠️ WhatsApp desconectado');
+    } else if (statusSession === 'qrReadSuccess') {
+      console.log('📱 QR Code lido com sucesso! Aguardando confirmação...');
+    } else if (statusSession === 'qrReadFail') {
+      console.log('❌ Falha ao ler QR Code');
     }
   },
   headless: true,
   devtools: false,
   useChrome: true,
-  logQR: true,  // Habilitar geração de QR Code
+  logQR: true,  // Mostrar QR no console também
   disableWelcome: true,
   updatesLog: false,
-  autoClose: 60000,
+  autoClose: 120000,  // 2 minutos ao invés de 1
   // Configurações do Puppeteer para Alpine Linux (Render)
   puppeteerOptions: {
     headless: true,
@@ -126,6 +133,16 @@ app.post('/start', async (req, res) => {
         client = createdClient;
         console.log('✅ Cliente WhatsApp criado com sucesso!');
 
+        // Adicionar listener para QR Code (fallback)
+        if (client.onStateChange) {
+          client.onStateChange(state => {
+            console.log('🔄 Estado mudou:', state);
+          });
+        }
+
+        // Verificar se há método alternativo para QR Code
+        console.log('🔍 Métodos disponíveis no cliente:', Object.keys(client).filter(k => k.toLowerCase().includes('qr')));
+
         // Obter informações do número (se já conectado)
         client.getHostDevice()
           .then(hostDevice => {
@@ -138,6 +155,7 @@ app.post('/start', async (req, res) => {
       })
       .catch(error => {
         console.error('❌ Erro ao iniciar cliente WhatsApp:', error);
+        console.error('Stack:', error.stack);
         client = null;
       });
 
