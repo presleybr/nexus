@@ -260,11 +260,16 @@ class WhatsAppEvolution:
             logger.info(f"📤 Enviando mensagem para {telefone_formatado}")
 
             endpoint = f'/message/sendText/{self.instance_name}'
+
+            # Evolution API v2 formato correto
             data = {
                 "number": telefone_formatado,
-                "text": mensagem,
-                "delay": 1000
+                "textMessage": {
+                    "text": mensagem
+                }
             }
+
+            logger.info(f"📦 Payload: {data}")
 
             result = self._make_request('POST', endpoint, data)
 
@@ -295,14 +300,20 @@ class WhatsAppEvolution:
                 pdf_base64 = base64.b64encode(f.read()).decode('utf-8')
 
             endpoint = f'/message/sendMedia/{self.instance_name}'
+
+            # Evolution API v2 formato correto para envio de mídia
             data = {
                 "number": telefone_formatado,
-                "mediatype": "document",
-                "mimetype": "application/pdf",
-                "caption": caption,
-                "fileName": filename,
-                "media": pdf_base64
+                "mediaMessage": {
+                    "mediatype": "document",
+                    "mimetype": "application/pdf",
+                    "caption": caption,
+                    "fileName": filename,
+                    "media": pdf_base64
+                }
             }
+
+            logger.info(f"📦 Payload PDF (tamanho base64: {len(pdf_base64)} chars)")
 
             result = self._make_request('POST', endpoint, data)
 
