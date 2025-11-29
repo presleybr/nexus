@@ -789,8 +789,10 @@
             btn.innerHTML = '<span>Processando...</span>';
 
             // Mostrar indicador de progresso
-            const progressContainer = document.getElementById('downloadProgress');
-            progressContainer.style.display = 'block';
+            const progressContainer = document.getElementById('progressSection');
+            if (progressContainer) {
+                progressContainer.style.display = 'block';
+            }
 
             mostrarProgresso();
             adicionarLog('info', `Iniciando download de boletos do PV ${pontoVenda}...`);
