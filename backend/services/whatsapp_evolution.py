@@ -100,7 +100,7 @@ class WhatsAppEvolution:
             result = self._make_request('GET', endpoint)
 
             if 'error' in result:
-                return {'success': False, 'error': result['error']}
+                return {'success': False, 'sucesso': False, 'error': result['error']}
 
             logger.info(f"✅ Conexão iniciada")
             return {'success': True, 'message': 'Conexão iniciada. Aguarde QR Code...'}
@@ -252,7 +252,7 @@ class WhatsAppEvolution:
 
         return telefone_limpo
 
-    def enviar_mensagem(self, telefone, mensagem):
+    def enviar_mensagem(self, telefone, mensagem, cliente_nexus_id=None):
         """Envia mensagem de texto"""
         try:
             telefone_formatado = self.formatar_telefone(telefone)
@@ -274,20 +274,21 @@ class WhatsAppEvolution:
             result = self._make_request('POST', endpoint, data)
 
             if 'error' in result:
-                return {'success': False, 'error': result['error']}
+                return {'success': False, 'sucesso': False, 'error': result['error']}
 
             logger.info(f"✅ Mensagem enviada para {telefone}")
             return {
                 'success': True,
+                'sucesso': True,  # Compatibilidade com crm.py
                 'message_id': result.get('key', {}).get('id'),
                 'status': 'sent'
             }
 
         except Exception as e:
             logger.error(f"❌ Erro ao enviar mensagem: {str(e)}")
-            return {'success': False, 'error': str(e)}
+            return {'success': False, 'sucesso': False, 'error': str(e)}
 
-    def enviar_pdf(self, telefone, pdf_path, caption="", filename="documento.pdf"):
+    def enviar_pdf(self, telefone, pdf_path, caption="", cliente_nexus_id=None, filename="documento.pdf"):
         """Envia arquivo PDF"""
         try:
             telefone_formatado = self.formatar_telefone(telefone)
@@ -318,18 +319,19 @@ class WhatsAppEvolution:
             result = self._make_request('POST', endpoint, data)
 
             if 'error' in result:
-                return {'success': False, 'error': result['error']}
+                return {'success': False, 'sucesso': False, 'error': result['error']}
 
             logger.info(f"✅ PDF enviado para {telefone}")
             return {
                 'success': True,
+                'sucesso': True,  # Compatibilidade com crm.py
                 'message_id': result.get('key', {}).get('id'),
                 'status': 'sent'
             }
 
         except Exception as e:
             logger.error(f"❌ Erro ao enviar PDF: {str(e)}")
-            return {'success': False, 'error': str(e)}
+            return {'success': False, 'sucesso': False, 'error': str(e)}
 
     def enviar_boleto_completo(self, telefone, pdf_path, mensagem_antibloqueio):
         """Envia mensagem + PDF com delay anti-bloqueio"""
