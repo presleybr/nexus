@@ -261,12 +261,10 @@ class WhatsAppEvolution:
 
             endpoint = f'/message/sendText/{self.instance_name}'
 
-            # Evolution API v2 formato correto
+            # Evolution API v2 formato correto (sem aninhamento)
             data = {
                 "number": telefone_formatado,
-                "textMessage": {
-                    "text": mensagem
-                }
+                "text": mensagem
             }
 
             logger.info(f"📦 Payload: {data}")
@@ -302,16 +300,14 @@ class WhatsAppEvolution:
 
             endpoint = f'/message/sendMedia/{self.instance_name}'
 
-            # Evolution API v2 formato correto para envio de mídia
+            # Evolution API v2 formato simplificado
             data = {
                 "number": telefone_formatado,
-                "mediaMessage": {
-                    "mediatype": "document",
-                    "mimetype": "application/pdf",
-                    "caption": caption,
-                    "fileName": filename,
-                    "media": pdf_base64
-                }
+                "mediatype": "document",
+                "mimetype": "application/pdf",
+                "caption": caption,
+                "fileName": filename,
+                "media": pdf_base64
             }
 
             logger.info(f"📦 Payload PDF (tamanho base64: {len(pdf_base64)} chars)")
