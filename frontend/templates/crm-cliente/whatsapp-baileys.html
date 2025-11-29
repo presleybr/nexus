@@ -3,279 +3,365 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Baileys - Nexus CRM</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <title>WhatsApp - Nexus CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Nexus Design System -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/crm-cliente.css">
     <style>
-        :root {
-            --nexus-primary: #2563eb;
-            --nexus-secondary: #1e40af;
-            --nexus-success: #10b981;
-            --nexus-danger: #ef4444;
-            --nexus-warning: #f59e0b;
-            --nexus-dark: #1f2937;
-            --nexus-light: #f3f4f6;
+        /* Estilos específicos da página WhatsApp */
+        .nexus-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
         }
 
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        .nexus-input:focus {
+            outline: none;
+            border-color: #2ed573;
+            box-shadow: 0 0 0 3px rgba(46, 213, 115, 0.2);
+            background: rgba(255, 255, 255, 0.08);
         }
 
-        .navbar {
-            background: rgba(255, 255, 255, 0.95) !important;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .main-container {
-            padding: 2rem;
-            margin-top: 2rem;
-        }
-
-        .card {
-            border-radius: 15px;
-            border: none;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            margin-bottom: 2rem;
-        }
-
-        .card-header {
-            background: linear-gradient(135deg, var(--nexus-primary), var(--nexus-secondary));
-            color: white;
-            border-radius: 15px 15px 0 0 !important;
-            padding: 1.5rem;
-            font-weight: bold;
-            font-size: 1.2rem;
+        .nexus-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
         }
 
         .status-badge {
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
-            font-weight: bold;
             display: inline-block;
+            padding: 0.5rem 1.2rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
         }
 
         .status-connected {
-            background: var(--nexus-success);
+            background: linear-gradient(135deg, #10b981, #059669);
             color: white;
         }
 
         .status-disconnected {
-            background: var(--nexus-danger);
+            background: linear-gradient(135deg, #ef4444, #dc2626);
             color: white;
         }
 
         .status-connecting {
-            background: var(--nexus-warning);
+            background: linear-gradient(135deg, #f59e0b, #d97706);
             color: white;
         }
 
-        .qr-container {
-            text-align: center;
-            padding: 2rem;
+        .qr-code-area {
             background: white;
-            border-radius: 10px;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
             min-height: 400px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
 
         .qr-code-img {
             max-width: 300px;
-            border: 3px solid var(--nexus-primary);
+            border: 3px solid var(--cor-primaria);
             border-radius: 10px;
             padding: 1rem;
             background: white;
         }
 
-        .btn-nexus {
-            background: linear-gradient(135deg, var(--nexus-primary), var(--nexus-secondary));
-            color: white;
-            border: none;
-            padding: 0.75rem 2rem;
-            border-radius: 25px;
-            font-weight: bold;
-            transition: all 0.3s;
+        .phone-display {
+            background: var(--cor-background);
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            margin-top: 1rem;
         }
 
-        .btn-nexus:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4);
-            color: white;
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--cor-primaria);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
         }
 
-        .btn-danger-nexus {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-            border: none;
-            padding: 0.75rem 2rem;
-            border-radius: 25px;
-            font-weight: bold;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .info-box {
-            background: #f0f9ff;
-            border-left: 4px solid var(--nexus-primary);
+            background: #e0f2fe;
+            border-left: 4px solid #0284c7;
             padding: 1rem;
-            border-radius: 5px;
-            margin-bottom: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
         }
 
-        .spinner-border-sm {
-            width: 1rem;
-            height: 1rem;
+        .info-box h4 {
+            margin-top: 0;
+            color: #0284c7;
         }
 
-        .phone-display {
-            background: var(--nexus-light);
-            padding: 1rem;
-            border-radius: 10px;
-            font-family: monospace;
-            font-size: 1.1rem;
-            text-align: center;
-        }
-
-        .test-section {
-            background: #fef3c7;
-            border-left: 4px solid var(--nexus-warning);
-            padding: 1.5rem;
-            border-radius: 5px;
+        .info-box ol {
+            margin: 0.5rem 0 0 1rem;
+            padding-left: 0.5rem;
         }
     </style>
 </head>
 <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-light">
-        <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="/crm/dashboard">
-                <i class="bi bi-whatsapp text-success"></i> Nexus CRM - WhatsApp Baileys
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/crm/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
+    <div class="crm-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="/static/images/nexus_Logotipo.png" alt="Nexus" style="height: 80px; margin-bottom: 15px;">
+            </div>
+
+            <nav>
+                <ul class="sidebar-menu">
+                    <li class="menu-item">
+                        <a href="/crm/dashboard" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            Dashboard
+                        </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/crm/whatsapp-baileys"><i class="bi bi-whatsapp"></i> WhatsApp Baileys</a>
+                    <li class="menu-item">
+                        <a href="/crm/cadastro-clientes" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Clientes
+                        </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/crm/whatsapp"><i class="bi bi-telephone"></i> WhatsApp API</a>
+                    <li class="menu-item">
+                        <a href="/crm/whatsapp" class="menu-link active">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                            </svg>
+                            WhatsApp
+                        </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/api/auth/logout"><i class="bi bi-box-arrow-right"></i> Sair</a>
+                    <li class="menu-item">
+                        <a href="/crm/disparos" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            Disparos
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/automacao-canopus" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                            </svg>
+                            Automação Canopus
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/monitoramento" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            Monitoramento
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/graficos" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="12" y1="20" x2="12" y2="10"></line>
+                                <line x1="18" y1="20" x2="18" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="16"></line>
+                            </svg>
+                            Gráficos
+                        </a>
                     </li>
                 </ul>
-            </div>
-        </div>
-    </nav>
+            </nav>
 
-    <!-- Main Container -->
-    <div class="container main-container">
-        <!-- Status Card -->
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-whatsapp"></i> Status da Conexão WhatsApp Baileys
-            </div>
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <h5>Status Atual:</h5>
+            <button class="logout-btn" onclick="logout()">
+                <svg style="width: 18px; height: 18px; vertical-align: middle; margin-right: 8px;" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Sair
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Conexão WhatsApp</h1>
+                <p class="breadcrumb">Conecte seu WhatsApp via QR Code</p>
+            </header>
+
+            <!-- Status Card -->
+            <div class="table-container" style="margin-bottom: 1.5rem;">
+                <h3 style="margin-bottom: 1rem; color: var(--cor-destaque);">📱 Status da Conexão</h3>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                    <div>
                         <div id="statusBadge" class="status-badge status-disconnected">
-                            <i class="bi bi-x-circle"></i> Desconectado
+                            ❌ Desconectado
                         </div>
-                        <div id="phoneDisplay" class="phone-display mt-3" style="display: none;">
-                            <i class="bi bi-phone"></i> <span id="phoneNumber"></span>
+                        <div id="phoneDisplay" class="phone-display" style="display: none;">
+                            <strong>📱 Número:</strong> <span id="phoneNumber"></span>
                         </div>
                     </div>
-                    <div class="col-md-6 text-end">
-                        <button id="btnConectar" class="btn btn-nexus me-2" onclick="conectarWhatsApp()">
-                            <i class="bi bi-power"></i> Conectar WhatsApp
+
+                    <div style="display: flex; gap: 0.75rem;">
+                        <button id="btnConectar" class="btn-primary nexus-btn-lg" onclick="conectarWhatsApp()">
+                            <svg style="width: 20px; height: 20px; margin-right: 8px;" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                            </svg>
+                            Conectar WhatsApp
                         </button>
-                        <button id="btnDesconectar" class="btn btn-danger-nexus" onclick="desconectarWhatsApp()" style="display: none;">
-                            <i class="bi bi-x-circle"></i> Desconectar
+                        <button id="btnDesconectar" class="btn-danger nexus-btn-lg" onclick="desconectarWhatsApp()" style="display: none;">
+                            <svg style="width: 20px; height: 20px; margin-right: 8px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                            </svg>
+                            Desconectar
                         </button>
                     </div>
                 </div>
 
-                <div class="info-box mt-4">
-                    <i class="bi bi-info-circle"></i> <strong>Instruções:</strong>
-                    <ol class="mb-0 mt-2">
-                        <li>Clique em "Conectar WhatsApp" para iniciar a conexão</li>
-                        <li>Escaneie o QR Code com seu WhatsApp (WhatsApp > Configurações > Aparelhos Conectados)</li>
-                        <li>Aguarde a confirmação da conexão</li>
-                        <li>Depois de conectado, você pode enviar mensagens de teste</li>
+                <div style="margin-top: 1.5rem; background: var(--nexus-bg-glass); backdrop-filter: blur(var(--nexus-blur-md)); border: 1px solid var(--nexus-border); border-left: 4px solid var(--nexus-primary); border-radius: var(--nexus-radius-md); padding: var(--nexus-space-xl); box-shadow: var(--nexus-shadow-sm);">
+                    <h4 style="color: var(--nexus-primary); font-family: var(--nexus-font-display); font-size: var(--nexus-text-lg); font-weight: var(--nexus-font-bold); margin-bottom: var(--nexus-space-md); display: flex; align-items: center; gap: var(--nexus-space-sm);">
+                        <svg style="width: 20px; height: 20px;" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                        Instruções
+                    </h4>
+                    <ol style="color: var(--nexus-text-secondary); font-size: var(--nexus-text-base); line-height: 1.8; margin: 0; padding-left: 1.5rem;">
+                        <li style="margin-bottom: var(--nexus-space-sm);">Clique em <strong style="color: var(--nexus-primary);">"Conectar WhatsApp"</strong> para iniciar a conexão</li>
+                        <li style="margin-bottom: var(--nexus-space-sm);">Aguarde o <strong style="color: var(--nexus-primary);">QR Code</strong> aparecer (5-10 segundos)</li>
+                        <li style="margin-bottom: var(--nexus-space-sm);">Abra <strong style="color: var(--nexus-primary);">WhatsApp no celular</strong> → Configurações → Aparelhos Conectados</li>
+                        <li style="margin-bottom: var(--nexus-space-sm);">Escaneie o <strong style="color: var(--nexus-primary);">QR Code</strong> que aparecerá abaixo</li>
+                        <li>Aguarde a <strong style="color: var(--nexus-success);">confirmação da conexão</strong></li>
                     </ol>
                 </div>
             </div>
-        </div>
 
-        <!-- QR Code Card -->
-        <div class="card" id="qrCard" style="display: none;">
-            <div class="card-header">
-                <i class="bi bi-qr-code"></i> QR Code para Conexão
-            </div>
-            <div class="card-body">
-                <div class="qr-container" id="qrContainer">
-                    <div class="spinner-border text-primary mb-3" role="status">
-                        <span class="visually-hidden">Carregando...</span>
-                    </div>
-                    <p class="text-muted">Aguardando QR Code...</p>
+            <!-- QR Code Area -->
+            <div id="qrCard" class="table-container" style="display: none;">
+                <h3 style="margin-bottom: 1rem; color: var(--cor-destaque);">📱 QR Code para Conexão</h3>
+
+                <div class="qr-code-area" id="qrContainer">
+                    <div class="spinner"></div>
+                    <p style="color: #666; margin-top: 1rem;">Aguardando QR Code...</p>
+                    <p style="color: #999; font-size: 0.9rem;">Isso pode levar alguns segundos</p>
                 </div>
             </div>
-        </div>
 
-        <!-- Test Section -->
-        <div class="card" id="testCard" style="display: none;">
-            <div class="card-header">
-                <i class="bi bi-send"></i> Testar Envio de Mensagem
-            </div>
-            <div class="card-body">
-                <div class="test-section">
-                    <h5><i class="bi bi-lightbulb"></i> Teste de Envio</h5>
-                    <p>Envie uma mensagem de teste para verificar se o WhatsApp está funcionando corretamente.</p>
+            <!-- Test Area -->
+            <div id="testCard" class="table-container" style="display: none;">
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+                    <div style="width: 50px; height: 50px; background: linear-gradient(135deg, var(--nexus-success), var(--nexus-success-dark)); border-radius: var(--nexus-radius-lg); display: flex; align-items: center; justify-content: center; box-shadow: var(--nexus-shadow-md);">
+                        <svg style="width: 28px; height: 28px; color: white;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; color: var(--nexus-text-primary); font-family: var(--nexus-font-display); font-size: var(--nexus-text-2xl); font-weight: var(--nexus-font-bold);">Teste de Envio</h3>
+                        <p style="margin: 0; color: var(--nexus-text-secondary); font-size: var(--nexus-text-sm);">Envie uma mensagem de teste para verificar a conexão</p>
+                    </div>
+                </div>
 
-                    <div class="row mt-3">
-                        <div class="col-md-8">
-                            <label for="testPhone" class="form-label">Telefone (com DDD):</label>
-                            <input type="text" class="form-control" id="testPhone" placeholder="67999887766">
-                            <small class="text-muted">Digite apenas números (DDD + número)</small>
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <button class="btn btn-nexus w-100" onclick="enviarTeste()">
-                                <i class="bi bi-send"></i> Enviar Teste
-                            </button>
-                        </div>
+                <div style="background: var(--nexus-bg-glass); backdrop-filter: blur(var(--nexus-blur-md)); border: 1px solid var(--nexus-border); border-radius: var(--nexus-radius-lg); padding: var(--nexus-space-2xl); box-shadow: var(--nexus-shadow-sm);">
+                    <div style="margin-bottom: var(--nexus-space-lg);">
+                        <label style="display: block; margin-bottom: var(--nexus-space-sm); font-weight: var(--nexus-font-semibold); color: var(--nexus-text-primary); font-size: var(--nexus-text-sm);">
+                            <svg style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px;" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
+                            </svg>
+                            Telefone (com DDD)
+                        </label>
+                        <input
+                            type="text"
+                            id="testPhone"
+                            class="nexus-input"
+                            placeholder="Ex: 67999887766"
+                            style="width: 100%; font-size: var(--nexus-text-base); padding: var(--nexus-space-md);"
+                        >
+                        <small style="color: var(--nexus-text-secondary); display: block; margin-top: var(--nexus-space-xs); font-size: var(--nexus-text-xs);">
+                            💡 Digite apenas números (DDD + número)
+                        </small>
                     </div>
 
-                    <div id="testResult" class="mt-3" style="display: none;"></div>
+                    <button class="btn-primary nexus-btn-lg" onclick="enviarTeste()" style="width: 100%;">
+                        <svg style="width: 20px; height: 20px; margin-right: 8px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                        </svg>
+                        Enviar Mensagem de Teste
+                    </button>
+
+                    <div id="testResult" style="margin-top: var(--nexus-space-lg);"></div>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/crm-cliente.js"></script>
     <script>
         let qrPollingInterval = null;
         let statusPollingInterval = null;
 
         // Verifica status ao carregar a página
         window.onload = function() {
+            console.log('[WHATSAPP] Verificando status da conexão ao iniciar...');
             verificarStatus();
             // Atualiza status a cada 5 segundos
             statusPollingInterval = setInterval(verificarStatus, 5000);
         };
 
+        let primeiraVerificacao = true;
+
         async function verificarStatus() {
             try {
                 const response = await fetch('/api/whatsapp/status');
                 const data = await response.json();
+
+                console.log('[STATUS WHATSAPP]', data);
 
                 const statusBadge = document.getElementById('statusBadge');
                 const phoneDisplay = document.getElementById('phoneDisplay');
@@ -286,7 +372,7 @@
 
                 if (data.connected) {
                     statusBadge.className = 'status-badge status-connected';
-                    statusBadge.innerHTML = '<i class="bi bi-check-circle"></i> Conectado';
+                    statusBadge.innerHTML = '✅ Conectado';
 
                     if (data.phone) {
                         phoneNumber.textContent = data.phone;
@@ -294,8 +380,14 @@
                     }
 
                     btnConectar.style.display = 'none';
-                    btnDesconectar.style.display = 'inline-block';
+                    btnDesconectar.style.display = 'inline-flex';
                     testCard.style.display = 'block';
+
+                    // Mostrar mensagem na primeira verificação se já estiver conectado
+                    if (primeiraVerificacao) {
+                        console.log('✅ WhatsApp já está conectado!');
+                        primeiraVerificacao = false;
+                    }
 
                     // Para o polling do QR Code se estiver rodando
                     if (qrPollingInterval) {
@@ -305,15 +397,24 @@
                     }
                 } else {
                     statusBadge.className = 'status-badge status-disconnected';
-                    statusBadge.innerHTML = '<i class="bi bi-x-circle"></i> Desconectado';
+                    statusBadge.innerHTML = '❌ Desconectado';
 
                     phoneDisplay.style.display = 'none';
-                    btnConectar.style.display = 'inline-block';
+                    btnConectar.style.display = 'inline-flex';
                     btnDesconectar.style.display = 'none';
                     testCard.style.display = 'none';
+
+                    if (primeiraVerificacao) {
+                        console.log('⚠️ WhatsApp não está conectado. Clique em "Conectar WhatsApp" para começar.');
+                        primeiraVerificacao = false;
+                    }
                 }
             } catch (error) {
-                console.error('Erro ao verificar status:', error);
+                console.error('[ERRO] Ao verificar status:', error);
+                if (primeiraVerificacao) {
+                    console.error('❌ Erro ao verificar conexão. Verifique se o servidor WPPConnect está rodando.');
+                    primeiraVerificacao = false;
+                }
             }
         }
 
@@ -321,7 +422,9 @@
             try {
                 const btnConectar = document.getElementById('btnConectar');
                 btnConectar.disabled = true;
-                btnConectar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Conectando...';
+                btnConectar.innerHTML = '<svg style="width: 20px; height: 20px; margin-right: 8px;" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Conectando...';
+
+                console.log('[CONECTAR] Iniciando conexão...');
 
                 const response = await fetch('/api/whatsapp/conectar', {
                     method: 'POST',
@@ -329,31 +432,76 @@
                 });
 
                 const data = await response.json();
+                console.log('[CONECTAR] Resposta:', data);
 
                 if (data.success) {
-                    // Mostra card do QR Code
+                    // Se já está conectado (tem número de telefone na resposta)
+                    if (data.phone) {
+                        console.log('✅ WhatsApp já estava conectado! Número:', data.phone);
+
+                        // Mostra mensagem de sucesso
+                        const qrCard = document.getElementById('qrCard');
+                        qrCard.style.display = 'block';
+                        qrCard.innerHTML = `
+                            <div style="text-align: center; padding: 2rem;">
+                                <div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>
+                                <h3 style="color: #10b981; margin-bottom: 1rem;">WhatsApp Conectado!</h3>
+                                <p style="color: #666; font-size: 1.1rem;">
+                                    Sua sessão já estava ativa.<br>
+                                    Número: <strong>${data.phone}</strong>
+                                </p>
+                                <p style="color: #888; margin-top: 1rem; font-size: 0.9rem;">
+                                    Não é necessário escanear o QR Code novamente.
+                                </p>
+                            </div>
+                        `;
+
+                        // Scroll suave até a mensagem
+                        qrCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                        // Atualiza o status após 2 segundos e esconde a mensagem
+                        setTimeout(() => {
+                            qrCard.style.display = 'none';
+                            verificarStatus();
+                        }, 3000);
+
+                        btnConectar.disabled = false;
+                        btnConectar.innerHTML = '<svg style="width: 20px; height: 20px; margin-right: 8px;" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Conectar WhatsApp';
+
+                        return; // Sai da função
+                    }
+
+                    // Se não está conectado, mostra card do QR Code
+                    console.log('⏳ Aguardando QR Code...');
                     document.getElementById('qrCard').style.display = 'block';
+
+                    // Scroll suave até o QR Code
+                    document.getElementById('qrCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
                     // Inicia polling do QR Code
                     qrPollingInterval = setInterval(obterQRCode, 3000);
                     obterQRCode(); // Primeira chamada imediata
                 } else {
-                    alert('Erro ao conectar: ' + data.error);
+                    alert('Erro ao conectar: ' + (data.error || 'Erro desconhecido'));
                     btnConectar.disabled = false;
-                    btnConectar.innerHTML = '<i class="bi bi-power"></i> Conectar WhatsApp';
+                    btnConectar.innerHTML = '<svg style="width: 20px; height: 20px; margin-right: 8px;" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Conectar WhatsApp';
                 }
             } catch (error) {
-                console.error('Erro ao conectar:', error);
-                alert('Erro ao conectar ao WhatsApp. Verifique se o servidor Baileys está rodando.');
+                console.error('[ERRO] Ao conectar:', error);
+                alert('Erro ao conectar. Verifique se o servidor WPPConnect está rodando.');
                 document.getElementById('btnConectar').disabled = false;
-                document.getElementById('btnConectar').innerHTML = '<i class="bi bi-power"></i> Conectar WhatsApp';
+                document.getElementById('btnConectar').innerHTML = '<svg style="width: 20px; height: 20px; margin-right: 8px;" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Conectar WhatsApp';
             }
         }
 
         async function obterQRCode() {
             try {
+                console.log('[QR] Solicitando QR Code...');
+
                 const response = await fetch('/api/whatsapp/qr');
                 const data = await response.json();
+
+                console.log('[QR] Resposta:', data);
 
                 const qrContainer = document.getElementById('qrContainer');
 
@@ -361,8 +509,12 @@
                     // Exibe QR Code
                     qrContainer.innerHTML = `
                         <img src="${data.qr}" class="qr-code-img" alt="QR Code">
-                        <p class="mt-3 text-primary fw-bold">Escaneie este QR Code com seu WhatsApp</p>
-                        <p class="text-muted small">WhatsApp > Configurações > Aparelhos Conectados > Conectar Aparelho</p>
+                        <p style="margin-top: 1rem; color: #0284c7; font-weight: 600; font-size: 1.1rem;">
+                            📱 Escaneie este QR Code com seu WhatsApp
+                        </p>
+                        <p style="color: #666; font-size: 0.9rem;">
+                            WhatsApp > Configurações > Aparelhos Conectados > Conectar Aparelho
+                        </p>
                     `;
                 } else if (data.connected) {
                     // Já conectado
@@ -370,11 +522,11 @@
                     qrPollingInterval = null;
                     document.getElementById('qrCard').style.display = 'none';
                     document.getElementById('btnConectar').disabled = false;
-                    document.getElementById('btnConectar').innerHTML = '<i class="bi bi-power"></i> Conectar WhatsApp';
+                    document.getElementById('btnConectar').innerHTML = '<svg style="width: 20px; height: 20px; margin-right: 8px;" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Conectar WhatsApp';
                     verificarStatus();
                 }
             } catch (error) {
-                console.error('Erro ao obter QR Code:', error);
+                console.error('[ERRO] Ao obter QR Code:', error);
             }
         }
 
@@ -384,22 +536,25 @@
             }
 
             try {
+                console.log('[DESCONECTAR] Desconectando...');
+
                 const response = await fetch('/api/whatsapp/desconectar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
 
                 const data = await response.json();
+                console.log('[DESCONECTAR] Resposta:', data);
 
                 if (data.success) {
-                    alert('Desconectado com sucesso!');
+                    alert('✅ Desconectado com sucesso!');
                     verificarStatus();
                 } else {
-                    alert('Erro ao desconectar: ' + data.error);
+                    alert('❌ Erro ao desconectar: ' + (data.error || 'Erro desconhecido'));
                 }
             } catch (error) {
-                console.error('Erro ao desconectar:', error);
-                alert('Erro ao desconectar do WhatsApp');
+                console.error('[ERRO] Ao desconectar:', error);
+                alert('❌ Erro ao desconectar do WhatsApp');
             }
         }
 
@@ -408,13 +563,26 @@
             const testResult = document.getElementById('testResult');
 
             if (!testPhone) {
-                alert('Digite um número de telefone');
+                testResult.innerHTML = `
+                    <div style="background: var(--nexus-warning-light); border: 1px solid var(--nexus-warning); border-radius: var(--nexus-radius-md); padding: var(--nexus-space-md); display: flex; align-items: center; gap: var(--nexus-space-sm);">
+                        <svg style="width: 20px; height: 20px; color: var(--nexus-warning); flex-shrink: 0;" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        <span style="color: var(--nexus-warning-dark); font-weight: var(--nexus-font-medium);">Por favor, digite um número de telefone</span>
+                    </div>
+                `;
                 return;
             }
 
             try {
-                testResult.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split"></i> Enviando mensagem de teste...</div>';
-                testResult.style.display = 'block';
+                testResult.innerHTML = `
+                    <div style="background: var(--nexus-info-light); border: 1px solid var(--nexus-info); border-radius: var(--nexus-radius-md); padding: var(--nexus-space-md); display: flex; align-items: center; gap: var(--nexus-space-sm);">
+                        <div class="spinner" style="width: 20px; height: 20px; margin: 0; border-width: 2px;"></div>
+                        <span style="color: var(--nexus-info-dark); font-weight: var(--nexus-font-medium);">Enviando mensagem de teste...</span>
+                    </div>
+                `;
+
+                console.log('[TESTE] Enviando para:', testPhone);
 
                 const response = await fetch('/api/whatsapp/teste', {
                     method: 'POST',
@@ -423,15 +591,43 @@
                 });
 
                 const data = await response.json();
+                console.log('[TESTE] Resposta:', data);
 
                 if (data.success) {
-                    testResult.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> Mensagem enviada com sucesso!</div>';
+                    testResult.innerHTML = `
+                        <div style="background: var(--nexus-success-light); border: 1px solid var(--nexus-success); border-radius: var(--nexus-radius-md); padding: var(--nexus-space-md); display: flex; align-items: center; gap: var(--nexus-space-sm); animation: slideDown 0.3s ease-out;">
+                            <svg style="width: 20px; height: 20px; color: var(--nexus-success); flex-shrink: 0;" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                            <div>
+                                <div style="color: var(--nexus-success-dark); font-weight: var(--nexus-font-semibold); margin-bottom: 2px;">Mensagem enviada com sucesso!</div>
+                                <div style="color: var(--nexus-text-secondary); font-size: var(--nexus-text-xs);">Verifique o WhatsApp de ${testPhone}</div>
+                            </div>
+                        </div>
+                    `;
                 } else {
-                    testResult.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro: ${data.error}</div>`;
+                    testResult.innerHTML = `
+                        <div style="background: var(--nexus-danger-light); border: 1px solid var(--nexus-danger); border-radius: var(--nexus-radius-md); padding: var(--nexus-space-md); display: flex; align-items: center; gap: var(--nexus-space-sm);">
+                            <svg style="width: 20px; height: 20px; color: var(--nexus-danger); flex-shrink: 0;" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                            </svg>
+                            <div>
+                                <div style="color: var(--nexus-danger-dark); font-weight: var(--nexus-font-semibold);">Erro ao enviar</div>
+                                <div style="color: var(--nexus-text-secondary); font-size: var(--nexus-text-xs);">${data.error || 'Erro desconhecido'}</div>
+                            </div>
+                        </div>
+                    `;
                 }
             } catch (error) {
-                console.error('Erro ao enviar teste:', error);
-                testResult.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro ao enviar mensagem de teste</div>';
+                console.error('[ERRO] Ao enviar teste:', error);
+                testResult.innerHTML = `
+                    <div style="background: var(--nexus-danger-light); border: 1px solid var(--nexus-danger); border-radius: var(--nexus-radius-md); padding: var(--nexus-space-md); display: flex; align-items: center; gap: var(--nexus-space-sm);">
+                        <svg style="width: 20px; height: 20px; color: var(--nexus-danger); flex-shrink: 0;" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                        </svg>
+                        <span style="color: var(--nexus-danger-dark); font-weight: var(--nexus-font-medium);">Erro ao enviar mensagem de teste</span>
+                    </div>
+                `;
             }
         }
 
