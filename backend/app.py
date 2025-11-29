@@ -127,10 +127,10 @@ def create_app():
 
     @app.route('/crm/whatsapp')
     def crm_whatsapp():
-        """Conexão WhatsApp"""
+        """Conexão WhatsApp com Evolution API"""
         if 'usuario_id' not in session:
             return render_template('login-cliente.html')
-        return render_template('crm-cliente/whatsapp-wppconnect.html')
+        return render_template('crm-cliente/whatsapp-baileys.html')
 
     @app.route('/crm/whatsapp-baileys')
     def crm_whatsapp_baileys():
