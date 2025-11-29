@@ -49,11 +49,24 @@ const clientOptions = {
     '--disable-accelerated-2d-canvas',
     '--no-first-run',
     '--no-zygote',
-    '--disable-gpu'
+    '--disable-gpu',
+    '--single-process',
+    '--disable-extensions'
   ],
-  headless: true,
+  headless: 'new',
   logQR: false,
-  disableWelcome: true
+  disableWelcome: true,
+  // Usar Puppeteer instalado
+  puppeteerOptions: {
+    headless: 'new',
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--single-process'
+    ]
+  }
 };
 
 // ============================================================================

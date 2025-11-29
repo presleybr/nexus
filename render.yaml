@@ -90,7 +90,9 @@ services:
     region: oregon
     plan: starter
     rootDir: wppconnect
-    buildCommand: npm install
+    buildCommand: |
+      npm install
+      npx puppeteer browsers install chrome
     startCommand: npm start
     envVars:
       - key: PORT
@@ -103,6 +105,10 @@ services:
         sync: false  # Definir manualmente: https://nexus-wppconnect.onrender.com
       - key: BASE_URL
         sync: false  # Definir manualmente: https://nexus-wppconnect.onrender.com
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: false
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/.cache/puppeteer
     healthCheckPath: /
     autoDeploy: true
 
