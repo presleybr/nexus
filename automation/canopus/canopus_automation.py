@@ -1068,47 +1068,69 @@ class CanopusAutomation:
                     nonlocal pdf_bytes_interceptado, pdf_url_interceptado
                     request = route.request
                     url = request.url
+                    resource_type = request.resource_type
 
-                    logger.info(f"🔀 [CONTEXT ROUTE] Interceptando: {url[:100]}")
+                    # FILTRO: Só interceptar URLs que podem ser PDF
+                    # Deixar JS, CSS, imagens, etc. passarem normalmente
+                    is_potential_pdf = (
+                        'frmConCmImpressao' in url or
+                        url.endswith('.pdf') or
+                        '.pdf?' in url or
+                        resource_type == 'document'  # Document pode ser PDF
+                    )
+
+                    if not is_potential_pdf:
+                        # NÃO é PDF - continuar normalmente SEM interceptar
+                        await route.continue_()
+                        return
+
+                    logger.info(f"🔀 [CONTEXT ROUTE] Interceptando potencial PDF: {url[:100]}")
                     sys.stdout.flush()
 
-                    # Continuar com a requisição normalmente
-                    response = await route.fetch()
+                    try:
+                        # Continuar com a requisição normalmente
+                        response = await route.fetch()
 
-                    # Verificar se é PDF
-                    headers = response.headers
-                    content_type = headers.get('content-type', '').lower()
+                        # Verificar se é PDF
+                        headers = response.headers
+                        content_type = headers.get('content-type', '').lower()
 
-                    logger.info(f"🔀 [CONTEXT ROUTE] Content-Type: {content_type}, Status: {response.status}")
-                    sys.stdout.flush()
+                        logger.info(f"🔀 [CONTEXT ROUTE] Content-Type: {content_type}, Status: {response.status}")
+                        sys.stdout.flush()
 
-                    # Tentar capturar QUALQUER resposta de PDF
-                    if 'pdf' in content_type or 'frmConCmImpressao' in url:
-                        try:
-                            body = await response.body()
-                            logger.info(f"🔀 [CONTEXT ROUTE] PDF CAPTURADO: {len(body)} bytes ({len(body)/1024:.1f} KB)")
-                            sys.stdout.flush()
-
-                            # Verificar se é PDF real (começa com %PDF)
-                            if body.startswith(b'%PDF'):
-                                pdf_bytes_interceptado = body
-                                pdf_url_interceptado = url
-                                logger.info(f"✅ [CONTEXT ROUTE] PDF REAL confirmado!")
+                        # Tentar capturar se for PDF
+                        if 'pdf' in content_type:
+                            try:
+                                body = await response.body()
+                                logger.info(f"🔀 [CONTEXT ROUTE] PDF CAPTURADO: {len(body)} bytes ({len(body)/1024:.1f} KB)")
                                 sys.stdout.flush()
-                            else:
-                                preview = body[:100].decode('latin-1', errors='ignore')
-                                logger.warning(f"⚠️ [CONTEXT ROUTE] Não é PDF real: {preview}")
-                                sys.stdout.flush()
-                        except Exception as e_route_body:
-                            logger.warning(f"⚠️ [CONTEXT ROUTE] Erro ao ler body: {e_route_body}")
-                            sys.stdout.flush()
 
-                    # Passar resposta pro navegador
-                    await route.fulfill(response=response)
+                                # Verificar se é PDF real (começa com %PDF)
+                                if body.startswith(b'%PDF'):
+                                    pdf_bytes_interceptado = body
+                                    pdf_url_interceptado = url
+                                    logger.info(f"✅ [CONTEXT ROUTE] PDF REAL confirmado!")
+                                    sys.stdout.flush()
+                                else:
+                                    preview = body[:100].decode('latin-1', errors='ignore')
+                                    logger.warning(f"⚠️ [CONTEXT ROUTE] Não é PDF real: {preview}")
+                                    sys.stdout.flush()
+                            except Exception as e_route_body:
+                                logger.warning(f"⚠️ [CONTEXT ROUTE] Erro ao ler body: {e_route_body}")
+                                sys.stdout.flush()
+
+                        # Passar resposta pro navegador
+                        await route.fulfill(response=response)
+
+                    except Exception as e_route:
+                        # Se der erro no fetch, continuar normalmente
+                        logger.warning(f"⚠️ [CONTEXT ROUTE] Erro no fetch, continuando: {e_route}")
+                        sys.stdout.flush()
+                        await route.continue_()
 
                 # Registrar route handler NO CONTEXTO (intercepta TODAS as abas)
                 await self.context.route('**/*', route_pdf_context)
-                logger.info("🎯 Context route handler registrado ANTES de clicar")
+                logger.info("🎯 Context route handler registrado ANTES de clicar (filtra apenas PDFs)")
                 sys.stdout.flush()
 
                 async def capturar_nova_aba(page):
