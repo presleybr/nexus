@@ -1,11 +1,12 @@
 """
 Serviço de WhatsApp - Integração para envio de mensagens e PDFs
-INTEGRADO COM WPPCONNECT - Solução estável e confiável
+INTEGRADO COM PLAYWRIGHT - Roda no mesmo servidor, sem dependências externas
 """
 
 import os
 import time
 import json
+import asyncio
 from datetime import datetime
 from typing import Dict, Optional, List
 import sys
@@ -14,20 +15,52 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import Config
 from models import log_sistema, ClienteNexus
-from services.wppconnect_service import wppconnect_service
+from services.whatsapp_playwright import whatsapp_playwright_service
 
 
 class WhatsAppService:
-    """Serviço de integração com WhatsApp via WPPConnect"""
+    """Serviço de integração com WhatsApp via Playwright"""
 
     def __init__(self):
         self.session_dir = Config.WHATSAPP_PATH
-        self.wpp = wppconnect_service
+        self.wpp = whatsapp_playwright_service
         self.session_data = {}
+        self.loop = None
+
+    def _run_async(self, coro):
+        """Helper para rodar código async de forma síncrona"""
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return loop.run_until_complete(coro)
+
+    def conectar(self) -> Dict:
+        """
+        Inicia conexão com WhatsApp Web via Playwright
+
+        Returns:
+            Dict com status da operação
+        """
+        try:
+            resultado = self._run_async(self.wpp.iniciar())
+
+            if resultado.get('success'):
+                log_sistema('info', 'WhatsApp iniciado via Playwright', 'whatsapp', {})
+
+            return resultado
+
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Erro ao conectar: {str(e)}'
+            }
 
     def gerar_qr_code(self, cliente_nexus_id: int) -> Dict:
         """
-        Gera QR Code para conexão WhatsApp via WPPConnect
+        Gera QR Code para conexão WhatsApp via Playwright
 
         Args:
             cliente_nexus_id: ID do cliente Nexus
@@ -35,56 +68,56 @@ class WhatsAppService:
         Returns:
             Dicionário com dados do QR Code
         """
-        # Inicia a conexão no WPPConnect
-        resultado_start = self.wpp.iniciar_conexao()
+        try:
+            # Obtém o QR Code
+            resultado_qr = self._run_async(self.wpp.obter_qr_code())
 
-        if not resultado_start.get('success'):
-            log_sistema('error', f'Erro ao iniciar conexão: {resultado_start.get("error")}',
+            if resultado_qr.get('connected'):
+                # Já está conectado
+                phone = resultado_qr.get('phone')
+
+                log_sistema('success', f'WhatsApp já conectado: {phone}',
+                           'whatsapp', {'cliente_nexus_id': cliente_nexus_id})
+
+                return {
+                    'qr_code': None,
+                    'timestamp': datetime.now().isoformat(),
+                    'cliente_nexus_id': cliente_nexus_id,
+                    'status': 'conectado',
+                    'phone': phone
+                }
+
+            if resultado_qr.get('qr'):
+                # QR Code disponível
+                log_sistema('info', 'QR Code gerado via Playwright',
+                           'whatsapp', {'cliente_nexus_id': cliente_nexus_id})
+
+                return {
+                    'qr_code': resultado_qr.get('qr'),
+                    'timestamp': datetime.now().isoformat(),
+                    'cliente_nexus_id': cliente_nexus_id,
+                    'status': 'aguardando_conexao'
+                }
+
+            # QR Code ainda não disponível
+            return {
+                'qr_code': None,
+                'timestamp': datetime.now().isoformat(),
+                'cliente_nexus_id': cliente_nexus_id,
+                'status': 'aguardando',
+                'mensagem': resultado_qr.get('message', 'Aguarde enquanto o QR Code é gerado...')
+            }
+
+        except Exception as e:
+            log_sistema('error', f'Erro ao gerar QR Code: {str(e)}',
                        'whatsapp', {'cliente_nexus_id': cliente_nexus_id})
             return {
                 'qr_code': None,
                 'timestamp': datetime.now().isoformat(),
                 'cliente_nexus_id': cliente_nexus_id,
                 'status': 'erro',
-                'erro': resultado_start.get('error')
+                'erro': str(e)
             }
-
-        # Aguarda um pouco para o QR ser gerado
-        time.sleep(2)
-
-        # Obtém o QR Code
-        resultado_qr = self.wpp.obter_qr_code()
-
-        if resultado_qr.get('connected'):
-            # Já está conectado
-            return {
-                'qr_code': None,
-                'timestamp': datetime.now().isoformat(),
-                'cliente_nexus_id': cliente_nexus_id,
-                'status': 'conectado',
-                'phone': resultado_qr.get('phone')
-            }
-
-        if resultado_qr.get('qr'):
-            # QR Code disponível
-            log_sistema('info', 'QR Code gerado via WPPConnect',
-                       'whatsapp', {'cliente_nexus_id': cliente_nexus_id})
-
-            return {
-                'qr_code': resultado_qr.get('qr'),
-                'timestamp': datetime.now().isoformat(),
-                'cliente_nexus_id': cliente_nexus_id,
-                'status': 'aguardando_conexao'
-            }
-
-        # QR Code ainda não disponível
-        return {
-            'qr_code': None,
-            'timestamp': datetime.now().isoformat(),
-            'cliente_nexus_id': cliente_nexus_id,
-            'status': 'aguardando',
-            'mensagem': 'Aguarde enquanto o QR Code é gerado...'
-        }
 
     def verificar_conexao(self, cliente_nexus_id: int) -> bool:
         """
