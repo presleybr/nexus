@@ -329,19 +329,36 @@ class CanopusAutomation:
             logger.info("🔧 Configurando listeners de console e erros...")
             sys.stdout.flush()
 
+            # CRÍTICO: Funções reais ao invés de lambdas para poder fazer flush
+            def log_console(msg):
+                logger.info(f"🖥️  [BROWSER CONSOLE] [{msg.type}] {msg.text}")
+                sys.stdout.flush()
+
+            def log_page_error(exc):
+                logger.error(f"❌ [BROWSER ERROR] {exc}")
+                sys.stdout.flush()
+
+            def log_request(req):
+                logger.debug(f"📤 [REQUEST] {req.method} {req.url}")
+                sys.stdout.flush()
+
+            def log_response(res):
+                logger.debug(f"📥 [RESPONSE] {res.status} {res.url}")
+                sys.stdout.flush()
+
             # Listener de console - captura TODOS os console.log, console.warn, console.error da página
-            self.page.on("console", lambda msg: logger.info(f"🖥️  [BROWSER CONSOLE] [{msg.type}] {msg.text}"))
+            self.page.on("console", log_console)
 
             # Listener de erros de página - captura erros JavaScript e outros
-            self.page.on("pageerror", lambda exc: logger.error(f"❌ [BROWSER ERROR] {exc}"))
+            self.page.on("pageerror", log_page_error)
 
             # Listener de requests - útil para debug de chamadas de rede
-            self.page.on("request", lambda req: logger.debug(f"📤 [REQUEST] {req.method} {req.url}"))
+            self.page.on("request", log_request)
 
             # Listener de responses - útil para debug de respostas
-            self.page.on("response", lambda res: logger.debug(f"📥 [RESPONSE] {res.status} {res.url}"))
+            self.page.on("response", log_response)
 
-            logger.info("✅ Listeners configurados para logging em tempo real")
+            logger.info("✅ Listeners configurados para logging em tempo real com flush")
             sys.stdout.flush()
 
             # Configurar timeouts
@@ -1070,8 +1087,12 @@ class CanopusAutomation:
                     logger.info(f"📄 Nova aba detectada: {page.url}")
                     sys.stdout.flush()
 
-                    # Capturar logs do console JavaScript
-                    page.on('console', lambda msg: logger.info(f"[CONSOLE] {msg.text}"))
+                    # Capturar logs do console JavaScript COM FLUSH
+                    def log_console_popup(msg):
+                        logger.info(f"[CONSOLE] {msg.text}")
+                        sys.stdout.flush()
+
+                    page.on('console', log_console_popup)
 
                     # ESTRATÉGIA AGRESSIVA: Usar page.route() para interceptar PDF ANTES do navegador processar
                     async def route_pdf(route):
@@ -1119,14 +1140,22 @@ class CanopusAutomation:
                     logger.info("🎯 Handler de PDF registrado na nova aba")
                     sys.stdout.flush()
 
-                    # Log de navegação
-                    page.on('framenavigated', lambda frame: logger.info(f"🧭 [NAV] Frame navegou: {frame.url[:100]}"))
+                    # Log de navegação COM FLUSH
+                    def log_frame_nav(frame):
+                        logger.info(f"🧭 [NAV] Frame navegou: {frame.url[:100]}")
+                        sys.stdout.flush()
+
+                    page.on('framenavigated', log_frame_nav)
                     logger.info("🎯 Listeners de navegação registrados")
                     sys.stdout.flush()
 
                 self.context.on('page', capturar_nova_aba)
 
                 # Clicar no botão
+                total_abas_antes = len(self.context.pages)
+                logger.info(f"🔍 DEBUG: Total de abas ANTES do click: {total_abas_antes}")
+                sys.stdout.flush()
+
                 await self.page.click(botao_emitir)
                 logger.info("✅ Clique executado")
                 sys.stdout.flush()
@@ -1136,9 +1165,18 @@ class CanopusAutomation:
                 while not nova_aba_pdf and contador < 30:  # 3 segundos
                     await asyncio.sleep(0.1)
                     contador += 1
+                    # Log a cada segundo
+                    if contador % 10 == 0:
+                        total_abas_agora = len(self.context.pages)
+                        logger.info(f"🔍 DEBUG: Aguardando nova aba... ({contador/10:.1f}s) - Abas abertas: {total_abas_agora}")
+                        sys.stdout.flush()
 
                 # Remover listener
                 self.context.remove_listener('page', capturar_nova_aba)
+
+                total_abas_depois = len(self.context.pages)
+                logger.info(f"🔍 DEBUG: Total de abas DEPOIS: {total_abas_depois} | Nova aba capturada: {nova_aba_pdf is not None}")
+                sys.stdout.flush()
 
                 if not nova_aba_pdf:
                     logger.error("❌ Nova aba com PDF não abriu")
@@ -1195,16 +1233,33 @@ class CanopusAutomation:
 
                             # CRÍTICO: Aguardar a aba navegar de about:blank para URL real
                             # Tentar até 10 segundos
+                            logger.info("🔍 DEBUG: Iniciando aguardo de navegação da aba popup...")
+                            sys.stdout.flush()
+
+                            url_navegada = False
                             for i in range(50):  # 50 x 200ms = 10 segundos
                                 url_atual = nova_aba_pdf.url
                                 if url_atual and url_atual != 'about:blank':
                                     logger.info(f"✅ Aba navegou para: {url_atual[:100]}")
                                     sys.stdout.flush()
+                                    url_navegada = True
                                     break
                                 if i % 10 == 0 and i > 0:
                                     logger.info(f"⏳ Ainda em about:blank... ({i*0.2:.1f}s)")
                                     sys.stdout.flush()
                                 await asyncio.sleep(0.2)
+
+                            # Se navegou, aguardar load state
+                            if url_navegada:
+                                try:
+                                    logger.info("🔍 DEBUG: Aguardando load state 'networkidle'...")
+                                    sys.stdout.flush()
+                                    await nova_aba_pdf.wait_for_load_state('networkidle', timeout=5000)
+                                    logger.info("✅ Load state 'networkidle' alcançado!")
+                                    sys.stdout.flush()
+                                except Exception as e_load:
+                                    logger.warning(f"⚠️ Timeout no load state (ok, continuando): {e_load}")
+                                    sys.stdout.flush()
 
                             # Aguardar mais um pouco após navegação
                             await asyncio.sleep(2)
@@ -1219,8 +1274,22 @@ class CanopusAutomation:
                                 titulo = await nova_aba_pdf.title()
                                 logger.info(f"📄 Título da página: {titulo}")
                                 sys.stdout.flush()
-                            except:
-                                pass
+
+                                # DEBUG: Se ainda está em about:blank, capturar HTML
+                                if url_atual == 'about:blank':
+                                    logger.warning("⚠️ Aba ainda está em about:blank após aguardar!")
+                                    logger.warning("🔍 Tentando capturar HTML da aba...")
+                                    sys.stdout.flush()
+                                    try:
+                                        html_content = await nova_aba_pdf.content()
+                                        logger.info(f"🔍 HTML da aba (primeiros 500 chars): {html_content[:500]}")
+                                        sys.stdout.flush()
+                                    except Exception as e_html:
+                                        logger.error(f"❌ Erro ao capturar HTML: {e_html}")
+                                        sys.stdout.flush()
+                            except Exception as e_titulo:
+                                logger.warning(f"⚠️ Erro ao obter título: {e_titulo}")
+                                sys.stdout.flush()
 
                             # Se a URL contém PDF ou é a página de impressão, tentar extrair
                             if 'frmConCmImpressao' in url_atual or 'pdf' in url_atual.lower():
