@@ -34,19 +34,35 @@ const clientOptions = {
   },
   // Callback de status da sessão
   statusFind: (statusSession, session) => {
-    console.log('📊 Status da sessão:', statusSession, session);
+    console.log('========================================');
+    console.log('📊 [STATUS-CALLBACK] statusFind CHAMADO!');
+    console.log('📊 [STATUS-CALLBACK] statusSession:', statusSession);
+    console.log('📊 [STATUS-CALLBACK] session:', session);
+    console.log('📊 [STATUS-CALLBACK] Type:', typeof statusSession);
+    console.log('========================================');
 
     if (statusSession === 'isLogged') {
       isConnected = true;
       qrCode = null;
-      console.log('✅ WhatsApp conectado!');
+      console.log('✅✅✅ [STATUS-CALLBACK] WhatsApp CONECTADO! isConnected = true');
     } else if (statusSession === 'notLogged') {
       isConnected = false;
-      console.log('⚠️ WhatsApp desconectado');
+      console.log('⚠️ [STATUS-CALLBACK] WhatsApp desconectado, isConnected = false');
     } else if (statusSession === 'qrReadSuccess') {
-      console.log('📱 QR Code lido com sucesso! Aguardando confirmação...');
+      console.log('📱 [STATUS-CALLBACK] QR Code lido! Aguardando confirmação...');
+      // Iniciar polling para verificar conexão
+      setTimeout(() => checkConnectionStatus(), 2000);
     } else if (statusSession === 'qrReadFail') {
-      console.log('❌ Falha ao ler QR Code');
+      console.log('❌ [STATUS-CALLBACK] Falha ao ler QR Code');
+    } else if (statusSession === 'autocloseCalled') {
+      console.log('🔄 [STATUS-CALLBACK] AutoClose chamado');
+    } else if (statusSession === 'desconnectedMobile') {
+      isConnected = false;
+      console.log('📱 [STATUS-CALLBACK] Desconectado do celular');
+    } else if (statusSession === 'browserClose') {
+      console.log('🌐 [STATUS-CALLBACK] Browser fechado');
+    } else {
+      console.log('⚠️ [STATUS-CALLBACK] Status desconhecido:', statusSession);
     }
   },
   headless: true,
@@ -55,7 +71,7 @@ const clientOptions = {
   logQR: true,  // Mostrar QR no console também
   disableWelcome: true,
   updatesLog: false,
-  autoClose: 120000,  // 2 minutos ao invés de 1
+  autoClose: false,  // DESABILITADO - não fechar automaticamente
   // Configurações do Puppeteer para Alpine Linux (Render)
   puppeteerOptions: {
     headless: true,
@@ -97,7 +113,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Iniciar sessão (modo assíncrono - não bloqueia)
+// Iniciar sessão (agora apenas verifica/retorna status)
 app.post('/start', async (req, res) => {
   try {
     console.log('📥 [START] Requisição recebida');
@@ -107,69 +123,34 @@ app.post('/start', async (req, res) => {
       return res.json({
         success: true,
         message: 'WhatsApp já está conectado',
-        connected: true
+        connected: true,
+        phone: phoneNumber
       });
     }
 
     if (client) {
-      console.log('⏳ [START] Cliente já está inicializando');
+      console.log('⏳ [START] Cliente inicializado, aguardando QR Code');
       return res.json({
         success: true,
-        message: 'Sessão já está sendo iniciada. Use /qr para obter o QR Code.',
+        message: 'Cliente inicializado. Use /qr para obter o QR Code.',
         connected: false,
         initializing: true
       });
     }
 
-    console.log('🚀 [START] Iniciando cliente WhatsApp de forma assíncrona...');
-    console.log('🔧 [START] Opções do cliente:', {
-      session: clientOptions.session,
-      headless: clientOptions.headless,
-      logQR: clientOptions.logQR,
-      autoClose: clientOptions.autoClose
-    });
+    // Se não tem cliente, iniciar agora
+    console.log('🚀 [START] Cliente não existe, iniciando...');
+    initializeWhatsAppClient();
 
-    // Responde IMEDIATAMENTE (não aguarda o Chromium iniciar)
     res.json({
       success: true,
-      message: 'Iniciando sessão... Use /qr para obter o QR Code.',
+      message: 'Inicializando cliente WhatsApp... Use /qr para obter o QR Code.',
       connected: false,
       initializing: true
     });
 
-    // Inicializa em background (não bloqueia a resposta)
-    console.log('🔄 [START] Chamando wppconnect.create()...');
-
-    wppconnect.create(clientOptions)
-      .then(createdClient => {
-        console.log('✅ [THEN] wppconnect.create() resolvido!');
-        console.log('📦 [THEN] Tipo do cliente:', typeof createdClient);
-        console.log('🔍 [THEN] Cliente tem página?', !!createdClient.page);
-
-        client = createdClient;
-        console.log('✅ Cliente WhatsApp criado com sucesso!');
-
-        // Iniciar captura agressiva de QR Code
-        startQRCodeCapture();
-
-        // Obter informações do número (se já conectado)
-        client.getHostDevice()
-          .then(hostDevice => {
-            phoneNumber = hostDevice.id.user;
-            console.log(`📱 Conectado como: ${phoneNumber}`);
-          })
-          .catch(err => {
-            console.log('ℹ️ Aguardando conexão via QR Code...');
-          });
-      })
-      .catch(error => {
-        console.error('❌ [CATCH] Erro ao iniciar cliente WhatsApp:', error);
-        console.error('📋 [CATCH] Stack:', error.stack);
-        client = null;
-      });
-
   } catch (error) {
-    console.error('❌ [ERROR] Erro ao processar requisição /start:', error);
+    console.error('❌ [START-ERROR] Erro:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -325,7 +306,13 @@ app.get('/qr', async (req, res) => {
 // Verificar status
 app.get('/status', async (req, res) => {
   try {
+    console.log('🔍 [/status] Verificando status...');
+    console.log('🔍 [/status] isConnected:', isConnected);
+    console.log('🔍 [/status] client exists:', !!client);
+    console.log('🔍 [/status] phoneNumber:', phoneNumber);
+
     if (!client) {
+      console.log('⚠️ [/status] Cliente não inicializado');
       return res.json({
         success: true,
         connected: false,
@@ -334,15 +321,32 @@ app.get('/status', async (req, res) => {
     }
 
     const connectionState = await client.getConnectionState();
+    console.log('🔍 [/status] connectionState:', connectionState);
+
+    // Verificar se está realmente conectado
+    try {
+      const hostDevice = await client.getHostDevice();
+      console.log('📱 [/status] hostDevice obtido:', hostDevice.id.user);
+      phoneNumber = hostDevice.id.user;
+      isConnected = true;
+      qrCode = null; // Limpar QR Code quando conectado
+    } catch (err) {
+      console.log('⚠️ [/status] Não foi possível obter hostDevice:', err.message);
+    }
+
+    const finalConnected = isConnected && connectionState === 'CONNECTED';
+    console.log('✅ [/status] Retornando connected:', finalConnected);
 
     res.json({
       success: true,
-      connected: isConnected && connectionState === 'CONNECTED',
+      connected: finalConnected,
       phone: phoneNumber,
-      state: connectionState
+      state: connectionState,
+      hasQR: !!qrCode
     });
 
   } catch (error) {
+    console.error('❌ [/status] Erro:', error.message);
     res.json({
       success: false,
       connected: false,
@@ -482,7 +486,130 @@ app.listen(PORT, () => {
   console.log('  POST /send-text - Enviar mensagem');
   console.log('  POST /send-file - Enviar arquivo');
   console.log('  POST /logout - Desconectar');
+
+  // INICIAR CLIENTE AUTOMATICAMENTE AO SUBIR O SERVIDOR
+  console.log('\n🔄 [AUTO-START] Iniciando cliente WhatsApp automaticamente...');
+  console.log('🔧 [AUTO-START] Opções:', {
+    session: clientOptions.session,
+    headless: clientOptions.headless,
+    logQR: clientOptions.logQR,
+    autoClose: clientOptions.autoClose
+  });
+
+  initializeWhatsAppClient();
 });
+
+/**
+ * Verifica periodicamente se a conexão foi estabelecida
+ */
+function checkConnectionStatus() {
+  console.log('🔄 [CHECK-CONN] Verificando conexão...');
+
+  if (!client) {
+    console.log('⚠️ [CHECK-CONN] Cliente não disponível');
+    return;
+  }
+
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  const checkInterval = setInterval(async () => {
+    attempts++;
+    console.log(`🔄 [CHECK-CONN] Tentativa ${attempts}/${maxAttempts}`);
+
+    try {
+      const connectionState = await client.getConnectionState();
+      console.log(`🔍 [CHECK-CONN] connectionState: ${connectionState}`);
+
+      if (connectionState === 'CONNECTED') {
+        console.log('✅✅✅ [CHECK-CONN] CONECTADO DETECTADO!');
+        clearInterval(checkInterval);
+
+        try {
+          const hostDevice = await client.getHostDevice();
+          phoneNumber = hostDevice.id.user;
+          isConnected = true;
+          qrCode = null;
+          console.log(`📱 [CHECK-CONN] Número: ${phoneNumber}`);
+          console.log('✅ [CHECK-CONN] isConnected = true, qrCode = null');
+        } catch (err) {
+          console.error('❌ [CHECK-CONN] Erro ao obter hostDevice:', err.message);
+        }
+      } else if (attempts >= maxAttempts) {
+        console.log('⏱️ [CHECK-CONN] Timeout - max tentativas atingido');
+        clearInterval(checkInterval);
+      }
+    } catch (err) {
+      console.error(`❌ [CHECK-CONN] Erro:`, err.message);
+    }
+  }, 2000); // Verificar a cada 2 segundos
+}
+
+// Função para inicializar cliente WhatsApp
+function initializeWhatsAppClient() {
+  console.log('🚀 [INIT] Criando cliente WhatsApp...');
+
+  wppconnect.create(clientOptions)
+    .then(createdClient => {
+      console.log('✅ [INIT-THEN] wppconnect.create() RESOLVIDO!');
+      console.log('📦 [INIT-THEN] Cliente criado com sucesso!');
+      console.log('🔍 [INIT-THEN] Cliente tem página?', !!createdClient.page);
+
+      client = createdClient;
+
+      // Adicionar listeners de eventos
+      console.log('📡 [INIT] Registrando event listeners...');
+
+      // Listener para mudanças de estado
+      if (client.onStateChange) {
+        client.onStateChange((state) => {
+          console.log('🔔 [EVENT] onStateChange:', state);
+          if (state === 'CONNECTED') {
+            isConnected = true;
+            qrCode = null;
+            console.log('✅ [EVENT] Conectado via onStateChange!');
+          }
+        });
+      }
+
+      // Listener para quando autenticado
+      if (client.onAuthenticated) {
+        client.onAuthenticated(() => {
+          console.log('🔔 [EVENT] onAuthenticated disparado!');
+          isConnected = true;
+          qrCode = null;
+          checkConnectionStatus();
+        });
+      }
+
+      // Iniciar captura agressiva de QR Code
+      console.log('🎯 [INIT] Iniciando captura de QR Code...');
+      startQRCodeCapture();
+
+      // Tentar obter informações (se já conectado)
+      client.getHostDevice()
+        .then(hostDevice => {
+          phoneNumber = hostDevice.id.user;
+          isConnected = true;
+          qrCode = null;
+          console.log(`📱 [INIT] Conectado como: ${phoneNumber}`);
+        })
+        .catch(err => {
+          console.log('ℹ️ [INIT] Aguardando conexão via QR Code...');
+        });
+    })
+    .catch(error => {
+      console.error('❌ [INIT-CATCH] ERRO ao criar cliente:', error.message);
+      console.error('📋 [INIT-CATCH] Stack:', error.stack);
+      client = null;
+
+      // Tentar novamente em 10 segundos
+      console.log('⏳ [INIT] Tentando novamente em 10 segundos...');
+      setTimeout(() => {
+        initializeWhatsAppClient();
+      }, 10000);
+    });
+}
 
 // Tratamento de erros
 process.on('unhandledRejection', (error) => {
