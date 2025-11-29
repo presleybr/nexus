@@ -1320,7 +1320,7 @@ def ativar_disparo_completo():
         nome_empresa = cliente_nexus[0]['nome_empresa'] if cliente_nexus else 'Nexus'
 
         # Enviar notificação de INÍCIO para Nexus
-        from services.whatsapp_service import whatsapp_service
+        from services.whatsapp_evolution import whatsapp_service
         from routes.crm_disparo_individual import buscar_numeros_notificacao
         numeros_notificacao = buscar_numeros_notificacao(cliente_nexus_id)
 
