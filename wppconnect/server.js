@@ -110,11 +110,6 @@ async function criarTabelaWhatsAppStatus() {
   }
 }
 
-// Inicializar banco de dados
-if (process.env.DATABASE_URL) {
-  initializeDatabasePool();
-}
-
 // Middlewares
 app.use(cors());
 app.use(bodyParser.json());
@@ -161,10 +156,22 @@ const clientOptions = {
       console.log('❌ [STATUS-CALLBACK] Falha ao ler QR Code');
     } else if (statusSession === 'autocloseCalled') {
       console.log('🔄 [STATUS-CALLBACK] AutoClose chamado');
-    } else if (statusSession === 'desconnectedMobile') {
+    } else if (statusSession === 'desconnectedMobile' || statusSession === 'disconnectedMobile') {
       isConnected = false;
-      console.log('📱 [STATUS-CALLBACK] Desconectado do celular');
-      saveWhatsAppStatus(false, null, null);
+      console.log('📱 [STATUS-CALLBACK] Desconectado do celular - Tentando reconectar...');
+      saveWhatsAppStatus(false, phoneNumber, null);
+
+      // Não fechar o cliente, apenas aguardar reconexão
+      setTimeout(() => {
+        if (!isConnected) {
+          console.log('🔄 [STATUS-CALLBACK] Ainda desconectado, tentando reiniciar cliente...');
+          if (client) {
+            client.close().catch(e => console.log('⚠️ Erro ao fechar:', e.message));
+          }
+          client = null;
+          setTimeout(() => initializeWhatsAppClient(), 5000);
+        }
+      }, 30000); // Aguardar 30s para reconexão natural antes de forçar
     } else if (statusSession === 'browserClose') {
       console.log('🌐 [STATUS-CALLBACK] Browser fechado');
     } else {
@@ -525,9 +532,18 @@ app.post('/send-text', async (req, res) => {
 // Enviar arquivo
 app.post('/send-file', async (req, res) => {
   try {
-    const { phone, filePath, caption } = req.body;
+    console.log('📥 [/send-file] Requisição recebida');
+    const { phone, filePath, caption, filename } = req.body;
+
+    console.log('📊 [/send-file] Dados:', {
+      phone,
+      filePath: filePath ? filePath.substring(0, 50) + '...' : null,
+      caption: caption ? caption.substring(0, 30) + '...' : null,
+      filename
+    });
 
     if (!phone || !filePath) {
+      console.log('❌ [/send-file] Phone ou filePath faltando');
       return res.status(400).json({
         success: false,
         error: 'Phone e filePath são obrigatórios'
@@ -535,32 +551,57 @@ app.post('/send-file', async (req, res) => {
     }
 
     if (!client || !isConnected) {
+      console.log('❌ [/send-file] Cliente não conectado');
       return res.status(400).json({
         success: false,
-        error: 'WhatsApp não está conectado'
+        error: 'WhatsApp não está conectado. Por favor, escaneie o QR Code.'
       });
     }
 
+    // Verificar se arquivo existe
+    const fs = require('fs');
+    const path = require('path');
+
+    if (!fs.existsSync(filePath)) {
+      console.log('❌ [/send-file] Arquivo não encontrado:', filePath);
+      return res.status(404).json({
+        success: false,
+        error: `Arquivo não encontrado: ${filePath}`
+      });
+    }
+
+    const fileSize = fs.statSync(filePath).size;
+    console.log('📄 [/send-file] Arquivo encontrado, tamanho:', fileSize, 'bytes');
+
     // Formatar número
     const formattedNumber = phone.includes('@c.us') ? phone : `${phone}@c.us`;
+    console.log('📞 [/send-file] Enviando para:', formattedNumber);
 
     const result = await client.sendFile(
       formattedNumber,
       filePath,
-      null,
+      filename || path.basename(filePath),
       caption || ''
     );
 
-    console.log(`✅ Arquivo enviado para ${phone}`);
+    console.log(`✅ [/send-file] Arquivo enviado com sucesso para ${phone}`);
+    console.log('📋 [/send-file] Result:', {
+      id: result?.id,
+      ack: result?.ack,
+      from: result?.from
+    });
 
     res.json({
       success: true,
       messageId: result.id,
-      numero: phone
+      numero: phone,
+      arquivo: filename || path.basename(filePath),
+      tamanho: fileSize
     });
 
   } catch (error) {
-    console.error('❌ Erro ao enviar arquivo:', error);
+    console.error('❌ [/send-file] Erro ao enviar arquivo:', error.message);
+    console.error('📋 [/send-file] Stack:', error.stack);
     res.status(500).json({
       success: false,
       error: error.message
@@ -607,33 +648,50 @@ app.post('/logout', async (req, res) => {
 // INICIAR SERVIDOR
 // ============================================================================
 
-app.listen(PORT, () => {
-  console.log('🚀 WPPConnect Server para Nexus CRM');
-  console.log(`📡 Servidor rodando na porta: ${PORT}`);
-  console.log(`🔑 Secret Key: ${SECRET_KEY !== 'CHANGE_SECRET_KEY' ? 'Configurada ✅' : 'ALTERE! ⚠️'}`);
-  console.log('📱 Pronto para conectar WhatsApp!');
-  console.log('\nEndpoints disponíveis:');
-  console.log('  GET  / - Health check');
-  console.log('  POST /start - Iniciar sessão');
-  console.log('  GET  /qr - Obter QR Code');
-  console.log('  GET  /status - Status da conexão');
-  console.log('  POST /send-text - Enviar mensagem');
-  console.log('  POST /send-file - Enviar arquivo');
-  console.log('  POST /logout - Desconectar');
+async function startServer() {
+  // 1. Inicializar banco de dados PRIMEIRO
+  if (process.env.DATABASE_URL) {
+    console.log('\n📊 [STARTUP] Inicializando conexão com PostgreSQL...');
+    await initializeDatabasePool();
+  } else {
+    console.log('\n⚠️ [STARTUP] DATABASE_URL não configurado - funcionando SEM persistência');
+  }
 
-  // INICIAR CLIENTE AUTOMATICAMENTE AO SUBIR O SERVIDOR
-  console.log('\n🔄 [AUTO-START] Iniciando cliente WhatsApp automaticamente...');
-  console.log('🔧 [AUTO-START] Opções:', {
-    session: clientOptions.session,
-    headless: clientOptions.headless,
-    logQR: clientOptions.logQR,
-    autoClose: clientOptions.autoClose
+  // 2. Iniciar servidor HTTP
+  app.listen(PORT, () => {
+    console.log('\n🚀 WPPConnect Server para Nexus CRM');
+    console.log(`📡 Servidor rodando na porta: ${PORT}`);
+    console.log(`🔑 Secret Key: ${SECRET_KEY !== 'CHANGE_SECRET_KEY' ? 'Configurada ✅' : 'ALTERE! ⚠️'}`);
+    console.log('📱 Pronto para conectar WhatsApp!');
+    console.log('\nEndpoints disponíveis:');
+    console.log('  GET  / - Health check');
+    console.log('  POST /start - Iniciar sessão');
+    console.log('  GET  /qr - Obter QR Code');
+    console.log('  GET  /status - Status da conexão');
+    console.log('  POST /send-text - Enviar mensagem');
+    console.log('  POST /send-file - Enviar arquivo');
+    console.log('  POST /logout - Desconectar');
+
+    // 3. INICIAR CLIENTE AUTOMATICAMENTE AO SUBIR O SERVIDOR
+    console.log('\n🔄 [AUTO-START] Iniciando cliente WhatsApp automaticamente...');
+    console.log('🔧 [AUTO-START] Opções:', {
+      session: clientOptions.session,
+      headless: clientOptions.headless,
+      logQR: clientOptions.logQR,
+      autoClose: clientOptions.autoClose
+    });
+
+    // Limpar lock files antes de iniciar
+    cleanChromiumLocks();
+
+    initializeWhatsAppClient();
   });
+}
 
-  // Limpar lock files antes de iniciar
-  cleanChromiumLocks();
-
-  initializeWhatsAppClient();
+// Iniciar servidor
+startServer().catch(err => {
+  console.error('❌ Erro ao iniciar servidor:', err);
+  process.exit(1);
 });
 
 /**
