@@ -1179,30 +1179,45 @@ class CanopusAutomation:
                 try:
                     pdf_bytes = None
 
-                    # Aguardar até 20 segundos pelo interceptador pegar o PDF real (mais tempo para Render)
-                    logger.info("⏳ Aguardando interceptador capturar PDF real (até 20s)...")
+                    # CRÍTICO: Aguardar PDF REAL (170KB), não HTML redirect (678 bytes)!
+                    TAMANHO_MINIMO_PDF_REAL = 150000  # 150KB - boletos Canopus têm ~170KB
+
+                    logger.info("⏳ Aguardando interceptador capturar PDF REAL (até 20s)...")
+                    logger.info(f"   Tamanho mínimo: {TAMANHO_MINIMO_PDF_REAL/1024:.0f} KB (ignora HTMLs de 678 bytes)")
                     sys.stdout.flush()
+
                     for tentativa in range(200):  # 200 x 100ms = 20 segundos
-                        if pdf_bytes_interceptado and len(pdf_bytes_interceptado) > 10000:
+                        # Só aceitar se for PDF REAL (> 150KB), não HTML pequeno!
+                        if pdf_bytes_interceptado and len(pdf_bytes_interceptado) > TAMANHO_MINIMO_PDF_REAL:
                             pdf_bytes = pdf_bytes_interceptado
-                            logger.info(f"✅ PDF INTERCEPTADO: {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
+                            logger.info(f"✅ PDF REAL INTERCEPTADO: {len(pdf_bytes)} bytes ({len(pdf_bytes)/1024:.1f} KB)")
                             logger.info(f"   URL: {pdf_url_interceptado[:80] if pdf_url_interceptado else 'N/A'}")
                             sys.stdout.flush()
                             break
 
-                        # Log a cada 5 segundos
+                        # Log a cada 5 segundos mostrando o que capturou
                         if tentativa % 50 == 0 and tentativa > 0:
-                            logger.info(f"⏳ Ainda aguardando... ({tentativa/10:.0f}s)")
+                            if pdf_bytes_interceptado:
+                                tamanho_kb = len(pdf_bytes_interceptado) / 1024
+                                logger.info(f"⏳ Aguardando PDF REAL... ({tentativa/10:.0f}s)")
+                                logger.info(f"   Capturado: {tamanho_kb:.1f} KB - Aguardando >{TAMANHO_MINIMO_PDF_REAL/1024:.0f} KB")
+                            else:
+                                logger.info(f"⏳ Aguardando... ({tentativa/10:.0f}s) - Nada capturado ainda")
                             sys.stdout.flush()
 
                         await asyncio.sleep(0.1)
 
                     # Log do resultado da espera
                     if pdf_bytes_interceptado:
-                        logger.warning(f"⚠️ PDF interceptado mas muito pequeno: {len(pdf_bytes_interceptado)} bytes")
+                        tamanho_kb = len(pdf_bytes_interceptado) / 1024
+                        if len(pdf_bytes_interceptado) < TAMANHO_MINIMO_PDF_REAL:
+                            logger.warning(f"⚠️ PDF interceptado mas é HTML redirect pequeno: {tamanho_kb:.1f} KB")
+                            logger.warning(f"   Esperava PDF real (>{TAMANHO_MINIMO_PDF_REAL/1024:.0f} KB)")
+                        else:
+                            logger.warning(f"⚠️ PDF interceptado: {tamanho_kb:.1f} KB")
                         sys.stdout.flush()
                     else:
-                        logger.warning(f"⚠️ Nenhum PDF foi interceptado após 10s de espera")
+                        logger.warning(f"⚠️ Nenhum PDF foi interceptado após 20s de espera")
                         logger.info(f"📊 Respostas capturadas: {len(todas_respostas_pdf)}")
                         sys.stdout.flush()
 
@@ -1500,26 +1515,30 @@ class CanopusAutomation:
                             sys.stdout.flush()
                             pdf_bytes = None
 
-                    # VALIDAÇÃO CRÍTICA: Verificar se extraiu PDF válido
-                    TAMANHO_MINIMO_PDF = 20000  # 20KB - boletos devem ter pelo menos isso
+                    # VALIDAÇÃO CRÍTICA: Verificar se extraiu PDF REAL (não HTML de 678 bytes)
+                    TAMANHO_MINIMO_PDF_REAL = 150000  # 150KB - boletos Canopus têm ~170KB
 
                     if not pdf_bytes:
                         logger.error("❌ ERRO CRÍTICO: Nenhum PDF foi extraído!")
                         logger.error("   O embed do PDF não carregou ou não foi possível fazer fetch")
+                        sys.stdout.flush()
                         raise Exception("Falha ao extrair PDF do Canopus - nenhum dado recebido")
 
                     tamanho_kb = len(pdf_bytes) / 1024
                     logger.info(f"📊 PDF extraído: {len(pdf_bytes)} bytes ({tamanho_kb:.1f} KB)")
+                    sys.stdout.flush()
 
-                    if len(pdf_bytes) < TAMANHO_MINIMO_PDF:
-                        logger.error(f"❌ ERRO CRÍTICO: PDF muito pequeno ({tamanho_kb:.1f} KB)")
-                        logger.error(f"   Tamanho mínimo esperado: {TAMANHO_MINIMO_PDF/1024:.1f} KB")
-                        logger.error(f"   Isso geralmente indica que o PDF não foi carregado corretamente")
+                    if len(pdf_bytes) < TAMANHO_MINIMO_PDF_REAL:
+                        logger.error(f"❌ ERRO CRÍTICO: PDF muito pequeno - é HTML redirect, não PDF real!")
+                        logger.error(f"   Tamanho capturado: {tamanho_kb:.1f} KB")
+                        logger.error(f"   Tamanho mínimo esperado: {TAMANHO_MINIMO_PDF_REAL/1024:.0f} KB")
+                        logger.error(f"   Isso indica que capturamos o HTML do popup (678 bytes), não o PDF real (170KB)")
                         logger.error(f"   Possíveis causas:")
-                        logger.error(f"     1. Embed do PDF não carregou completamente")
-                        logger.error(f"     2. URL do PDF estava incorreta")
-                        logger.error(f"     3. Problema de rede/timeout")
-                        raise Exception(f"PDF inválido - tamanho muito pequeno ({tamanho_kb:.1f} KB < {TAMANHO_MINIMO_PDF/1024:.1f} KB)")
+                        logger.error(f"     1. PDF não carregou no embed dentro de 20 segundos")
+                        logger.error(f"     2. Sistema Canopus está lento")
+                        logger.error(f"     3. Bloqueio de popup impediu carregamento do PDF")
+                        sys.stdout.flush()
+                        raise Exception(f"PDF inválido - HTML redirect ({tamanho_kb:.1f} KB) ao invés de PDF real (>{TAMANHO_MINIMO_PDF_REAL/1024:.0f} KB)")
 
                     # Validar que é realmente um PDF (bytes começam com %PDF)
                     if not pdf_bytes.startswith(b'%PDF'):
