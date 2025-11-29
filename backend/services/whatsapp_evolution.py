@@ -93,7 +93,7 @@ class WhatsAppEvolution:
     def obter_qr(self):
         """Obtém QR Code da instância"""
         try:
-            endpoint = f'/instance/qrcode/{self.instance_name}'
+            endpoint = f'/instance/connect/{self.instance_name}'
             result = self._make_request('GET', endpoint)
 
             if 'error' in result:
