@@ -1270,13 +1270,23 @@ def ativar_disparo_completo():
     try:
         cliente_nexus_id = session.get('cliente_nexus_id')
 
+        # LIMPAR DISPAROS TRAVADOS (mais de 10 minutos em andamento = erro)
+        db.execute_update("""
+            UPDATE historico_disparos
+            SET status = 'erro',
+                detalhes = 'Disparo finalizado automaticamente (travado por mais de 10 minutos)'
+            WHERE cliente_nexus_id = %s
+            AND status = 'em_andamento'
+            AND horario_execucao < NOW() - INTERVAL '10 minutes'
+        """, (cliente_nexus_id,))
+
         # VERIFICAR SE JÁ TEM DISPARO RODANDO (evita duplicação)
         disparo_em_andamento = db.execute_query("""
             SELECT COUNT(*) as count
             FROM historico_disparos
             WHERE cliente_nexus_id = %s
             AND status = 'em_andamento'
-            AND horario_execucao > NOW() - INTERVAL '2 hours'
+            AND horario_execucao > NOW() - INTERVAL '10 minutes'
         """, (cliente_nexus_id,))
 
         if disparo_em_andamento and disparo_em_andamento[0]['count'] > 0:

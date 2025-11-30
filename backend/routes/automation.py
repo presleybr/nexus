@@ -122,19 +122,19 @@ def get_historico():
         historico_formatado = []
         for item in historico:
             historico_formatado.append({
-                'id': item[0],
-                'tipo_automacao': item[1],
-                'total_processados': item[2],
-                'total_sucessos': item[3],
-                'total_erros': item[4],
-                'data_execucao': item[5],
-                'tempo_execucao_segundos': item[6] if item[6] else 0,
-                'detalhes': item[7],
-                'status': item[8],
-                'total_boletos_processados': item[9] or 0,
-                'boletos_enviados': item[10] or 0,
-                'valor_total_boletos': float(item[11]) if item[11] else 0.0,
-                'ultimos_boletos': item[12] or []
+                'id': item['id'],
+                'tipo_automacao': item['tipo_automacao'],
+                'total_processados': item['total_processados'],
+                'total_sucessos': item['total_sucessos'],
+                'total_erros': item['total_erros'],
+                'data_execucao': item['data_execucao'],
+                'tempo_execucao_segundos': item['tempo_execucao_segundos'] if item['tempo_execucao_segundos'] else 0,
+                'detalhes': item['detalhes'],
+                'status': item['status'],
+                'total_boletos_processados': item['total_boletos_processados'] or 0,
+                'boletos_enviados': item['boletos_enviados'] or 0,
+                'valor_total_boletos': float(item['valor_total_boletos']) if item['valor_total_boletos'] else 0.0,
+                'ultimos_boletos': item['ultimos_boletos'] or []
             })
 
         return jsonify({'historico': historico_formatado}), 200
