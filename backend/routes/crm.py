@@ -1274,7 +1274,7 @@ def ativar_disparo_completo():
         db.execute_update("""
             UPDATE historico_disparos
             SET status = 'erro',
-                detalhes = 'Disparo finalizado automaticamente (travado por mais de 10 minutos)'
+                detalhes = '{"mensagem": "Disparo finalizado automaticamente (travado por mais de 10 minutos)"}'::jsonb
             WHERE cliente_nexus_id = %s
             AND status = 'em_andamento'
             AND horario_execucao < NOW() - INTERVAL '10 minutes'
@@ -1628,11 +1628,15 @@ Obrigado por confiar em nossos serviços."""
                 envios_sucesso = %s,
                 envios_erro = %s,
                 detalhes = %s::jsonb
-            WHERE cliente_nexus_id = %s
-            AND tipo_disparo = 'manual_completo'
-            AND status = 'em_andamento'
-            ORDER BY horario_execucao DESC
-            LIMIT 1
+            WHERE id = (
+                SELECT id
+                FROM historico_disparos
+                WHERE cliente_nexus_id = %s
+                AND tipo_disparo = 'manual_completo'
+                AND status = 'em_andamento'
+                ORDER BY horario_execucao DESC
+                LIMIT 1
+            )
         """, (stats['total'], stats['enviados'], stats['erros'],
               json.dumps({'tempo_minutos': tempo_minutos, 'taxa_sucesso': taxa_sucesso}),
               cliente_nexus_id))
@@ -1654,11 +1658,15 @@ Obrigado por confiar em nossos serviços."""
                 UPDATE historico_disparos
                 SET status = 'erro',
                     detalhes = %s::jsonb
-                WHERE cliente_nexus_id = %s
-                AND tipo_disparo = 'manual_completo'
-                AND status = 'em_andamento'
-                ORDER BY horario_execucao DESC
-                LIMIT 1
+                WHERE id = (
+                    SELECT id
+                    FROM historico_disparos
+                    WHERE cliente_nexus_id = %s
+                    AND tipo_disparo = 'manual_completo'
+                    AND status = 'em_andamento'
+                    ORDER BY horario_execucao DESC
+                    LIMIT 1
+                )
             """, (json.dumps({'erro': str(e)}), session.get('cliente_nexus_id')))
         except:
             pass
@@ -1734,7 +1742,7 @@ def status_disparo_atual():
         db.execute_update("""
             UPDATE historico_disparos
             SET status = 'erro',
-                detalhes = 'Disparo finalizado automaticamente (travado por mais de 10 minutos)'
+                detalhes = '{"mensagem": "Disparo finalizado automaticamente (travado por mais de 10 minutos)"}'::jsonb
             WHERE cliente_nexus_id = %s
             AND status = 'em_andamento'
             AND horario_execucao < NOW() - INTERVAL '10 minutes'
