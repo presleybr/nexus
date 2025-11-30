@@ -1730,7 +1730,17 @@ def status_disparo_atual():
     try:
         cliente_nexus_id = session.get('cliente_nexus_id')
 
-        # BUSCAR DISPARO EM ANDAMENTO
+        # LIMPAR DISPAROS TRAVADOS primeiro
+        db.execute_update("""
+            UPDATE historico_disparos
+            SET status = 'erro',
+                detalhes = 'Disparo finalizado automaticamente (travado por mais de 10 minutos)'
+            WHERE cliente_nexus_id = %s
+            AND status = 'em_andamento'
+            AND horario_execucao < NOW() - INTERVAL '10 minutes'
+        """, (cliente_nexus_id,))
+
+        # BUSCAR DISPARO EM ANDAMENTO (apenas dos últimos 10 minutos)
         disparo = db.execute_query("""
             SELECT
                 id,
@@ -1743,7 +1753,7 @@ def status_disparo_atual():
             FROM historico_disparos
             WHERE cliente_nexus_id = %s
             AND status = 'em_andamento'
-            AND horario_execucao > NOW() - INTERVAL '2 hours'
+            AND horario_execucao > NOW() - INTERVAL '10 minutes'
             ORDER BY horario_execucao DESC
             LIMIT 1
         """, (cliente_nexus_id,))

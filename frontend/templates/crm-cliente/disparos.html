@@ -320,10 +320,10 @@
                         <strong>Disparo Completo:</strong> Ativa o envio automático de boletos com mensagens personalizadas em sequência
                     </small>
 
-                    <button class="btn-primary" onclick="pausarDisparo()" id="btnPausarDisparo" style="margin-top: 1rem; background: #FFA500;">
+                    <button class="btn-primary" onclick="pausarDisparo()" id="btnPausarDisparo" style="margin-top: 1rem; background: #FFA500; display: none;">
                         ⏸️ Pausar Disparo
                     </button>
-                    <small style="display: block; margin-top: 0.75rem; color: var(--cor-texto-secundario, #888);">
+                    <small id="textoPausarDisparo" style="display: none; margin-top: 0.75rem; color: var(--cor-texto-secundario, #888);">
                         <strong>Pausar:</strong> Interrompe o disparo em andamento
                     </small>
 
@@ -681,6 +681,11 @@
             // Mostrar painel de status
             document.getElementById('statusDisparoEmAndamento').style.display = 'block';
 
+            // Mostrar botão de pausar e esconder botão de ativar
+            document.getElementById('btnPausarDisparo').style.display = 'block';
+            document.getElementById('textoPausarDisparo').style.display = 'block';
+            document.getElementById('btnAtivarDisparo').style.display = 'none';
+
             // Iniciar contador de tempo
             tempoInicioDisparo = Date.now();
             if (intervalTempo) clearInterval(intervalTempo);
@@ -701,6 +706,11 @@
                 clearInterval(intervalTempo);
                 intervalTempo = null;
             }
+
+            // Esconder botão de pausar e mostrar botão de ativar
+            document.getElementById('btnPausarDisparo').style.display = 'none';
+            document.getElementById('textoPausarDisparo').style.display = 'none';
+            document.getElementById('btnAtivarDisparo').style.display = 'block';
 
             // Esconder painel após 3 segundos
             setTimeout(() => {
@@ -1257,10 +1267,26 @@
             }
         }
 
+        // Verificar disparo ativo ao carregar a página
+        async function verificarDisparoAtivo() {
+            try {
+                const response = await fetch('/api/crm/scheduler/status-disparo-atual');
+                const data = await response.json();
+
+                if (data.success && data.disparo) {
+                    // Há disparo em andamento - iniciar monitoramento
+                    iniciarMonitoramento();
+                }
+            } catch (error) {
+                console.error('Erro ao verificar disparo ativo:', error);
+            }
+        }
+
         // Inicialização
         carregarConfiguracoes();
         carregarHistorico();
         carregarNumeros();
+        verificarDisparoAtivo();
 
         function logout() {
             fetch('/api/auth/logout', {method: 'POST'}).then(() => window.location.href = '/');
