@@ -7,6 +7,7 @@ import sys
 import os
 from pathlib import Path
 import re
+import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -1313,8 +1314,12 @@ def ativar_disparo_completo():
             AND b.status_envio = 'nao_enviado'
             AND cf.whatsapp IS NOT NULL
             AND cf.whatsapp != ''
-            AND cf.whatsapp != '55679999999999'
-            AND cf.whatsapp != '0000000000'
+            AND cf.whatsapp NOT LIKE '%999999999%'
+            AND cf.whatsapp NOT LIKE '55679%'
+            AND cf.whatsapp NOT LIKE '55649%'
+            AND cf.whatsapp NOT LIKE '0000000000%'
+            AND LENGTH(cf.whatsapp) >= 12
+            AND LENGTH(cf.whatsapp) <= 13
             AND cf.ativo = true
             ORDER BY b.data_vencimento ASC
         """, (cliente_nexus_id,))
@@ -1828,8 +1833,12 @@ def executar_scheduler_agora():
             AND b.status_envio = 'nao_enviado'
             AND cf.whatsapp IS NOT NULL
             AND cf.whatsapp != ''
-            AND cf.whatsapp != '55679999999999'
-            AND cf.whatsapp != '0000000000'
+            AND cf.whatsapp NOT LIKE '%999999999%'
+            AND cf.whatsapp NOT LIKE '55679%'
+            AND cf.whatsapp NOT LIKE '55649%'
+            AND cf.whatsapp NOT LIKE '0000000000%'
+            AND LENGTH(cf.whatsapp) >= 12
+            AND LENGTH(cf.whatsapp) <= 13
             AND cf.ativo = true
             ORDER BY b.data_vencimento ASC
         """, (cliente_nexus_id,))

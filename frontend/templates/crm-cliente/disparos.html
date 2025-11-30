@@ -320,7 +320,7 @@
                         <strong>Disparo Completo:</strong> Ativa o envio automático de boletos com mensagens personalizadas em sequência
                     </small>
 
-                    <button class="btn-danger" onclick="pausarDisparo()" style="margin-top: 1rem;">
+                    <button class="btn-primary" onclick="pausarDisparo()" id="btnPausarDisparo" style="margin-top: 1rem; background: #FFA500;">
                         ⏸️ Pausar Disparo
                     </button>
                     <small style="display: block; margin-top: 0.75rem; color: var(--cor-texto-secundario, #888);">
@@ -579,11 +579,12 @@
         }
 
         async function pausarDisparo() {
-            if (!confirm('⚠️ ATENÇÃO!\n\nDeseja PAUSAR o disparo em andamento?\n\nIsso irá:\n❌ Interromper os envios em andamento\n❌ Cancelar os disparos pendentes\n\nDeseja CONTINUAR?')) return;
+            if (!confirm('⚠️ ATENÇÃO!\n\nDeseja PAUSAR o disparo em andamento?\n\nIsso irá:\n⏸️ Pausar temporariamente o disparo\n✅ Você poderá continuar depois clicando em "Ativar Disparo"\n\nDeseja PAUSAR?')) return;
 
-            const btn = event.target;
+            const btn = document.getElementById('btnPausarDisparo');
+            const btnAtivar = document.getElementById('btnAtivarDisparo');
+
             btn.disabled = true;
-            const textoOriginal = btn.textContent;
             btn.textContent = '⏸️ Pausando...';
 
             try {
@@ -600,17 +601,29 @@
                 console.log('Dados completos:', data);
 
                 if (data.success) {
-                    alert('✅ ' + data.message);
+                    alert('⏸️ Disparo pausado!\n\nClique em "Ativar Disparo Completo" para continuar de onde parou.');
+
+                    // Atualizar texto do botão pausar
+                    btn.style.background = '#888';
+                    btn.textContent = '⏸️ DISPARO PAUSADO';
+
+                    // Atualizar botão de ativar para mostrar que pode continuar
+                    btnAtivar.textContent = '▶️ Continuar Disparo';
+                    btnAtivar.style.background = '#39FF14';
+
+                    // Parar monitoramento
+                    pararMonitoramento();
                     carregarHistorico();
                 } else {
                     alert('❌ Erro: ' + (data.erro || data.message || 'Erro desconhecido'));
+                    btn.textContent = '⏸️ Pausar Disparo';
                 }
             } catch (error) {
                 console.error('Erro ao pausar disparo:', error);
                 alert('❌ Erro ao pausar disparo. Verifique o console.');
+                btn.textContent = '⏸️ Pausar Disparo';
             } finally {
                 btn.disabled = false;
-                btn.textContent = textoOriginal;
             }
         }
 
