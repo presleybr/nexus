@@ -292,7 +292,8 @@ def upload_planilha():
                         numero_contrato = f"CANOPUS-{pv}-{cpf}"
 
                         # RESTAURAR WHATSAPP DO BACKUP (se existir)
-                        whatsapp = '5567999999999'  # Placeholder padrão
+                        # NÃO cria WhatsApp fake - deixa NULL se não tiver backup
+                        whatsapp = None
 
                         # Tentar carregar do backup
                         try:
@@ -311,26 +312,30 @@ def upload_planilha():
                                 cpf_limpo = cpf.replace('.', '').replace('-', '')
                                 if cpf_limpo in backup_data['clientes']:
                                     whatsapp_backup = backup_data['clientes'][cpf_limpo]['whatsapp']
-                                    if whatsapp_backup and whatsapp_backup != '5567999999999':
+                                    # Só restaura se for um número REAL (não placeholder)
+                                    if whatsapp_backup and whatsapp_backup != '5567999999999' and '999999999' not in whatsapp_backup:
                                         whatsapp = whatsapp_backup
                                         logger.info(f"✅ WhatsApp restaurado do backup para {nome}: {whatsapp}")
                         except Exception as e:
                             logger.warning(f"⚠️ Não foi possível restaurar WhatsApp do backup para {nome}: {str(e)}")
+
+                        # Se não restaurou do backup, deixa NULL
+                        if not whatsapp:
+                            logger.info(f"ℹ️ Cliente {nome} importado SEM WhatsApp (adicione manualmente depois)")
 
                         cur.execute("""
                             INSERT INTO clientes_finais (
                                 cliente_nexus_id,
                                 nome_completo,
                                 cpf,
-                                telefone_celular,
                                 whatsapp,
                                 ponto_venda,
                                 numero_contrato,
                                 ativo,
                                 created_at,
                                 updated_at
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """, (cliente_nexus_id, nome, cpf, whatsapp, whatsapp, pv, numero_contrato))
+                            ) VALUES (%s, %s, %s, %s, %s, %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        """, (cliente_nexus_id, nome, cpf, whatsapp, pv, numero_contrato))
 
                         importados += 1
 

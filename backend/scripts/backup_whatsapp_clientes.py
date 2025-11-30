@@ -25,7 +25,6 @@ def fazer_backup_whatsapp():
             cpf,
             nome_completo,
             whatsapp,
-            telefone_celular,
             email
         FROM clientes_finais
         WHERE whatsapp IS NOT NULL
@@ -51,7 +50,6 @@ def fazer_backup_whatsapp():
         backup_data['clientes'][cpf] = {
             'nome': cliente['nome_completo'],
             'whatsapp': cliente['whatsapp'],
-            'telefone_celular': cliente.get('telefone_celular'),
             'email': cliente.get('email')
         }
 
