@@ -1651,6 +1651,155 @@ Obrigado por confiar em nossos serviços."""
         return jsonify({'erro': str(e)}), 500
 
 
+@crm_bp.route('/scheduler/pausar-disparo', methods=['POST'])
+@login_required
+def pausar_disparo():
+    """Pausa/cancela o disparo em andamento"""
+    try:
+        cliente_nexus_id = session.get('cliente_nexus_id')
+
+        # VERIFICAR SE HÁ DISPARO EM ANDAMENTO
+        disparo_em_andamento = db.execute_query("""
+            SELECT id
+            FROM historico_disparos
+            WHERE cliente_nexus_id = %s
+            AND status = 'em_andamento'
+            AND horario_execucao > NOW() - INTERVAL '2 hours'
+            ORDER BY horario_execucao DESC
+            LIMIT 1
+        """, (cliente_nexus_id,))
+
+        if not disparo_em_andamento:
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum disparo em andamento encontrado'
+            }), 404
+
+        disparo_id = disparo_em_andamento[0]['id']
+
+        # ATUALIZAR STATUS PARA CANCELADO
+        db.execute_update("""
+            UPDATE historico_disparos
+            SET status = 'cancelado',
+                detalhes = jsonb_set(
+                    COALESCE(detalhes, '{}'::jsonb),
+                    '{cancelado_em}',
+                    to_jsonb(NOW()::text)
+                )
+            WHERE id = %s
+        """, (disparo_id,))
+
+        log_sistema('warning', '⏸️ Disparo pausado/cancelado pelo usuário', 'disparo', {
+            'disparo_id': disparo_id,
+            'cliente_nexus_id': cliente_nexus_id
+        })
+
+        return jsonify({
+            'success': True,
+            'message': 'Disparo pausado com sucesso'
+        }), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'erro': str(e)
+        }), 500
+
+
+@crm_bp.route('/scheduler/status-disparo-atual', methods=['GET'])
+@login_required
+def status_disparo_atual():
+    """Retorna o status em tempo real do disparo em andamento"""
+    try:
+        cliente_nexus_id = session.get('cliente_nexus_id')
+
+        # BUSCAR DISPARO EM ANDAMENTO
+        disparo = db.execute_query("""
+            SELECT
+                id,
+                status,
+                total_envios,
+                envios_sucesso,
+                envios_erro,
+                detalhes,
+                horario_execucao
+            FROM historico_disparos
+            WHERE cliente_nexus_id = %s
+            AND status = 'em_andamento'
+            AND horario_execucao > NOW() - INTERVAL '2 hours'
+            ORDER BY horario_execucao DESC
+            LIMIT 1
+        """, (cliente_nexus_id,))
+
+        if not disparo:
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum disparo em andamento'
+            }), 200
+
+        disparo_data = disparo[0]
+
+        # Extrair informações dos detalhes (JSON)
+        detalhes = disparo_data.get('detalhes', {})
+        if isinstance(detalhes, str):
+            import json
+            detalhes = json.loads(detalhes) if detalhes else {}
+
+        # Buscar cliente atual sendo processado (último boleto em processamento)
+        cliente_atual = db.execute_query("""
+            SELECT
+                cf.nome_completo as nome,
+                cf.whatsapp,
+                cf.cpf,
+                b.id as boleto_id
+            FROM disparos d
+            INNER JOIN boletos b ON d.boleto_id = b.id
+            INNER JOIN clientes_finais cf ON b.cliente_final_id = cf.id
+            WHERE d.cliente_nexus_id = %s
+            AND d.data_disparo IS NOT NULL
+            AND d.data_disparo > NOW() - INTERVAL '1 minute'
+            ORDER BY d.data_disparo DESC
+            LIMIT 1
+        """, (cliente_nexus_id,))
+
+        total = disparo_data.get('total_envios') or 0
+        enviados = disparo_data.get('envios_sucesso') or 0
+        erros = disparo_data.get('envios_erro') or 0
+        atual = enviados + erros
+
+        resultado = {
+            'success': True,
+            'disparo': {
+                'id': disparo_data['id'],
+                'status': disparo_data['status'],
+                'total': total,
+                'atual': atual,
+                'enviados': enviados,
+                'erros': erros,
+                'cliente_atual': None
+            }
+        }
+
+        if cliente_atual and len(cliente_atual) > 0:
+            resultado['disparo']['cliente_atual'] = {
+                'nome': cliente_atual[0].get('nome'),
+                'whatsapp': cliente_atual[0].get('whatsapp'),
+                'cpf': cliente_atual[0].get('cpf')
+            }
+
+        return jsonify(resultado), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'erro': str(e)
+        }), 500
+
+
 @crm_bp.route('/scheduler/executar-agora', methods=['POST'])
 @login_required
 def executar_scheduler_agora():

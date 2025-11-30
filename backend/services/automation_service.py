@@ -56,34 +56,44 @@ class AutomationService:
         }
 
         try:
-            # Etapa 21-22: Buscar todos os clientes e gerar boletos (SEM LIMITE)
-            clientes_todos = ClienteFinal.listar_por_cliente_nexus(cliente_nexus_id, limit=None)
+            # FILTRO CRÍTICO: Buscar apenas clientes com boletos pendentes na tabela 'boletos'
+            # Evita disparos para quem não tem boleto!
+            from models.database import db
 
-            log_sistema('info', f'Clientes buscados: {len(clientes_todos) if clientes_todos else 0}', 'automacao',
+            clientes_com_boletos = db.execute_query("""
+                SELECT DISTINCT
+                    cf.id,
+                    cf.nome_completo as nome,
+                    cf.whatsapp,
+                    cf.cpf,
+                    COUNT(b.id) as total_boletos_pendentes
+                FROM clientes_finais cf
+                INNER JOIN boletos b ON b.cliente_final_id = cf.id
+                WHERE cf.cliente_nexus_id = %s
+                    AND b.status_envio IN ('nao_enviado', 'pendente')
+                    AND cf.whatsapp IS NOT NULL
+                    AND LENGTH(cf.whatsapp) >= 10
+                GROUP BY cf.id, cf.nome_completo, cf.whatsapp, cf.cpf
+                ORDER BY cf.nome_completo
+            """, (cliente_nexus_id,))
+
+            log_sistema('info', f'Clientes com boletos pendentes: {len(clientes_com_boletos) if clientes_com_boletos else 0}', 'automacao',
                        {'cliente_nexus_id': cliente_nexus_id,
-                        'primeiro_cliente': clientes_todos[0] if clientes_todos else None})
+                        'total_clientes_filtrados': len(clientes_com_boletos) if clientes_com_boletos else 0})
 
-            if not clientes_todos:
-                stats['mensagem'] = 'Nenhum cliente encontrado'
-                return stats
-
-            # FILTRO: Processar apenas clientes COM WhatsApp válido
-            clientes = [c for c in clientes_todos if c.get('whatsapp') and len(str(c.get('whatsapp')).strip()) >= 10]
-
-            total_sem_whatsapp = len(clientes_todos) - len(clientes)
-
-            log_sistema('info', f'Filtragem de clientes: {len(clientes)} com WhatsApp, {total_sem_whatsapp} sem WhatsApp',
-                       'automacao', {
-                           'total_clientes': len(clientes_todos),
-                           'com_whatsapp': len(clientes),
-                           'sem_whatsapp': total_sem_whatsapp
-                       })
-
-            if not clientes:
-                stats['mensagem'] = f'Nenhum cliente com WhatsApp válido encontrado ({len(clientes_todos)} clientes sem WhatsApp)'
+            if not clientes_com_boletos:
+                stats['mensagem'] = 'Nenhum cliente com boletos pendentes encontrado'
                 log_sistema('warning', stats['mensagem'], 'automacao',
-                           {'total_clientes': len(clientes_todos)})
+                           {'cliente_nexus_id': cliente_nexus_id})
                 return stats
+
+            clientes = clientes_com_boletos
+
+            log_sistema('info', f'Total de clientes a processar: {len(clientes)}',
+                       'automacao', {
+                           'total_clientes': len(clientes),
+                           'criterio': 'apenas_com_boletos_pendentes'
+                       })
 
             # Busca configurações do cliente
             config = Configuracao.buscar(cliente_nexus_id)
@@ -91,46 +101,47 @@ class AutomationService:
                                               'Olá! Você receberá seu boleto em instantes.')
             intervalo = config.get('intervalo_disparos', 5)
 
-            # Etapa 23: Criar pasta organizada para os boletos
+            # Buscar cliente Nexus
             cliente_nexus = ClienteNexus.buscar_por_id(cliente_nexus_id)
-            pasta_cliente = self._criar_pasta_organizada(
-                cliente_nexus_id,
-                cliente_nexus.get('nome_empresa', 'Cliente')
-            )
 
             # Etapa 28: Notificação inicial
             self._enviar_notificacao_inicial(cliente_nexus, len(clientes))
 
-            boletos_gerados = []
+            # BUSCAR BOLETOS PENDENTES EXISTENTES (não gera novos!)
+            boletos_para_enviar = db.execute_query("""
+                SELECT
+                    b.id as boleto_id,
+                    b.numero_boleto,
+                    b.valor_original as valor,
+                    b.data_vencimento as vencimento,
+                    b.pdf_path,
+                    b.pdf_filename,
+                    b.mes_referencia,
+                    cf.id as cliente_final_id,
+                    cf.nome_completo as cliente_final_nome,
+                    cf.whatsapp
+                FROM boletos b
+                INNER JOIN clientes_finais cf ON b.cliente_final_id = cf.id
+                WHERE b.cliente_nexus_id = %s
+                    AND b.status_envio IN ('nao_enviado', 'pendente')
+                    AND cf.whatsapp IS NOT NULL
+                    AND LENGTH(cf.whatsapp) >= 10
+                ORDER BY b.data_vencimento, cf.nome_completo
+            """, (cliente_nexus_id,))
 
-            # Para cada cliente final
-            for cliente_final in clientes:
-                try:
-                    # Etapa 22: Gerar boleto
-                    boleto_data = self._gerar_boleto_para_cliente(
-                        cliente_nexus_id,
-                        cliente_final,
-                        pasta_cliente
-                    )
+            stats['clientes_processados'] = len(clientes)
+            stats['boletos_gerados'] = len(boletos_para_enviar)
 
-                    if boleto_data:
-                        boletos_gerados.append(boleto_data)
-                        stats['boletos_gerados'] += 1
-
-                    stats['clientes_processados'] += 1
-
-                except Exception as e:
-                    log_sistema('error', f'Erro ao processar cliente {cliente_final["id"]}: {str(e)}',
-                               'automacao')
-                    stats['erros'] += 1
-
-            # Etapa 26: Registrar no banco de dados
-            self._registrar_boletos_no_banco(cliente_nexus_id, boletos_gerados)
+            log_sistema('info', f'Boletos pendentes encontrados: {len(boletos_para_enviar)}',
+                       'automacao', {
+                           'total_boletos': len(boletos_para_enviar),
+                           'clientes_distintos': len(clientes)
+                       })
 
             # Etapa 29-30: Disparos automáticos
             stats_disparos = self._executar_disparos_automaticos(
                 cliente_nexus_id,
-                boletos_gerados,
+                boletos_para_enviar,
                 mensagem_antibloqueio,
                 intervalo
             )
@@ -301,16 +312,8 @@ class AutomationService:
                     stats['erros'] += 1
                     continue
 
-                # Buscar ID do boleto recém-criado
-                boleto_db = db.execute_query("""
-                    SELECT id FROM boletos
-                    WHERE cliente_nexus_id = %s
-                    AND cliente_final_id = %s
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                """, (cliente_nexus_id, boleto['cliente_final_id']))
-
-                boleto_id = boleto_db[0]['id'] if boleto_db else None
+                # Usar boleto_id que já vem da query
+                boleto_id = boleto.get('boleto_id')
 
                 # Registra o disparo como pendente
                 if boleto_id:

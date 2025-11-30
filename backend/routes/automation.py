@@ -78,6 +78,7 @@ def get_historico():
                     WHERE id = hd.id
                 ))::INTEGER as tempo_execucao_segundos,
                 hd.detalhes,
+                hd.status,
                 -- Dados REAIS de boletos processados
                 (
                     SELECT COUNT(DISTINCT b.id)
@@ -129,10 +130,11 @@ def get_historico():
                 'data_execucao': item[5],
                 'tempo_execucao_segundos': item[6] if item[6] else 0,
                 'detalhes': item[7],
-                'total_boletos_processados': item[8] or 0,
-                'boletos_enviados': item[9] or 0,
-                'valor_total_boletos': float(item[10]) if item[10] else 0.0,
-                'ultimos_boletos': item[11] or []
+                'status': item[8],
+                'total_boletos_processados': item[9] or 0,
+                'boletos_enviados': item[10] or 0,
+                'valor_total_boletos': float(item[11]) if item[11] else 0.0,
+                'ultimos_boletos': item[12] or []
             })
 
         return jsonify({'historico': historico_formatado}), 200

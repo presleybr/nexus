@@ -451,6 +451,31 @@
 
             <!-- Cards de Ação - Reorganizados em Etapas -->
             <div class="action-cards">
+                <!-- BACKUP DE WHATSAPP -->
+                <div class="action-card" style="background: linear-gradient(135deg, rgba(57, 255, 20, 0.1), rgba(0, 255, 255, 0.1)); border: 2px solid #39FF14;">
+                    <h3 style="color: #39FF14;">
+                        💾 Backup de WhatsApp
+                    </h3>
+                    <p style="color: #888; margin-bottom: 1.5rem;">
+                        📱 Salva os números de WhatsApp dos clientes antes de resetar o banco.
+                        <br>
+                        <strong style="color: #39FF14;">IMPORTANTE:</strong> Execute este backup ANTES de resetar os dados!
+                    </p>
+
+                    <button class="btn-canopus" onclick="fazerBackupWhatsApp()" style="background: #39FF14; color: #000;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                        </svg>
+                        Fazer Backup Agora
+                    </button>
+
+                    <div id="statusBackup" style="margin-top: 1rem; display: none; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px;">
+                        <div style="color: #39FF14; font-size: 0.9rem;"></div>
+                    </div>
+                </div>
+
                 <!-- ETAPA 1: Importar Planilha -->
                 <div class="action-card step-import" data-step="1">
                     <h3>
@@ -1140,6 +1165,64 @@ Os boletos importados já estão prontos para envio via WhatsApp!`;
 
         function baixarBoleto(nomeArquivo) {
             window.open(`/api/automation/download-boleto?nome=${encodeURIComponent(nomeArquivo)}`, '_blank');
+        }
+
+        // FUNÇÃO DE BACKUP DE WHATSAPP
+        async function fazerBackupWhatsApp() {
+            const statusDiv = document.getElementById('statusBackup');
+            const btn = event.target;
+
+            if (!confirm('Fazer backup de todos os números de WhatsApp dos clientes?\n\nIsso salvará os números para restauração após reset do banco.')) {
+                return;
+            }
+
+            try {
+                btn.disabled = true;
+                btn.textContent = '💾 Fazendo backup...';
+
+                statusDiv.style.display = 'block';
+                statusDiv.innerHTML = '<div style="color: #FFA500;">⏳ Criando backup...</div>';
+
+                const response = await fetch('/api/automation-canopus/backup-whatsapp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    statusDiv.innerHTML = `
+                        <div style="color: #39FF14; margin-bottom: 0.5rem;">✅ Backup criado com sucesso!</div>
+                        <div style="font-size: 0.85rem; color: #888;">
+                            📱 Total: ${data.total} WhatsApps salvos<br>
+                            📅 Data: ${new Date(data.data_backup).toLocaleString('pt-BR')}<br>
+                            📁 Arquivo: whatsapp_clientes_backup.json
+                        </div>
+                    `;
+
+                    alert(`✅ Backup concluído!\n\n` +
+                          `Total de WhatsApps salvos: ${data.total}\n` +
+                          `Os números serão restaurados automaticamente na próxima importação.`);
+                } else {
+                    throw new Error(data.error || 'Erro desconhecido');
+                }
+            } catch (error) {
+                console.error('Erro ao fazer backup:', error);
+                statusDiv.innerHTML = `<div style="color: #FF3333;">❌ Erro: ${error.message}</div>`;
+                alert('❌ Erro ao fazer backup: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                        <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    Fazer Backup Agora
+                `;
+            }
         }
 
         // Carregar boletos ao carregar a página

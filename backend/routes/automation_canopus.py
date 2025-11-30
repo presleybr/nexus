@@ -290,7 +290,32 @@ def upload_planilha():
 
                         # Inserir novo
                         numero_contrato = f"CANOPUS-{pv}-{cpf}"
-                        whatsapp = '5567999999999'  # Placeholder
+
+                        # RESTAURAR WHATSAPP DO BACKUP (se existir)
+                        whatsapp = '5567999999999'  # Placeholder padrão
+
+                        # Tentar carregar do backup
+                        try:
+                            import json
+                            backup_path = os.path.join(
+                                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                'backups',
+                                'whatsapp_clientes_backup.json'
+                            )
+
+                            if os.path.exists(backup_path):
+                                with open(backup_path, 'r', encoding='utf-8') as f:
+                                    backup_data = json.load(f)
+
+                                # Buscar WhatsApp pelo CPF
+                                cpf_limpo = cpf.replace('.', '').replace('-', '')
+                                if cpf_limpo in backup_data['clientes']:
+                                    whatsapp_backup = backup_data['clientes'][cpf_limpo]['whatsapp']
+                                    if whatsapp_backup and whatsapp_backup != '5567999999999':
+                                        whatsapp = whatsapp_backup
+                                        logger.info(f"✅ WhatsApp restaurado do backup para {nome}: {whatsapp}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Não foi possível restaurar WhatsApp do backup para {nome}: {str(e)}")
 
                         cur.execute("""
                             INSERT INTO clientes_finais (
@@ -2909,6 +2934,91 @@ def resetar_dados():
         logger.error(f"❌ Erro ao resetar dados: {e}")
         import traceback
         logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@automation_canopus_bp.route('/backup-whatsapp', methods=['POST'])
+@handle_errors
+def backup_whatsapp():
+    """Faz backup dos números de WhatsApp dos clientes"""
+    import json
+    from datetime import datetime
+
+    try:
+        logger.info("📦 Iniciando backup de WhatsApps...")
+
+        # Buscar todos os clientes com WhatsApp
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+
+            cur.execute("""
+                SELECT
+                    cpf,
+                    nome_completo,
+                    whatsapp,
+                    telefone_celular,
+                    email
+                FROM clientes_finais
+                WHERE whatsapp IS NOT NULL
+                AND whatsapp != ''
+                AND whatsapp != '0000000000'
+                AND whatsapp != '55679999999999'
+                ORDER BY nome_completo
+            """)
+
+            clientes = cur.fetchall()
+
+        if not clientes:
+            return jsonify({
+                'success': False,
+                'error': 'Nenhum cliente com WhatsApp encontrado'
+            }), 404
+
+        # Preparar dados para backup
+        backup_data = {
+            'data_backup': datetime.now().isoformat(),
+            'total_clientes': len(clientes),
+            'clientes': {}
+        }
+
+        for cliente in clientes:
+            cpf = cliente['cpf']
+            backup_data['clientes'][cpf] = {
+                'nome': cliente['nome_completo'],
+                'whatsapp': cliente['whatsapp'],
+                'telefone_celular': cliente.get('telefone_celular'),
+                'email': cliente.get('email')
+            }
+
+        # Salvar arquivo de backup
+        backup_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'backups'
+        )
+        os.makedirs(backup_dir, exist_ok=True)
+
+        backup_file = os.path.join(backup_dir, 'whatsapp_clientes_backup.json')
+
+        with open(backup_file, 'w', encoding='utf-8') as f:
+            json.dump(backup_data, f, ensure_ascii=False, indent=2)
+
+        logger.info(f"✅ Backup salvo: {backup_file} ({len(clientes)} clientes)")
+
+        return jsonify({
+            'success': True,
+            'message': f'Backup criado com sucesso! {len(clientes)} WhatsApps salvos.',
+            'total': len(clientes),
+            'arquivo': backup_file,
+            'data_backup': backup_data['data_backup']
+        }), 200
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao fazer backup: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)

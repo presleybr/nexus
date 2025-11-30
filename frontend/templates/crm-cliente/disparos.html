@@ -313,19 +313,85 @@
                 </p>
 
                 <div class="test-section">
-                    <button class="btn-secondary" onclick="testarAutomacaoAgora()">
-                        🧪 Testar Agora
-                    </button>
-                    <small style="display: block; margin-top: 0.75rem; color: var(--cor-texto-secundario, #888);">
-                        <strong>Modo Teste:</strong> Envia boletos REAIS para TODOS os clientes com boletos pendentes
-                    </small>
-
-                    <button class="btn-primary" onclick="ativarDisparoAutomatico()" style="margin-top: 1rem;">
+                    <button class="btn-primary" onclick="ativarDisparoAutomatico()" id="btnAtivarDisparo">
                         🚀 Ativar Disparo Completo
                     </button>
                     <small style="display: block; margin-top: 0.75rem; color: var(--cor-texto-secundario, #888);">
                         <strong>Disparo Completo:</strong> Ativa o envio automático de boletos com mensagens personalizadas em sequência
                     </small>
+
+                    <button class="btn-danger" onclick="pausarDisparo()" style="margin-top: 1rem;">
+                        ⏸️ Pausar Disparo
+                    </button>
+                    <small style="display: block; margin-top: 0.75rem; color: var(--cor-texto-secundario, #888);">
+                        <strong>Pausar:</strong> Interrompe o disparo em andamento
+                    </small>
+
+                    <!-- STATUS EM TEMPO REAL -->
+                    <div id="statusDisparoEmAndamento" style="display: none; margin-top: 2rem; padding: 1.5rem; background: linear-gradient(135deg, rgba(57, 255, 20, 0.1), rgba(0, 255, 255, 0.1)); border: 2px solid #39FF14; border-radius: 12px; animation: pulse 2s infinite;">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <div class="spinner" style="width: 24px; height: 24px; border: 3px solid #39FF14; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                            <h3 style="margin: 0; color: #39FF14; font-size: 1.2rem;">🚀 DISPARO EM ANDAMENTO</h3>
+                        </div>
+
+                        <!-- Progresso -->
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="font-weight: 600; font-size: 1.1rem;" id="statusProgresso">0/0</span>
+                                <span style="color: #39FF14; font-weight: 600;" id="statusPorcentagem">0%</span>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; height: 20px;">
+                                <div id="barraProgresso" style="background: linear-gradient(90deg, #39FF14, #00FFFF); width: 0%; height: 100%; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Cliente Atual -->
+                        <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; border-left: 4px solid #39FF14;">
+                            <div style="color: #888; font-size: 0.85rem; margin-bottom: 0.5rem;">📤 ENVIANDO AGORA:</div>
+                            <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;" id="statusClienteNome">-</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+                                <div>
+                                    <span style="color: #888;">📱 WhatsApp:</span>
+                                    <span style="color: #39FF14; font-weight: 600; margin-left: 0.5rem;" id="statusWhatsApp">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #888;">🆔 CPF:</span>
+                                    <span style="color: #39FF14; font-weight: 600; margin-left: 0.5rem;" id="statusCPF">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Estatísticas -->
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1rem;">
+                            <div style="text-align: center; padding: 0.75rem; background: rgba(57, 255, 20, 0.1); border-radius: 8px;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #39FF14;" id="statusEnviados">0</div>
+                                <div style="font-size: 0.8rem; color: #888;">✅ Enviados</div>
+                            </div>
+                            <div style="text-align: center; padding: 0.75rem; background: rgba(255, 51, 51, 0.1); border-radius: 8px;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #FF3333;" id="statusErros">0</div>
+                                <div style="font-size: 0.8rem; color: #888;">❌ Erros</div>
+                            </div>
+                            <div style="text-align: center; padding: 0.75rem; background: rgba(255, 165, 0, 0.1); border-radius: 8px;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #FFA500;" id="statusPendentes">0</div>
+                                <div style="font-size: 0.8rem; color: #888;">⏳ Pendentes</div>
+                            </div>
+                        </div>
+
+                        <!-- Tempo decorrido -->
+                        <div style="margin-top: 1rem; text-align: center; color: #888; font-size: 0.9rem;">
+                            ⏱️ Tempo decorrido: <span id="statusTempo" style="color: #39FF14; font-weight: 600;">00:00</span>
+                        </div>
+                    </div>
+
+                    <style>
+                        @keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                        @keyframes pulse {
+                            0%, 100% { box-shadow: 0 0 20px rgba(57, 255, 20, 0.3); }
+                            50% { box-shadow: 0 0 40px rgba(57, 255, 20, 0.6); }
+                        }
+                    </style>
                 </div>
             </div>
 
@@ -512,16 +578,16 @@
             }
         }
 
-        async function testarAutomacaoAgora() {
-            if (!confirm('Isso enviará boletos REAIS para TODOS os clientes com boletos pendentes. Continuar?')) return;
+        async function pausarDisparo() {
+            if (!confirm('⚠️ ATENÇÃO!\n\nDeseja PAUSAR o disparo em andamento?\n\nIsso irá:\n❌ Interromper os envios em andamento\n❌ Cancelar os disparos pendentes\n\nDeseja CONTINUAR?')) return;
 
             const btn = event.target;
             btn.disabled = true;
             const textoOriginal = btn.textContent;
-            btn.textContent = 'Enviando boletos...';
+            btn.textContent = '⏸️ Pausando...';
 
             try {
-                const response = await fetch('/api/crm/scheduler/executar-agora', {
+                const response = await fetch('/api/crm/scheduler/pausar-disparo', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -530,41 +596,35 @@
 
                 const data = await response.json();
 
-                // IMPORTANTE: Mostra detalhes completos no console
-                console.log('=== RESULTADO DO DISPARO ===');
+                console.log('=== RESULTADO PAUSAR DISPARO ===');
                 console.log('Dados completos:', data);
 
                 if (data.success) {
-                    let mensagem = data.message;
-
-                    if (data.stats) {
-                        mensagem += `\n\nDetalhes:\n`;
-                        mensagem += `✅ Total: ${data.stats.total}\n`;
-                        mensagem += `✅ Enviados: ${data.stats.enviados}\n`;
-                        mensagem += `❌ Erros: ${data.stats.erros}\n`;
-                    }
-
-                    alert(mensagem);
+                    alert('✅ ' + data.message);
                     carregarHistorico();
                 } else {
-                    alert('Erro: ' + (data.erro || 'Erro desconhecido'));
+                    alert('❌ Erro: ' + (data.erro || data.message || 'Erro desconhecido'));
                 }
             } catch (error) {
-                console.error('Erro:', error);
-                alert('Erro ao executar disparo de automação');
+                console.error('Erro ao pausar disparo:', error);
+                alert('❌ Erro ao pausar disparo. Verifique o console.');
             } finally {
                 btn.disabled = false;
                 btn.textContent = textoOriginal;
             }
         }
 
+        // Variáveis globais para monitoramento
+        let intervalMonitoramento = null;
+        let tempoInicioDisparo = null;
+        let intervalTempo = null;
+
         async function ativarDisparoAutomatico() {
             if (!confirm('⚠️ ATENÇÃO!\n\nIsso ativará o disparo COMPLETO e automático de boletos!\n\nO sistema irá:\n✅ Enviar mensagens personalizadas\n✅ Enviar boletos em PDF\n✅ Processar TODOS os clientes com boletos pendentes\n✅ Seguir intervalo de segurança entre envios\n\nDeseja CONTINUAR?')) return;
 
-            const btn = event.target;
+            const btn = document.getElementById('btnAtivarDisparo');
             btn.disabled = true;
-            const textoOriginal = btn.textContent;
-            btn.textContent = '🚀 Disparando...';
+            btn.textContent = '🚀 Iniciando...';
 
             try {
                 const response = await fetch('/api/crm/scheduler/ativar-disparo-completo', {
@@ -579,31 +639,135 @@
                 console.log('=== RESULTADO DO DISPARO COMPLETO ===');
                 console.log('Dados completos:', data);
 
+                if (response.status === 409) {
+                    // Já existe disparo em andamento
+                    alert('⚠️ ' + data.message);
+                    // Iniciar monitoramento do disparo existente
+                    iniciarMonitoramento();
+                    return;
+                }
+
                 if (data.success) {
-                    let mensagem = `✅ DISPARO COMPLETO ATIVADO!\n\n`;
-
-                    if (data.stats) {
-                        mensagem += `📊 Estatísticas:\n`;
-                        mensagem += `• Total processado: ${data.stats.total}\n`;
-                        mensagem += `• Enviados com sucesso: ${data.stats.enviados}\n`;
-                        mensagem += `• Erros: ${data.stats.erros}\n`;
-
-                        if (data.tempo_execucao) {
-                            mensagem += `• Tempo total: ${(data.tempo_execucao / 60).toFixed(1)} minutos\n`;
-                        }
-                    }
-
-                    alert(mensagem);
-                    carregarHistorico();
+                    // Disparo iniciado com sucesso
+                    alert('✅ Disparo iniciado! Acompanhe o progresso abaixo.');
+                    iniciarMonitoramento();
                 } else {
-                    alert('❌ Erro: ' + (data.erro || 'Erro desconhecido'));
+                    alert('❌ Erro: ' + (data.erro || data.message || 'Erro desconhecido'));
+                    btn.disabled = false;
+                    btn.textContent = '🚀 Ativar Disparo Completo';
                 }
             } catch (error) {
                 console.error('Erro:', error);
                 alert('❌ Erro ao ativar disparo automático');
-            } finally {
                 btn.disabled = false;
-                btn.textContent = textoOriginal;
+                btn.textContent = '🚀 Ativar Disparo Completo';
+            }
+        }
+
+        function iniciarMonitoramento() {
+            // Mostrar painel de status
+            document.getElementById('statusDisparoEmAndamento').style.display = 'block';
+
+            // Iniciar contador de tempo
+            tempoInicioDisparo = Date.now();
+            if (intervalTempo) clearInterval(intervalTempo);
+            intervalTempo = setInterval(atualizarTempo, 1000);
+
+            // Iniciar polling do status (atualiza a cada 2 segundos)
+            if (intervalMonitoramento) clearInterval(intervalMonitoramento);
+            atualizarStatusDisparo(); // Primeira atualização imediata
+            intervalMonitoramento = setInterval(atualizarStatusDisparo, 2000);
+        }
+
+        function pararMonitoramento() {
+            if (intervalMonitoramento) {
+                clearInterval(intervalMonitoramento);
+                intervalMonitoramento = null;
+            }
+            if (intervalTempo) {
+                clearInterval(intervalTempo);
+                intervalTempo = null;
+            }
+
+            // Esconder painel após 3 segundos
+            setTimeout(() => {
+                document.getElementById('statusDisparoEmAndamento').style.display = 'none';
+
+                // Reabilitar botão
+                const btn = document.getElementById('btnAtivarDisparo');
+                btn.disabled = false;
+                btn.textContent = '🚀 Ativar Disparo Completo';
+            }, 3000);
+        }
+
+        function atualizarTempo() {
+            if (!tempoInicioDisparo) return;
+
+            const segundos = Math.floor((Date.now() - tempoInicioDisparo) / 1000);
+            const minutos = Math.floor(segundos / 60);
+            const segs = segundos % 60;
+
+            document.getElementById('statusTempo').textContent =
+                `${String(minutos).padStart(2, '0')}:${String(segs).padStart(2, '0')}`;
+        }
+
+        async function atualizarStatusDisparo() {
+            try {
+                const response = await fetch('/api/crm/scheduler/status-disparo-atual');
+                const data = await response.json();
+
+                if (!data.success || !data.disparo) {
+                    // Não há disparo em andamento
+                    pararMonitoramento();
+                    carregarHistorico();
+                    return;
+                }
+
+                const disparo = data.disparo;
+
+                // Atualizar progresso
+                const total = disparo.total || 0;
+                const atual = disparo.atual || 0;
+                const enviados = disparo.enviados || 0;
+                const erros = disparo.erros || 0;
+                const pendentes = total - atual;
+                const porcentagem = total > 0 ? Math.round((atual / total) * 100) : 0;
+
+                document.getElementById('statusProgresso').textContent = `${atual}/${total}`;
+                document.getElementById('statusPorcentagem').textContent = `${porcentagem}%`;
+                document.getElementById('barraProgresso').style.width = `${porcentagem}%`;
+
+                // Atualizar cliente atual
+                if (disparo.cliente_atual) {
+                    document.getElementById('statusClienteNome').textContent = disparo.cliente_atual.nome || '-';
+                    document.getElementById('statusWhatsApp').textContent = disparo.cliente_atual.whatsapp || '-';
+                    document.getElementById('statusCPF').textContent = disparo.cliente_atual.cpf || '-';
+                }
+
+                // Atualizar estatísticas
+                document.getElementById('statusEnviados').textContent = enviados;
+                document.getElementById('statusErros').textContent = erros;
+                document.getElementById('statusPendentes').textContent = pendentes;
+
+                // Verificar se concluído
+                if (disparo.status === 'concluido' || disparo.status === 'cancelado' || disparo.status === 'erro') {
+                    pararMonitoramento();
+
+                    let mensagemFinal = '';
+                    if (disparo.status === 'concluido') {
+                        mensagemFinal = `✅ DISPARO CONCLUÍDO!\n\n📊 Estatísticas:\n• Total: ${total}\n• Enviados: ${enviados}\n• Erros: ${erros}`;
+                    } else if (disparo.status === 'cancelado') {
+                        mensagemFinal = `⏸️ Disparo cancelado\n\n📊 Parcial:\n• Processados: ${atual}/${total}\n• Enviados: ${enviados}\n• Erros: ${erros}`;
+                    } else {
+                        mensagemFinal = `❌ Disparo finalizado com erro\n\n📊 Parcial:\n• Processados: ${atual}/${total}\n• Enviados: ${enviados}\n• Erros: ${erros}`;
+                    }
+
+                    alert(mensagemFinal);
+                    carregarHistorico();
+                }
+
+            } catch (error) {
+                console.error('Erro ao atualizar status:', error);
             }
         }
 
@@ -688,63 +852,209 @@
         }
 
         async function carregarHistorico() {
-            const response = await fetch('/api/automation/historico');
-            const data = await response.json();
+            try {
+                const response = await fetch('/api/automation/historico');
+                const data = await response.json();
 
-            if (!data.historico || data.historico.length === 0) {
-                document.getElementById('historico').innerHTML = '<p>Nenhuma automação executada ainda</p>';
-                return;
-            }
+                if (!data.historico || data.historico.length === 0) {
+                    document.getElementById('historico').innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: var(--cor-texto-secundario);">
+                            <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">📭 Nenhuma automação executada ainda</p>
+                            <small>Clique em "Ativar Disparo Completo" para iniciar o envio de boletos</small>
+                        </div>
+                    `;
+                    return;
+                }
 
-            let html = '<table class="table-nexus"><thead><tr><th>Data</th><th>Tipo</th><th>Processados</th><th>Boletos</th><th>Valor Total</th><th>Sucessos</th><th>Erros</th><th>Tempo</th></tr></thead><tbody>';
+                let html = `
+                    <table class="table-nexus">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Data/Hora</th>
+                                <th>Tipo</th>
+                                <th>Total</th>
+                                <th>Enviados</th>
+                                <th>Erros</th>
+                                <th>Taxa</th>
+                                <th>Detalhes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
 
-            data.historico.forEach(h => {
-                const data_exec = new Date(h.data_execucao).toLocaleString('pt-BR');
-                const valorFormatado = (h.valor_total_boletos || 0).toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
+                data.historico.forEach(h => {
+                    const data_exec = new Date(h.data_execucao).toLocaleString('pt-BR');
+                    const status = h.status || 'desconhecido';
+                    const total = h.total_processados || 0;
+                    const enviados = h.total_sucessos || 0;
+                    const erros = h.total_erros || 0;
+                    const taxa = total > 0 ? ((enviados / total) * 100).toFixed(1) : 0;
+
+                    // Ícone e cor do status
+                    let statusBadge = '';
+                    let statusIcon = '';
+                    let statusColor = '';
+
+                    switch(status) {
+                        case 'em_andamento':
+                            statusIcon = '🔄';
+                            statusColor = '#FFA500';
+                            statusBadge = 'Em Andamento';
+                            break;
+                        case 'concluido':
+                            statusIcon = '✅';
+                            statusColor = '#39FF14';
+                            statusBadge = 'Concluído';
+                            break;
+                        case 'erro':
+                            statusIcon = '❌';
+                            statusColor = '#FF3333';
+                            statusBadge = 'Erro';
+                            break;
+                        case 'cancelado':
+                            statusIcon = '⏸️';
+                            statusColor = '#888';
+                            statusBadge = 'Cancelado';
+                            break;
+                        default:
+                            statusIcon = '❓';
+                            statusColor = '#888';
+                            statusBadge = status;
+                    }
+
+                    // Tipo de disparo formatado
+                    let tipoFormatado = h.tipo_automacao || 'desconhecido';
+                    if (tipoFormatado === 'manual_completo') tipoFormatado = '🚀 Disparo Manual';
+                    if (tipoFormatado === 'agendado') tipoFormatado = '⏰ Agendado';
+                    if (tipoFormatado === 'teste') tipoFormatado = '🧪 Teste';
+
+                    html += `
+                        <tr style="border-left: 4px solid ${statusColor};">
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-size: 1.2rem;">${statusIcon}</span>
+                                    <span style="color: ${statusColor}; font-weight: 600;">${statusBadge}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="line-height: 1.4;">
+                                    <div>${data_exec.split(' ')[0]}</div>
+                                    <small style="color: #888;">${data_exec.split(' ')[1]}</small>
+                                </div>
+                            </td>
+                            <td>${tipoFormatado}</td>
+                            <td><strong>${total}</strong></td>
+                            <td><span class="badge badge-success">${enviados}</span></td>
+                            <td>${erros > 0 ? `<span class="badge badge-error">${erros}</span>` : '<span style="color: #888;">0</span>'}</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="background: rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; width: 60px; height: 8px;">
+                                        <div style="background: ${taxa >= 80 ? '#39FF14' : taxa >= 50 ? '#FFA500' : '#FF3333'}; width: ${taxa}%; height: 100%;"></div>
+                                    </div>
+                                    <span style="font-size: 0.85rem; color: #888;">${taxa}%</span>
+                                </div>
+                            </td>
+                            <td>
+                                <button
+                                    class="btn-secondary"
+                                    style="font-size: 0.8rem; padding: 0.3rem 0.8rem;"
+                                    onclick="mostrarDetalhesHistorico(${h.id}, '${statusBadge}', '${data_exec}', ${total}, ${enviados}, ${erros}, '${tipoFormatado}', ${h.tempo_execucao_segundos || 0})">
+                                    📊 Ver Detalhes
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+
+                    // Mensagens de erro/alerta
+                    if (status === 'erro' && h.detalhes) {
+                        try {
+                            const detalhes = typeof h.detalhes === 'string' ? JSON.parse(h.detalhes) : h.detalhes;
+                            if (detalhes.erro) {
+                                html += `
+                                    <tr style="background: rgba(255, 51, 51, 0.1);">
+                                        <td colspan="8" style="padding: 1rem 2rem;">
+                                            <div style="color: #FF3333; font-size: 0.9rem;">
+                                                <strong>❌ Erro:</strong> ${detalhes.erro}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `;
+                            }
+                        } catch (e) {}
+                    }
+
+                    // Se cancelado, mostrar info
+                    if (status === 'cancelado') {
+                        html += `
+                            <tr style="background: rgba(136, 136, 136, 0.1);">
+                                <td colspan="8" style="padding: 1rem 2rem;">
+                                    <div style="color: #888; font-size: 0.9rem;">
+                                        ⏸️ <strong>Disparo pausado/cancelado pelo usuário</strong>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }
+
+                    // Se em andamento, mostrar alerta
+                    if (status === 'em_andamento') {
+                        html += `
+                            <tr style="background: rgba(255, 165, 0, 0.1); animation: pulse 2s infinite;">
+                                <td colspan="8" style="padding: 1rem 2rem;">
+                                    <div style="color: #FFA500; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+                                        <span class="spinner" style="width: 16px; height: 16px; border: 2px solid #FFA500; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span>
+                                        <strong>Disparo em andamento...</strong> Aguarde a conclusão ou pause o disparo.
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }
                 });
 
-                html += `<tr>
-                    <td>${data_exec}</td>
-                    <td>${h.tipo_automacao}</td>
-                    <td>${h.total_processados}</td>
-                    <td>
-                        <span class="badge badge-success">${h.total_boletos_processados || 0} boletos</span>
-                        ${h.boletos_enviados ? `<br><small style="color: #39FF14;">${h.boletos_enviados} enviados</small>` : ''}
-                    </td>
-                    <td><strong style="color: #39FF14;">R$ ${valorFormatado}</strong></td>
-                    <td><span class="badge badge-success">${h.total_sucessos}</span></td>
-                    <td><span class="badge badge-error">${h.total_erros}</span></td>
-                    <td>${h.tempo_execucao_segundos}s</td>
-                </tr>`;
+                html += `
+                        </tbody>
+                    </table>
 
-                // Se tiver últimos boletos, mostra em linha expandida
-                if (h.ultimos_boletos && h.ultimos_boletos.length > 0) {
-                    html += `<tr style="background: rgba(57, 255, 20, 0.05);">
-                        <td colspan="8" style="padding-left: 2rem;">
-                            <details>
-                                <summary style="cursor: pointer; color: #39FF14; font-weight: 600;">
-                                    📄 Ver últimos ${h.ultimos_boletos.length} boletos processados
-                                </summary>
-                                <div style="margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px;">
-                                    ${h.ultimos_boletos.map(b => `
-                                        <div style="margin-bottom: 0.5rem; padding: 0.5rem; border-left: 3px solid ${b.status_envio === 'enviado' ? '#39FF14' : '#888'};">
-                                            <strong>${b.cliente_nome}</strong> -
-                                            R$ ${(b.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})} -
-                                            Venc: ${new Date(b.vencimento).toLocaleDateString('pt-BR')} -
-                                            <span class="badge ${b.status_envio === 'enviado' ? 'badge-success' : 'badge-error'}">${b.status_envio}</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </details>
-                        </td>
-                    </tr>`;
-                }
-            });
+                    <style>
+                        @keyframes pulse {
+                            0%, 100% { opacity: 1; }
+                            50% { opacity: 0.7; }
+                        }
 
-            html += '</tbody></table>';
-            document.getElementById('historico').innerHTML = html;
+                        @keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                    </style>
+                `;
+
+                document.getElementById('historico').innerHTML = html;
+
+            } catch (error) {
+                console.error('Erro ao carregar histórico:', error);
+                document.getElementById('historico').innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #FF3333;">
+                        <p>❌ Erro ao carregar histórico</p>
+                        <small>${error.message}</small>
+                    </div>
+                `;
+            }
+        }
+
+        function mostrarDetalhesHistorico(id, status, data, total, enviados, erros, tipo, tempo) {
+            const tempoMin = (tempo / 60).toFixed(1);
+            const taxa = total > 0 ? ((enviados / total) * 100).toFixed(1) : 0;
+
+            alert(`📊 DETALHES DO DISPARO #${id}\n\n` +
+                  `Status: ${status}\n` +
+                  `Data/Hora: ${data}\n` +
+                  `Tipo: ${tipo}\n\n` +
+                  `━━━━━━━━━━━━━━━━━━━━\n` +
+                  `Total Processados: ${total}\n` +
+                  `✅ Enviados: ${enviados}\n` +
+                  `❌ Erros: ${erros}\n` +
+                  `📈 Taxa de Sucesso: ${taxa}%\n\n` +
+                  `⏱️ Tempo de Execução: ${tempoMin} minutos (${tempo}s)`);
         }
 
         // ===== GERENCIAMENTO DE NÚMEROS DE NOTIFICAÇÃO =====
