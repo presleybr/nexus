@@ -112,6 +112,7 @@ def get_historico():
                 ) as ultimos_boletos
             FROM historico_disparos hd
             WHERE hd.cliente_nexus_id = %s
+            AND hd.status IN ('concluido', 'cancelado')
             ORDER BY hd.horario_execucao DESC
             LIMIT 20
         """

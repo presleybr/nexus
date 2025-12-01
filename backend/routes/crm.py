@@ -1324,10 +1324,10 @@ def ativar_disparo_completo():
             AND b.status_envio = 'nao_enviado'
             AND cf.whatsapp IS NOT NULL
             AND cf.whatsapp != ''
-            AND cf.whatsapp NOT LIKE '%999999999%'
-            AND cf.whatsapp NOT LIKE '55679%'
-            AND cf.whatsapp NOT LIKE '55649%'
-            AND cf.whatsapp NOT LIKE '0000000000%'
+            AND cf.whatsapp NOT LIKE '%%999999999%%'
+            AND cf.whatsapp NOT LIKE '55679%%'
+            AND cf.whatsapp NOT LIKE '55649%%'
+            AND cf.whatsapp NOT LIKE '0000000000%%'
             AND LENGTH(cf.whatsapp) >= 12
             AND LENGTH(cf.whatsapp) <= 13
             AND cf.ativo = true
@@ -1861,10 +1861,10 @@ def executar_scheduler_agora():
             AND b.status_envio = 'nao_enviado'
             AND cf.whatsapp IS NOT NULL
             AND cf.whatsapp != ''
-            AND cf.whatsapp NOT LIKE '%999999999%'
-            AND cf.whatsapp NOT LIKE '55679%'
-            AND cf.whatsapp NOT LIKE '55649%'
-            AND cf.whatsapp NOT LIKE '0000000000%'
+            AND cf.whatsapp NOT LIKE '%%999999999%%'
+            AND cf.whatsapp NOT LIKE '55679%%'
+            AND cf.whatsapp NOT LIKE '55649%%'
+            AND cf.whatsapp NOT LIKE '0000000000%%'
             AND LENGTH(cf.whatsapp) >= 12
             AND LENGTH(cf.whatsapp) <= 13
             AND cf.ativo = true
