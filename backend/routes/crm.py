@@ -1547,13 +1547,44 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
 
                     stats['enviados'] += 1
                     log_sistema('success', f"✅ Boleto enviado com sucesso para {nome_cliente}", 'disparo')
+
+                    # 6. REGISTRAR DISPARO NA TABELA disparos (para status em tempo real)
+                    db.execute_update("""
+                        INSERT INTO disparos
+                        (cliente_nexus_id, boleto_id, whatsapp_numero, status_disparo, data_disparo)
+                        VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    """, (cliente_nexus_id, boleto['boleto_id'], whatsapp, 'enviado'))
                 else:
                     erro_msg = resultado_pdf.get('error') or resultado_pdf.get('mensagem') or 'Erro desconhecido'
                     log_sistema('error', f"❌ Erro ao enviar PDF para {nome_cliente}: {erro_msg}", 'disparo')
                     log_sistema('error', f"📋 Detalhes do erro: {resultado_pdf}", 'disparo')
                     stats['erros'] += 1
 
-                # 6. INTERVALO ENTRE CLIENTES (segurança anti-bloqueio HUMANIZADO)
+                    # REGISTRAR ERRO NA TABELA disparos
+                    db.execute_update("""
+                        INSERT INTO disparos
+                        (cliente_nexus_id, boleto_id, whatsapp_numero, status_disparo, data_disparo)
+                        VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    """, (cliente_nexus_id, boleto['boleto_id'], whatsapp, 'erro'))
+
+                # 7. ATUALIZAR PROGRESSO EM TEMPO REAL no historico_disparos
+                db.execute_update("""
+                    UPDATE historico_disparos
+                    SET total_envios = %s,
+                        envios_sucesso = %s,
+                        envios_erro = %s
+                    WHERE id = (
+                        SELECT id
+                        FROM historico_disparos
+                        WHERE cliente_nexus_id = %s
+                        AND tipo_disparo = 'manual_completo'
+                        AND status = 'em_andamento'
+                        ORDER BY horario_execucao DESC
+                        LIMIT 1
+                    )
+                """, (stats['total'], stats['enviados'], stats['erros'], cliente_nexus_id))
+
+                # 8. INTERVALO ENTRE CLIENTES (segurança anti-bloqueio HUMANIZADO)
                 if idx < len(boletos_reais) - 1:
                     # Aumenta intervalo progressivamente a cada 10 disparos
                     # A cada 10 mensagens, pausa maior (simula descanso humano)
