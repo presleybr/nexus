@@ -1267,26 +1267,10 @@
             }
         }
 
-        // Verificar disparo ativo ao carregar a página
-        async function verificarDisparoAtivo() {
-            try {
-                const response = await fetch('/api/crm/scheduler/status-disparo-atual');
-                const data = await response.json();
-
-                if (data.success && data.disparo) {
-                    // Há disparo em andamento - iniciar monitoramento
-                    iniciarMonitoramento();
-                }
-            } catch (error) {
-                console.error('Erro ao verificar disparo ativo:', error);
-            }
-        }
-
         // Inicialização
         carregarConfiguracoes();
         carregarHistorico();
         carregarNumeros();
-        verificarDisparoAtivo();
 
         function logout() {
             fetch('/api/auth/logout', {method: 'POST'}).then(() => window.location.href = '/');
