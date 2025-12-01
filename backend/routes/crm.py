@@ -1831,6 +1831,50 @@ def status_disparo_atual():
         }), 500
 
 
+@crm_bp.route('/scheduler/limpar-disparos-travados', methods=['POST'])
+@login_required
+def limpar_disparos_travados():
+    """Limpa disparos travados (em andamento há mais de 10 minutos)"""
+    try:
+        cliente_nexus_id = session.get('cliente_nexus_id')
+
+        # Atualizar disparos travados para erro
+        result = db.execute_update("""
+            UPDATE historico_disparos
+            SET status = 'erro',
+                detalhes = '{"mensagem": "Disparo cancelado - estava travado por mais de 10 minutos"}'::jsonb
+            WHERE cliente_nexus_id = %s
+            AND status = 'em_andamento'
+            AND horario_execucao < NOW() - INTERVAL '10 minutes'
+        """, (cliente_nexus_id,))
+
+        # Contar quantos foram atualizados
+        verificar = db.execute_query("""
+            SELECT COUNT(*) as count
+            FROM historico_disparos
+            WHERE cliente_nexus_id = %s
+            AND status = 'erro'
+            AND detalhes->>'mensagem' LIKE '%travado%'
+            AND horario_execucao > NOW() - INTERVAL '1 hour'
+        """, (cliente_nexus_id,))
+
+        count = verificar[0]['count'] if verificar else 0
+
+        return jsonify({
+            'success': True,
+            'message': f'{count} disparo(s) travado(s) limpo(s)',
+            'count': count
+        }), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'erro': str(e)
+        }), 500
+
+
 @crm_bp.route('/scheduler/executar-agora', methods=['POST'])
 @login_required
 def executar_scheduler_agora():

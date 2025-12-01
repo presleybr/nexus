@@ -1267,7 +1267,19 @@
             }
         }
 
+        // Limpar disparos travados ao carregar página
+        async function limparDisparosTravados() {
+            try {
+                await fetch('/api/crm/scheduler/limpar-disparos-travados', {
+                    method: 'POST'
+                });
+            } catch (error) {
+                console.error('Erro ao limpar disparos travados:', error);
+            }
+        }
+
         // Inicialização
+        limparDisparosTravados(); // Limpa disparos travados primeiro
         carregarConfiguracoes();
         carregarHistorico();
         carregarNumeros();
