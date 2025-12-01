@@ -155,7 +155,7 @@ def diagnosticar_disparo():
     vencimento_str = dados_pdf.get('vencimento_str') if dados_pdf.get('sucesso') else boleto['data_vencimento'].strftime('%d/%m/%Y')
     valor_str = f"R$ {dados_pdf.get('valor', 0):.2f}" if dados_pdf.get('sucesso') else f"R$ {boleto['valor_original']:.2f}"
 
-    legenda = f"📄 *Boleto Cred MS*\nVencimento: {vencimento_str}\nValor: {valor_str}\n\n💚 Cred MS - Seu parceiro de confiança!"
+    legenda = f"📄 *Boleto Cred MS*\nVencimento: {vencimento_str}\nValor: {valor_str}\n\n💚 Seu parceiro de confiança!"
 
     resultado_pdf = whatsapp_service.enviar_pdf(
         boleto['whatsapp'],

@@ -167,7 +167,7 @@ class BoletoModeloService:
                         'phone': whatsapp_numero,
                         'file': pdf_base64,
                         'filename': 'boleto.pdf',
-                        'caption': '📄 *Boleto Cred MS*\n\n💚 Cred MS - Seu parceiro de confiança!'
+                        'caption': '📄 *Boleto Cred MS*\n\n💚 Seu parceiro de confiança!'
                     }
 
                     response_doc = requests.post('http://localhost:3001/send-file', json=payload_doc, timeout=30)

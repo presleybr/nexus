@@ -692,7 +692,7 @@ def enviar_boleto_whatsapp_crm(boleto_id):
         payload_doc = {
             'phone': whatsapp_numero,
             'filePath': boleto['pdf_path'],
-            'caption': f"📄 *Boleto Cred MS* - Vencimento: {boleto['data_vencimento'].strftime('%d/%m/%Y') if boleto['data_vencimento'] else 'N/A'}\n\n💚 Cred MS - Seu parceiro de confiança!",
+            'caption': f"📄 *Boleto Cred MS* - Vencimento: {boleto['data_vencimento'].strftime('%d/%m/%Y') if boleto['data_vencimento'] else 'N/A'}\n\n💚 Seu parceiro de confiança!",
             'filename': boleto['pdf_filename'] or 'boleto.pdf'
         }
 
@@ -923,7 +923,7 @@ def enviar_boleto_whatsapp_api_crm(boleto_id):
         payload_pdf = {
             'phone': whatsapp_numero,
             'filePath': pdf_path,
-            'caption': f"📄 *Boleto Cred MS* - Vencimento: {boleto['data_vencimento'].strftime('%d/%m/%Y') if boleto['data_vencimento'] else 'N/A'}\n\n💚 Cred MS - Seu parceiro de confiança!",
+            'caption': f"📄 *Boleto Cred MS* - Vencimento: {boleto['data_vencimento'].strftime('%d/%m/%Y') if boleto['data_vencimento'] else 'N/A'}\n\n💚 Seu parceiro de confiança!",
             'filename': boleto['pdf_filename'] or 'boleto.pdf'
         }
 
@@ -1504,7 +1504,10 @@ Sistema Nexus - Aqui seu tempo vale ouro"""
                 vencimento_str = dados_pdf.get('vencimento_str') if dados_pdf.get('sucesso') else boleto['data_vencimento'].strftime('%d/%m/%Y')
                 valor_str = f"R$ {dados_pdf.get('valor', 0):.2f}" if dados_pdf.get('sucesso') else f"R$ {boleto['valor_original']:.2f}"
 
-                legenda = f"📄 *Boleto {nome_empresa}*\nVencimento: {vencimento_str}\nValor: {valor_str}\n\n💚 {nome_empresa} - Seu parceiro de confiança!"
+                # Remover "Nexus Brasil" do nome da empresa se existir
+                nome_empresa_limpo = nome_empresa.replace(' - Nexus Brasil', '').replace('- Nexus Brasil', '').strip()
+
+                legenda = f"📄 *Boleto {nome_empresa_limpo}*\nVencimento: {vencimento_str}\nValor: {valor_str}\n\n💚 Seu parceiro de confiança!"
 
                 log_sistema('info', f"📄 Preparando envio de PDF:", 'disparo')
                 log_sistema('info', f"  ├─ Cliente: {nome_cliente}", 'disparo')
