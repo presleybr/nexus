@@ -527,6 +527,23 @@
                         Iniciar Download de Boletos
                     </button>
 
+                    <!-- Botão Pausar Download (inicialmente oculto) -->
+                    <button class="btn-canopus" id="btnPausarDownload" style="background: #ea4335; color: #fff; position: relative; z-index: 1; display: none; margin-top: 1rem;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="6" y="4" width="4" height="16"></rect>
+                            <rect x="14" y="4" width="4" height="16"></rect>
+                        </svg>
+                        Pausar Download
+                    </button>
+
+                    <!-- Botão Retomar Download (inicialmente oculto) -->
+                    <button class="btn-canopus" id="btnRetomarDownload" style="background: #34a853; color: #fff; position: relative; z-index: 1; display: none; margin-top: 1rem;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        Retomar Download
+                    </button>
+
                     <!-- Card de Monitoramento em Tempo Real -->
                     <div id="monitorCard" style="margin-top: 1.5rem; padding: 1.5rem; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid rgba(66,133,244,0.3); display: none;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
@@ -867,6 +884,63 @@
             }
         });
 
+        // Pausar download
+        document.getElementById('btnPausarDownload').addEventListener('click', async () => {
+            const btn = document.getElementById('btnPausarDownload');
+            btn.disabled = true;
+            btn.innerHTML = '<span>Pausando...</span>';
+
+            try {
+                const response = await fetch('/api/automation/pausar-download', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    adicionarLog('warning', '⏸️ Download será pausado após o cliente atual...');
+                } else {
+                    alert('Erro ao pausar: ' + result.error);
+                    btn.disabled = false;
+                    btn.innerHTML = 'Pausar Download';
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao conectar com o servidor');
+                btn.disabled = false;
+                btn.innerHTML = 'Pausar Download';
+            }
+        });
+
+        // Retomar download
+        document.getElementById('btnRetomarDownload').addEventListener('click', async () => {
+            const btn = document.getElementById('btnRetomarDownload');
+            btn.disabled = true;
+            btn.innerHTML = '<span>Retomando...</span>';
+
+            try {
+                const response = await fetch('/api/automation/retomar-download', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    adicionarLog('success', '▶️ Download retomado!');
+                    // Não precisa fazer nada, o polling vai atualizar os botões
+                } else {
+                    alert('Erro ao retomar: ' + result.error);
+                    btn.disabled = false;
+                    btn.innerHTML = 'Retomar Download';
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao conectar com o servidor');
+                btn.disabled = false;
+                btn.innerHTML = 'Retomar Download';
+            }
+        });
+
         // Importar boletos
         document.getElementById('btnImportarBoletos').addEventListener('click', async () => {
             console.log('🔵 Botão Importar Boletos clicado!');
@@ -962,28 +1036,57 @@ Os boletos importados já estão prontos para envio via WhatsApp!`;
                     // Atualizar etapa atual
                     document.getElementById('currentStep').textContent = status.etapa_atual;
 
-                    // Atualizar status badge
+                    // Atualizar status badge e botões
                     const badge = document.getElementById('statusBadge');
                     const spinner = document.getElementById('statusSpinner');
-                    const btn = document.getElementById('btnIniciarDownload');
+                    const btnIniciar = document.getElementById('btnIniciarDownload');
+                    const btnPausar = document.getElementById('btnPausarDownload');
+                    const btnRetomar = document.getElementById('btnRetomarDownload');
 
-                    if (status.ativo) {
+                    // Se está pausado
+                    if (status.pausado) {
+                        badge.textContent = 'PAUSADO';
+                        badge.style.background = '#fbbc04';
+                        badge.style.color = '#000';
+                        spinner.style.display = 'none';
+
+                        // Ocultar botões de iniciar e pausar, mostrar retomar
+                        btnIniciar.style.display = 'none';
+                        btnPausar.style.display = 'none';
+                        btnRetomar.style.display = 'block';
+                        btnRetomar.disabled = false;
+                        btnRetomar.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Retomar Download';
+                    }
+                    // Se está ativo (processando)
+                    else if (status.ativo) {
                         badge.textContent = 'ATIVO';
                         badge.style.background = '#39FF14';
                         badge.style.color = '#000';
                         spinner.style.display = 'inline';
-                        btn.disabled = true;
-                        btn.innerHTML = '<span>Processando...</span>';
-                    } else {
+
+                        // Ocultar iniciar e retomar, mostrar pausar
+                        btnIniciar.style.display = 'none';
+                        btnPausar.style.display = 'block';
+                        btnPausar.disabled = false;
+                        btnPausar.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> Pausar Download';
+                        btnRetomar.style.display = 'none';
+                    }
+                    // Se está inativo (não iniciado ou concluído)
+                    else {
                         badge.textContent = status.porcentagem === 100 ? 'CONCLUÍDO' : 'INATIVO';
                         badge.style.background = status.porcentagem === 100 ? '#34a853' : '#666';
                         badge.style.color = '#fff';
                         spinner.style.display = 'none';
-                        btn.disabled = false;
-                        btn.innerHTML = 'Iniciar Download';
 
-                        // Parar polling se não está ativo
-                        if (pollingStatusInterval) {
+                        // Mostrar apenas iniciar
+                        btnIniciar.style.display = 'block';
+                        btnIniciar.disabled = false;
+                        btnIniciar.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Iniciar Download de Boletos';
+                        btnPausar.style.display = 'none';
+                        btnRetomar.style.display = 'none';
+
+                        // Parar polling se não está ativo e não está pausado
+                        if (pollingStatusInterval && !status.pausado) {
                             clearInterval(pollingStatusInterval);
                             pollingStatusInterval = null;
 

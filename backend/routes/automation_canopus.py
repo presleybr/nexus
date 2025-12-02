@@ -60,6 +60,8 @@ automation_canopus_bp = Blueprint('automation_canopus', __name__, url_prefix='/a
 # Status global da execução de downloads
 execution_status = {
     'ativo': False,
+    'pausado': False,  # Flag de pausa
+    'pode_pausar': False,  # Indica se há execução que pode ser pausada
     'ponto_venda': None,
     'total_clientes': 0,
     'clientes_processados': 0,
@@ -103,6 +105,8 @@ def iniciar_execucao(ponto_venda: str, total_clientes: int):
     global execution_status
     execution_status.update({
         'ativo': True,
+        'pausado': False,
+        'pode_pausar': True,  # Agora é possível pausar
         'ponto_venda': ponto_venda,
         'total_clientes': total_clientes,
         'clientes_processados': 0,
@@ -117,9 +121,34 @@ def finalizar_execucao(sucesso: bool = True):
     """Marca fim da execução"""
     global execution_status
     execution_status['ativo'] = False
+    execution_status['pausado'] = False
+    execution_status['pode_pausar'] = False
     execution_status['etapa_atual'] = 'Concluído!' if sucesso else 'Erro na execução'
     execution_status['porcentagem'] = 100 if sucesso else execution_status['porcentagem']
     execution_status['ultimo_update'] = datetime.now().isoformat()
+
+def pausar_execucao():
+    """Marca que a execução deve ser pausada"""
+    global execution_status
+    if execution_status['ativo'] and not execution_status['pausado']:
+        execution_status['pausado'] = True
+        execution_status['etapa_atual'] = 'Pausando após cliente atual...'
+        execution_status['ultimo_update'] = datetime.now().isoformat()
+        logger.info("⏸️ Solicitação de pausa recebida - pausará após cliente atual")
+        return True
+    return False
+
+def retomar_execucao():
+    """Retoma a execução pausada"""
+    global execution_status
+    if execution_status['pausado']:
+        execution_status['pausado'] = False
+        execution_status['ativo'] = True
+        execution_status['etapa_atual'] = 'Retomando processamento...'
+        execution_status['ultimo_update'] = datetime.now().isoformat()
+        logger.info("▶️ Retomando execução pausada")
+        return True
+    return False
 
 
 # ============================================================================
@@ -1147,6 +1176,66 @@ def status_execucao():
     })
 
 
+@automation_canopus_bp.route('/pausar-download', methods=['POST'])
+def pausar_download():
+    """
+    Pausa a execução atual de downloads
+    O download atual será concluído antes de pausar
+    """
+    global execution_status
+
+    if not execution_status['ativo']:
+        return jsonify({
+            'success': False,
+            'error': 'Não há execução ativa para pausar'
+        }), 400
+
+    if execution_status['pausado']:
+        return jsonify({
+            'success': False,
+            'error': 'A execução já está pausada'
+        }), 400
+
+    if pausar_execucao():
+        return jsonify({
+            'success': True,
+            'message': 'Download será pausado após o cliente atual',
+            'status': execution_status.copy()
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': 'Não foi possível pausar a execução'
+        }), 500
+
+
+@automation_canopus_bp.route('/retomar-download', methods=['POST'])
+def retomar_download():
+    """
+    Retoma a execução pausada de downloads
+    Continua do ponto onde parou
+    """
+    global execution_status
+
+    if not execution_status['pausado']:
+        return jsonify({
+            'success': False,
+            'error': 'Não há execução pausada para retomar'
+        }), 400
+
+    if retomar_execucao():
+        return jsonify({
+            'success': True,
+            'message': 'Download retomado com sucesso',
+            'status': execution_status.copy()
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': 'Não foi possível retomar a execução'
+        }), 500
+
+
 @automation_canopus_bp.route('/verificar-arquivos', methods=['GET'])
 def verificar_arquivos():
     """
@@ -1618,6 +1707,35 @@ def baixar_boletos_ponto_venda():
 
                     # Processar cada CPF na mesma sessão
                     for idx, cpf in enumerate(cpfs, 1):
+                        # VERIFICAR SE FOI SOLICITADA PAUSA
+                        global execution_status
+                        if execution_status.get('pausado', False):
+                            logger.info("=" * 80)
+                            logger.info("⏸️ PAUSA SOLICITADA!")
+                            logger.info(f"   Pausando após cliente {idx - 1}/{len(cpfs)}")
+                            logger.info(f"   Próximo CPF a processar: {cpf}")
+                            logger.info("=" * 80)
+                            sys.stdout.flush()
+
+                            # Aguardar até que retome ou finalize
+                            atualizar_status(
+                                etapa=f'PAUSADO - Processados: {idx - 1}/{len(cpfs)}',
+                                progresso=idx - 1
+                            )
+                            execution_status['ativo'] = False  # Marcar como inativo enquanto pausado
+
+                            # Loop de espera
+                            while execution_status.get('pausado', False):
+                                await asyncio.sleep(2)  # Verificar a cada 2 segundos
+
+                            # Se chegou aqui, foi retomado
+                            logger.info("=" * 80)
+                            logger.info("▶️ RETOMANDO PROCESSAMENTO")
+                            logger.info(f"   Continuando do cliente {idx}/{len(cpfs)}")
+                            logger.info("=" * 80)
+                            sys.stdout.flush()
+                            execution_status['ativo'] = True
+
                         # Monitorar memória a cada 5 clientes
                         if idx % 5 == 0:
                             mem_info = process.memory_info()
