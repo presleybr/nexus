@@ -588,6 +588,21 @@
                                 Aguardando início...
                             </div>
                         </div>
+
+                        <!-- Lista de Downloads em Tempo Real -->
+                        <div id="downloadsListCard" style="margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px; display: none;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <h5 style="margin: 0; color: rgba(255,255,255,0.9); font-size: 0.95rem;">Últimos Processados</h5>
+                                <div style="display: flex; gap: 0.75rem; font-size: 0.8rem;">
+                                    <span style="color: #34a853;">✅ <span id="countSucesso">0</span></span>
+                                    <span style="color: #ea4335;">❌ <span id="countErro">0</span></span>
+                                    <span style="color: #fbbc04;">⚠️ <span id="countSemBoleto">0</span></span>
+                                </div>
+                            </div>
+                            <div id="downloadsList" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;">
+                                <!-- Downloads serão inseridos aqui via JavaScript -->
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -858,6 +873,9 @@
                     // Iniciar polling do status de execução
                     iniciarPollingStatus();
 
+                    // Iniciar polling da lista de downloads em tempo real
+                    iniciarPollingDownloads();
+
                     // Iniciar polling para atualizar lista de boletos a cada 5 segundos
                     let boletosPollingInterval = setInterval(() => {
                         carregarBoletosBaixados();
@@ -1090,14 +1108,103 @@ Os boletos importados já estão prontos para envio via WhatsApp!`;
                             clearInterval(pollingStatusInterval);
                             pollingStatusInterval = null;
 
+                            // Parar polling de downloads também
+                            pararPollingDownloads();
+
                             if (status.porcentagem === 100) {
                                 adicionarLog('success', '✅ Download de boletos concluído!');
+                                // Uma última atualização da lista
+                                atualizarListaDownloads();
                             }
                         }
                     }
                 }
             } catch (error) {
                 console.error('Erro ao atualizar status:', error);
+            }
+        }
+
+        // Polling de lista de downloads
+        let pollingDownloadsInterval = null;
+
+        async function atualizarListaDownloads() {
+            try {
+                const response = await fetch('/api/automation/downloads-status?limit=10');
+                const result = await response.json();
+
+                if (result.success) {
+                    // Atualizar contadores
+                    document.getElementById('countSucesso').textContent = result.resumo.sucesso;
+                    document.getElementById('countErro').textContent = result.resumo.erro;
+                    document.getElementById('countSemBoleto').textContent = result.resumo.sem_boleto;
+
+                    // Atualizar lista
+                    const lista = document.getElementById('downloadsList');
+                    lista.innerHTML = '';
+
+                    result.downloads.forEach(d => {
+                        const item = document.createElement('div');
+                        item.style.cssText = 'padding: 0.5rem; margin-bottom: 0.25rem; background: rgba(0,0,0,0.2); border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;';
+
+                        let icon = '';
+                        let color = '';
+                        let statusText = '';
+
+                        if (d.status === 'sucesso') {
+                            icon = '✅';
+                            color = '#34a853';
+                            statusText = 'Sucesso';
+                        } else if (d.status === 'erro') {
+                            icon = '❌';
+                            color = '#ea4335';
+                            statusText = d.mensagem_erro || 'Erro';
+                        } else if (d.status === 'sem_boleto') {
+                            icon = '⚠️';
+                            color = '#fbbc04';
+                            statusText = 'Sem boleto';
+                        } else {
+                            icon = '⏳';
+                            color = '#888';
+                            statusText = 'Pendente';
+                        }
+
+                        item.innerHTML = `
+                            <span style="font-size: 1rem;">${icon}</span>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="color: #fff; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    ${d.cliente_nome || d.cpf}
+                                </div>
+                                <div style="color: ${color}; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${statusText}">
+                                    ${statusText}
+                                </div>
+                            </div>
+                        `;
+
+                        lista.appendChild(item);
+                    });
+
+                    // Mostrar card se há downloads
+                    if (result.downloads.length > 0) {
+                        document.getElementById('downloadsListCard').style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao atualizar lista de downloads:', error);
+            }
+        }
+
+        function iniciarPollingDownloads() {
+            // Atualizar imediatamente
+            atualizarListaDownloads();
+
+            // Atualizar a cada 3 segundos
+            pollingDownloadsInterval = setInterval(atualizarListaDownloads, 3000);
+        }
+
+        function pararPollingDownloads() {
+            if (pollingDownloadsInterval) {
+                clearInterval(pollingDownloadsInterval);
+                pollingDownloadsInterval = null;
             }
         }
 

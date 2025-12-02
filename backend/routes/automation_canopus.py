@@ -1176,6 +1176,70 @@ def status_execucao():
     })
 
 
+@automation_canopus_bp.route('/downloads-status', methods=['GET'])
+def downloads_status():
+    """
+    Retorna status de todos os downloads em tempo real
+    Usado para mostrar lista de sucessos/erros no frontend
+    """
+    try:
+        # Pegar limite da query string (padrão: 50 últimos)
+        limit = request.args.get('limit', 50, type=int)
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Buscar últimos downloads ordenados por data
+                cur.execute("""
+                    SELECT
+                        d.id,
+                        d.cpf,
+                        d.status,
+                        d.mensagem_erro,
+                        d.nome_arquivo,
+                        d.data_download,
+                        cf.nome_completo as cliente_nome
+                    FROM downloads_canopus d
+                    LEFT JOIN clientes_finais cf ON cf.cpf = d.cpf
+                    ORDER BY d.data_download DESC
+                    LIMIT %s
+                """, (limit,))
+
+                downloads = cur.fetchall()
+
+                # Calcular resumo
+                cur.execute("""
+                    SELECT
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = 'sucesso' THEN 1 ELSE 0 END) as sucesso,
+                        SUM(CASE WHEN status = 'erro' THEN 1 ELSE 0 END) as erro,
+                        SUM(CASE WHEN status = 'sem_boleto' THEN 1 ELSE 0 END) as sem_boleto,
+                        SUM(CASE WHEN status = 'pendente' THEN 1 ELSE 0 END) as pendente
+                    FROM downloads_canopus
+                    WHERE DATE(data_download) = CURRENT_DATE
+                """)
+
+                resumo = cur.fetchone()
+
+                return jsonify({
+                    'success': True,
+                    'downloads': downloads,
+                    'resumo': {
+                        'total': resumo['total'] or 0,
+                        'sucesso': resumo['sucesso'] or 0,
+                        'erro': resumo['erro'] or 0,
+                        'sem_boleto': resumo['sem_boleto'] or 0,
+                        'pendente': resumo['pendente'] or 0
+                    }
+                })
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar status de downloads: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @automation_canopus_bp.route('/pausar-download', methods=['POST'])
 def pausar_download():
     """
@@ -2060,6 +2124,44 @@ def baixar_boletos_ponto_venda():
                                 logger.warning(f"⚠️ CPF {idx}/{len(cpfs)} NÃO ENCONTRADO: {cpf}")
                                 logger.warning("Aguardando 5 segundos antes de continuar...")
                                 logger.warning("=" * 80)
+
+                                # REGISTRAR ERRO NO BANCO
+                                try:
+                                    with get_db_connection() as conn_erro:
+                                        with conn_erro.cursor() as cur_erro:
+                                            # Buscar consultor_id
+                                            cur_erro.execute("""
+                                                SELECT consultor_id FROM clientes_finais
+                                                WHERE cpf = %s AND ativo = TRUE
+                                                LIMIT 1
+                                            """, (cpf,))
+                                            consultor_row = cur_erro.fetchone()
+                                            consultor_id = consultor_row['consultor_id'] if consultor_row else None
+
+                                            # Inserir registro de erro
+                                            cur_erro.execute("""
+                                                INSERT INTO downloads_canopus (
+                                                    consultor_id,
+                                                    cpf,
+                                                    status,
+                                                    mensagem_erro,
+                                                    data_download,
+                                                    created_at
+                                                ) VALUES (
+                                                    %s, %s, 'erro', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                                                )
+                                            """, (
+                                                consultor_id,
+                                                cpf,
+                                                f"CPF não encontrado no sistema Canopus: {resultado.get('mensagem', 'Cliente não localizado')}"
+                                            ))
+                                            conn_erro.commit()
+                                            logger.info(f"💾 ✅ Erro registrado no banco: CPF não encontrado")
+                                            sys.stdout.flush()
+                                except Exception as e_registro:
+                                    logger.error(f"❌ Erro ao registrar no banco: {e_registro}")
+                                    sys.stdout.flush()
+
                                 await asyncio.sleep(5)
 
                             elif resultado.get('status') == CanopusConfig.Status.SEM_BOLETO:
@@ -2069,6 +2171,44 @@ def baixar_boletos_ponto_venda():
                                 logger.warning(f"📄 SEM BOLETO: {cpf} - {resultado.get('mensagem')}")
                                 logger.warning("Aguardando 5 segundos antes de continuar...")
                                 logger.warning("=" * 80)
+
+                                # REGISTRAR NO BANCO
+                                try:
+                                    with get_db_connection() as conn_erro:
+                                        with conn_erro.cursor() as cur_erro:
+                                            # Buscar consultor_id
+                                            cur_erro.execute("""
+                                                SELECT consultor_id FROM clientes_finais
+                                                WHERE cpf = %s AND ativo = TRUE
+                                                LIMIT 1
+                                            """, (cpf,))
+                                            consultor_row = cur_erro.fetchone()
+                                            consultor_id = consultor_row['consultor_id'] if consultor_row else None
+
+                                            # Inserir registro
+                                            cur_erro.execute("""
+                                                INSERT INTO downloads_canopus (
+                                                    consultor_id,
+                                                    cpf,
+                                                    status,
+                                                    mensagem_erro,
+                                                    data_download,
+                                                    created_at
+                                                ) VALUES (
+                                                    %s, %s, 'sem_boleto', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                                                )
+                                            """, (
+                                                consultor_id,
+                                                cpf,
+                                                f"Sem boleto disponível: {resultado.get('mensagem', 'Nenhum boleto encontrado para este cliente')}"
+                                            ))
+                                            conn_erro.commit()
+                                            logger.info(f"💾 ✅ Registrado no banco: Sem boleto")
+                                            sys.stdout.flush()
+                                except Exception as e_registro:
+                                    logger.error(f"❌ Erro ao registrar no banco: {e_registro}")
+                                    sys.stdout.flush()
+
                                 await asyncio.sleep(5)
 
                             else:
@@ -2079,6 +2219,44 @@ def baixar_boletos_ponto_venda():
                                 logger.error(f"Mensagem: {resultado.get('mensagem')}")
                                 logger.error("Aguardando 5 segundos antes de continuar...")
                                 logger.error("=" * 80)
+
+                                # REGISTRAR ERRO NO BANCO
+                                try:
+                                    with get_db_connection() as conn_erro:
+                                        with conn_erro.cursor() as cur_erro:
+                                            # Buscar consultor_id
+                                            cur_erro.execute("""
+                                                SELECT consultor_id FROM clientes_finais
+                                                WHERE cpf = %s AND ativo = TRUE
+                                                LIMIT 1
+                                            """, (cpf,))
+                                            consultor_row = cur_erro.fetchone()
+                                            consultor_id = consultor_row['consultor_id'] if consultor_row else None
+
+                                            # Inserir registro de erro
+                                            cur_erro.execute("""
+                                                INSERT INTO downloads_canopus (
+                                                    consultor_id,
+                                                    cpf,
+                                                    status,
+                                                    mensagem_erro,
+                                                    data_download,
+                                                    created_at
+                                                ) VALUES (
+                                                    %s, %s, 'erro', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                                                )
+                                            """, (
+                                                consultor_id,
+                                                cpf,
+                                                f"Erro durante download: {resultado.get('mensagem', 'Erro desconhecido')}"
+                                            ))
+                                            conn_erro.commit()
+                                            logger.info(f"💾 ✅ Erro registrado no banco: {resultado.get('mensagem', 'Erro desconhecido')}")
+                                            sys.stdout.flush()
+                                except Exception as e_registro:
+                                    logger.error(f"❌ Erro ao registrar no banco: {e_registro}")
+                                    sys.stdout.flush()
+
                                 await asyncio.sleep(5)
 
                         except Exception as e:
@@ -2089,6 +2267,44 @@ def baixar_boletos_ponto_venda():
                             logger.error(f"Erro: {str(e)}")
                             logger.error("Aguardando 5 segundos antes de continuar...")
                             logger.error("=" * 80)
+
+                            # REGISTRAR EXCEÇÃO NO BANCO
+                            try:
+                                with get_db_connection() as conn_erro:
+                                    with conn_erro.cursor() as cur_erro:
+                                        # Buscar consultor_id
+                                        cur_erro.execute("""
+                                            SELECT consultor_id FROM clientes_finais
+                                            WHERE cpf = %s AND ativo = TRUE
+                                            LIMIT 1
+                                        """, (cpf,))
+                                        consultor_row = cur_erro.fetchone()
+                                        consultor_id = consultor_row['consultor_id'] if consultor_row else None
+
+                                        # Inserir registro de exceção
+                                        cur_erro.execute("""
+                                            INSERT INTO downloads_canopus (
+                                                consultor_id,
+                                                cpf,
+                                                status,
+                                                mensagem_erro,
+                                                data_download,
+                                                created_at
+                                            ) VALUES (
+                                                %s, %s, 'erro', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                                            )
+                                        """, (
+                                            consultor_id,
+                                            cpf,
+                                            f"Exceção durante processamento: {str(e)}"
+                                        ))
+                                        conn_erro.commit()
+                                        logger.info(f"💾 ✅ Exceção registrada no banco")
+                                        sys.stdout.flush()
+                            except Exception as e_registro:
+                                logger.error(f"❌ Erro ao registrar exceção no banco: {e_registro}")
+                                sys.stdout.flush()
+
                             await asyncio.sleep(5)
 
                     # Monitoramento final de memória
