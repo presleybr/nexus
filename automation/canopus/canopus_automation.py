@@ -57,6 +57,7 @@ def buscar_cliente_banco(cpf: str) -> Optional[Dict[str, Any]]:
     Returns:
         Dicionário com nome e outras informações ou None se não encontrado
     """
+    conn = None
     try:
         import psycopg
         from psycopg.rows import dict_row
@@ -85,8 +86,6 @@ def buscar_cliente_banco(cpf: str) -> Optional[Dict[str, Any]]:
 
             resultado = cur.fetchone()
 
-        conn.close()
-
         if resultado:
             logger.info(f"✅ DEBUG: Cliente encontrado - Nome: {resultado['nome_completo']}")
             sys.stdout.flush()
@@ -107,6 +106,15 @@ def buscar_cliente_banco(cpf: str) -> Optional[Dict[str, Any]]:
         traceback.print_exc()
         sys.stdout.flush()
         return None
+
+    finally:
+        # CRÍTICO: Garantir que conexão SEMPRE seja fechada
+        if conn:
+            try:
+                conn.close()
+                logger.debug("🔒 Conexão DB fechada com sucesso")
+            except Exception as e_close:
+                logger.error(f"❌ Erro ao fechar conexão: {e_close}")
 
 
 def buscar_cliente_planilha(cpf: str, planilha_path: Path = None) -> Optional[Dict[str, Any]]:
@@ -590,8 +598,9 @@ class CanopusAutomation:
             # RETRY: Tentar até 3 vezes se o seletor não aparecer
             for tentativa_select in range(3):
                 try:
-                    # Aguardar seletor com timeout maior (60s ao invés de 30s)
-                    await self.page.wait_for_selector(select_tipo, timeout=60000, state='visible')
+                    # CRÍTICO: Timeout reduzido para 15s (antes 60s) para evitar travamentos longos
+                    # 15s x 3 tentativas = 45s máximo (vs 180s antes)
+                    await self.page.wait_for_selector(select_tipo, timeout=15000, state='visible')
                     await self.page.select_option(select_tipo, value='F')  # F = CPF
                     logger.info(f"✅ Dropdown selecionado (tentativa {tentativa_select + 1})")
                     sys.stdout.flush()

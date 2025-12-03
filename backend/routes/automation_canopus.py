@@ -86,10 +86,17 @@ def atualizar_status(etapa: str = None, progresso: int = None, total: int = None
         execution_status['total_clientes'] = total
 
     if erro:
+        # CRÍTICO: Limitar tamanho para evitar memory leak
+        # Manter apenas últimos 100 erros (evita crescimento indefinido)
         execution_status['erros'].append({
             'timestamp': datetime.now().isoformat(),
             'mensagem': erro
         })
+
+        # Se ultrapassou 100 erros, remover os mais antigos
+        if len(execution_status['erros']) > 100:
+            execution_status['erros'] = execution_status['erros'][-100:]
+            logger.debug(f"🗑️ Lista de erros limitada a 100 (removidos {len(execution_status['erros']) - 100} antigos)")
 
     # Calcular porcentagem
     if execution_status['total_clientes'] > 0:
@@ -170,17 +177,49 @@ def handle_errors(f):
     return decorated_function
 
 
-def get_db_connection():
-    """Retorna conexão com banco de dados usando configuração centralizada"""
-    import psycopg
-    from psycopg.rows import dict_row
-    from config import Config
+from contextlib import contextmanager
 
-    # Usar DATABASE_URL do Config (já configurado para Render ou local)
-    return psycopg.connect(
-        Config.DATABASE_URL,
-        row_factory=dict_row
-    )
+def get_db_connection():
+    """
+    Retorna conexão do POOL de banco de dados (CRÍTICO para estabilidade!)
+
+    ANTES: Criava nova conexão a cada chamada (vazamento de recursos)
+    AGORA: Usa pool gerenciado que reutiliza conexões
+
+    IMPORTANTE: Use com context manager ou chame Database.return_connection(conn) no finally!
+    """
+    from models.database import Database
+
+    # CRÍTICO: Usar pool ao invés de criar conexão nova
+    # Isso evita esgotar o limite de conexões do PostgreSQL (25 no Render)
+    return Database.get_connection()
+
+
+@contextmanager
+def db_connection():
+    """
+    Context manager que GARANTE retorno da conexão ao pool
+
+    Uso:
+        with db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(...)
+
+    SEMPRE use este context manager ao invés de get_db_connection() diretamente!
+    """
+    from models.database import Database
+
+    conn = None
+    try:
+        conn = Database.get_connection()
+        yield conn
+    finally:
+        if conn:
+            try:
+                Database.return_connection(conn)
+                logger.debug("🔒 Conexão retornada ao pool")
+            except Exception as e:
+                logger.error(f"❌ Erro ao retornar conexão ao pool: {e}")
 
 
 # ============================================================================

@@ -30,20 +30,48 @@ class Database:
     _connection_pool = None
 
     @classmethod
-    def initialize_pool(cls, minconn: int = 5, maxconn: int = 50):
+    def initialize_pool(cls, minconn: int = None, maxconn: int = None):
         """
         Inicializa o pool de conexões
 
         Args:
-            minconn: Número mínimo de conexões no pool (default: 5)
-            maxconn: Número máximo de conexões no pool (default: 50)
+            minconn: Número mínimo de conexões no pool (default: 2 para economizar recursos)
+            maxconn: Número máximo de conexões no pool (default: 20)
+
+        IMPORTANTE:
+        - Render free/starter tier limita a 25 conexões totais
+        - Deixamos margem de 5 para conexões administrativas
+        - Pool configurado para máximo de 20 conexões
         """
+        import os
+
         try:
             if cls._connection_pool is None:
+                # CRÍTICO: Detectar ambiente e ajustar limites
+                # Render tem limite de 25 conexões, então configurar para 20 max
+                is_render = (
+                    os.getenv('RENDER') is not None or
+                    os.getenv('IS_RENDER') == 'true' or
+                    'render.com' in Config.DATABASE_URL
+                )
+
+                # Valores padrão ajustados para ambiente
+                if minconn is None:
+                    minconn = 2  # Economizar recursos, iniciar com poucas conexões
+                if maxconn is None:
+                    maxconn = 20 if is_render else 30  # 20 no Render, 30 local
+
+                # Validar limites
+                if maxconn > 25 and is_render:
+                    logger.warning(f"⚠️ maxconn={maxconn} excede limite do Render (25), ajustando para 20")
+                    maxconn = 20
+
                 # Usa DATABASE_URL diretamente (compatível com Render.com)
                 conninfo = Config.DATABASE_URL
                 cls._connection_pool = ConnectionPool(conninfo, min_size=minconn, max_size=maxconn)
                 logger.info(f"✅ Pool de conexões PostgreSQL inicializado com sucesso")
+                logger.info(f"   Ambiente: {'Render (produção)' if is_render else 'Local (desenvolvimento)'}")
+                logger.info(f"   Pool: min={minconn}, max={maxconn} conexões")
                 logger.info(f"   Conectado a: {Config.DB_HOST}:{Config.DB_PORT}/{Config.DB_NAME}")
         except Exception as e:
             logger.error(f"❌ Erro ao inicializar pool de conexões: {e}")
