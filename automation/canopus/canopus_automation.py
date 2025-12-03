@@ -736,7 +736,7 @@ class CanopusAutomation:
                         sys.stdout.flush()
                         # Tentar navegar novamente
                         await self.navegar_busca_avancada()
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(1)  # OTIMIZAÇÃO: Reduzido de 2s para 1s
                     else:
                         # Última tentativa falhou
                         logger.error(f"❌ Timeout final ao selecionar dropdown após 3 tentativas")
@@ -1523,7 +1523,7 @@ class CanopusAutomation:
                                 logger.info("✅ PDF carregado em nossa aba")
 
                                 # Aguardar mais um pouco para garantir que o PDF carregou
-                                await asyncio.sleep(2)
+                                await asyncio.sleep(1)  # OTIMIZAÇÃO: Reduzido de 2s para 1s
 
                                 # Tentar extrair via JavaScript desta aba
                                 nova_aba_controlada = nova_aba_nossa
