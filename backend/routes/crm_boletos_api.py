@@ -2,7 +2,7 @@
 API de Boletos - Endpoints para gestão de boletos
 """
 from flask import Blueprint, jsonify, request, session
-from decorators.auth import login_required
+from routes.auth import login_required
 from models.database import DatabaseConnection
 import logging
 
