@@ -4557,10 +4557,12 @@ def baixar_boletos_http():
                     senha = credencial_row['senha']
                     codigo_empresa = credencial_row.get('codigo_empresa', '0101')
 
-                    # Canopus requer PV com zeros à esquerda (10 dígitos)
-                    usuario_login = ponto_venda.zfill(10)
+                    # CORREÇÃO: Usar usuário do banco (NÃO formatar com zfill)
+                    # O banco já tem o usuário correto (ex: "24627" ou "0000024627")
+                    usuario_login = usuario
 
                     logger.info(f"✅ Credenciais obtidas")
+                    logger.info(f"   Usuário (banco): {usuario}")
                     logger.info(f"   Usuário (login): {usuario_login}")
                     logger.info(f"🔐 Senha: {'*' * len(senha)}")
 

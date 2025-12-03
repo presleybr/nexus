@@ -156,9 +156,9 @@ class CanopusHTTPClient:
           - __EVENTTARGET: btnLogin
         """
         try:
-            # Formatar usuário com zeros à esquerda (total 10 dígitos)
-            usuario_formatado = usuario.zfill(10)
-            logger.info(f"🔐 Login: {usuario} → {usuario_formatado}")
+            # CORREÇÃO: NÃO formatar usuário - usar como recebido
+            # O usuário já vem correto do banco (ex: "24627" ou "0000024627")
+            logger.info(f"🔐 Login: {usuario}")
 
             # 1. GET na página de login (COM DELAY)
             url_login = f'{self.BASE_URL}/frmCorCCCnsLogin.aspx'
@@ -177,7 +177,7 @@ class CanopusHTTPClient:
                 '__LASTFOCUS': '',
                 '__EVENTTARGET': 'btnLogin',
                 '__EVENTARGUMENT': '',
-                'edtUsuario': usuario_formatado,  # Com zeros: 0000024627
+                'edtUsuario': usuario,  # Usar como recebido (sem formatação)
                 'edtSenha': senha,
                 'hdnTokenRecaptcha': '',
                 'as_fid': '',  # Gerado automaticamente
