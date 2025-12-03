@@ -743,6 +743,44 @@ class CanopusAutomation:
                     }
                 """)
                 logger.info(f"📄 Conteúdo da página (primeiros 500 chars): {html_snippet}")
+
+                # CRÍTICO: Detectar campo de segurança APÓS tentativa de login
+                if 'segur' in html_snippet.lower() or 'caracteres' in html_snippet.lower():
+                    logger.error("🚨 CAMPO DE SEGURANÇA DETECTADO APÓS LOGIN!")
+                    logger.error("   O sistema está solicitando verificação de segurança")
+
+                    # Mapear TODOS os inputs visíveis na página
+                    all_inputs = await self.page.query_selector_all('input[type="text"], input[type="password"], input:not([type])')
+                    logger.info(f"   Total de inputs encontrados: {len(all_inputs)}")
+
+                    for idx, inp in enumerate(all_inputs):
+                        is_visible = await inp.is_visible()
+                        if is_visible:
+                            inp_id = await inp.get_attribute('id') or ''
+                            inp_name = await inp.get_attribute('name') or ''
+                            inp_type = await inp.get_attribute('type') or ''
+                            inp_value = await inp.get_attribute('value') or ''
+                            logger.info(f"   Input visível #{idx}:")
+                            logger.info(f"      ID: {inp_id}")
+                            logger.info(f"      Name: {inp_name}")
+                            logger.info(f"      Type: {inp_type}")
+                            logger.info(f"      Value: {inp_value[:20] if inp_value else '(vazio)'}")
+
+                    # Verificar se há imagens de CAPTCHA
+                    all_images = await self.page.query_selector_all('img')
+                    logger.info(f"   Total de imagens encontradas: {len(all_images)}")
+                    for idx, img in enumerate(all_images):
+                        is_visible = await img.is_visible()
+                        if is_visible:
+                            img_src = await img.get_attribute('src') or ''
+                            img_id = await img.get_attribute('id') or ''
+                            img_alt = await img.get_attribute('alt') or ''
+                            if 'captcha' in img_src.lower() or 'captcha' in img_id.lower() or 'segur' in img_src.lower():
+                                logger.error(f"   🖼️  IMAGEM DE CAPTCHA ENCONTRADA #{idx}:")
+                                logger.error(f"      SRC: {img_src}")
+                                logger.error(f"      ID: {img_id}")
+                                logger.error(f"      ALT: {img_alt}")
+
             except Exception as e_html:
                 logger.warning(f"⚠️ Erro ao capturar HTML: {e_html}")
 
