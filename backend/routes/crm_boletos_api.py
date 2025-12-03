@@ -80,12 +80,12 @@ def listar_boletos_baixados():
     Lista boletos baixados com sucesso
     Query params:
     - page: número da página (default 1)
-    - limit: itens por página (default 20)
+    - limit: itens por página (default 10)
     - status_envio: filtro por status de envio (todos, enviado, nao_enviado)
     """
     try:
         page = int(request.args.get('page', 1))
-        limit = int(request.args.get('limit', 20))
+        limit = int(request.args.get('limit', 10))
         status_envio_filter = request.args.get('status_envio', 'todos')
 
         offset = (page - 1) * limit
@@ -166,7 +166,7 @@ def listar_boletos_baixados():
             'success': True,
             'boletos': boletos_formatados,
             'total': total_count,
-            'pagina': page,
+            'pagina_atual': page,
             'total_paginas': total_pages
         })
 
@@ -182,9 +182,17 @@ def listar_boletos_baixados():
 def listar_erros_sem_boleto():
     """
     Lista clientes que retornaram 'sem boleto' na automação
+    Query params:
+    - page: número da página (default 1)
+    - limit: itens por página (default 10)
     """
     try:
-        erros = db.execute_query("""
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 10))
+        offset = (page - 1) * limit
+
+        # Buscar erros com paginação
+        erros = db.execute_query(f"""
             SELECT DISTINCT ON (dc.cpf)
                 dc.cpf,
                 cf.nome_completo as nome,
@@ -195,7 +203,18 @@ def listar_erros_sem_boleto():
             LEFT JOIN clientes_finais cf ON dc.cpf = cf.cpf
             WHERE dc.status = 'sem_boleto'
             ORDER BY dc.cpf, dc.data_download DESC
+            LIMIT {limit} OFFSET {offset}
         """)
+
+        # Contar total
+        total = db.execute_query("""
+            SELECT COUNT(DISTINCT dc.cpf) as total
+            FROM downloads_canopus dc
+            WHERE dc.status = 'sem_boleto'
+        """)
+
+        total_count = total[0]['total'] if total else 0
+        total_pages = (total_count + limit - 1) // limit
 
         clientes = []
         for erro in erros:
@@ -210,7 +229,9 @@ def listar_erros_sem_boleto():
         return jsonify({
             'success': True,
             'clientes': clientes,
-            'total': len(clientes)
+            'total': total_count,
+            'pagina_atual': page,
+            'total_paginas': total_pages
         })
 
     except Exception as e:
@@ -225,9 +246,17 @@ def listar_erros_sem_boleto():
 def listar_erros_cpf_nao_encontrado():
     """
     Lista clientes cujo CPF não foi encontrado no sistema Canopus
+    Query params:
+    - page: número da página (default 1)
+    - limit: itens por página (default 10)
     """
     try:
-        erros = db.execute_query("""
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 10))
+        offset = (page - 1) * limit
+
+        # Buscar erros com paginação
+        erros = db.execute_query(f"""
             SELECT DISTINCT ON (dc.cpf)
                 dc.cpf,
                 cf.nome_completo as nome_planilha,
@@ -239,7 +268,20 @@ def listar_erros_cpf_nao_encontrado():
               AND (dc.mensagem_erro LIKE '%CPF não encontrado%'
                    OR dc.mensagem_erro LIKE '%Nenhum resultado%')
             ORDER BY dc.cpf, dc.data_download DESC
+            LIMIT {limit} OFFSET {offset}
         """)
+
+        # Contar total
+        total = db.execute_query("""
+            SELECT COUNT(DISTINCT dc.cpf) as total
+            FROM downloads_canopus dc
+            WHERE dc.status = 'erro'
+              AND (dc.mensagem_erro LIKE '%CPF não encontrado%'
+                   OR dc.mensagem_erro LIKE '%Nenhum resultado%')
+        """)
+
+        total_count = total[0]['total'] if total else 0
+        total_pages = (total_count + limit - 1) // limit
 
         clientes = []
         for erro in erros:
@@ -253,7 +295,9 @@ def listar_erros_cpf_nao_encontrado():
         return jsonify({
             'success': True,
             'clientes': clientes,
-            'total': len(clientes)
+            'total': total_count,
+            'pagina_atual': page,
+            'total_paginas': total_pages
         })
 
     except Exception as e:

@@ -204,6 +204,37 @@
             padding: 2rem;
             color: #888;
         }
+
+        .search-input {
+            padding: 0.5rem 1rem 0.5rem 2.5rem;
+            background: #222;
+            border: 1px solid #333;
+            color: #fff;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            width: 300px;
+            position: relative;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #39FF14;
+        }
+
+        .search-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .search-wrapper::before {
+            content: '🔍';
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -374,11 +405,16 @@
             <div class="boletos-table">
                 <div class="table-header-actions">
                     <h3>✅ Boletos Baixados (<span id="countBaixados">0</span>)</h3>
-                    <select class="filter-dropdown" id="filterStatusEnvio">
-                        <option value="todos">Todos</option>
-                        <option value="enviados">Enviados</option>
-                        <option value="pendentes">Pendentes</option>
-                    </select>
+                    <div style="display: flex; gap: 1rem;">
+                        <div class="search-wrapper">
+                            <input type="text" class="search-input" id="searchBaixados" placeholder="Buscar por nome ou CPF...">
+                        </div>
+                        <select class="filter-dropdown" id="filterStatusEnvio">
+                            <option value="todos">Todos</option>
+                            <option value="enviados">Enviados</option>
+                            <option value="pendentes">Pendentes</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table>
@@ -428,6 +464,7 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="pagination" id="paginacaoSemBoleto"></div>
             </div>
 
             <!-- Card: Erros - CPF Não Encontrado -->
@@ -452,6 +489,7 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="pagination" id="paginacaoCpfNaoEncontrado"></div>
             </div>
 
             <!-- Card: Histórico de Downloads -->
@@ -488,8 +526,14 @@
         // Carregar informações da empresa
         carregarInformacoesEmpresa();
 
-        // Variável global para paginação
+        // Variáveis globais para paginação
         let paginaAtualBaixados = 1;
+        let paginaAtualSemBoleto = 1;
+        let paginaAtualCpfNaoEncontrado = 1;
+
+        // Variáveis para busca local
+        let boletosOriginal = [];
+        let debounceTimer = null;
 
         // Função para carregar resumo geral
         async function carregarResumo() {
@@ -565,39 +609,10 @@
                 if (data.success && data.boletos && data.boletos.length > 0) {
                     document.getElementById('countBaixados').textContent = data.total || 0;
 
-                    data.boletos.forEach(boleto => {
-                        const tr = document.createElement('tr');
+                    // Armazenar boletos originais para busca local
+                    boletosOriginal = data.boletos;
 
-                        const statusClass = 'sucesso';
-                        const statusTexto = 'Baixado';
-
-                        let disparoClass = 'pendente';
-                        let disparoTexto = 'Pendente';
-                        if (boleto.status_envio === 'enviado') {
-                            disparoClass = 'enviado';
-                            disparoTexto = 'Enviado';
-                        } else if (boleto.status_envio === 'erro') {
-                            disparoClass = 'erro';
-                            disparoTexto = 'Erro';
-                        }
-
-                        tr.innerHTML = `
-                            <td>
-                                <strong>${boleto.cliente_nome || 'N/A'}</strong><br>
-                                <small style="color: #888;">CPF: ${boleto.cpf || 'N/A'}</small>
-                            </td>
-                            <td>${boleto.valor ? 'R$ ' + boleto.valor.toFixed(2) : 'N/A'}</td>
-                            <td>${boleto.vencimento || 'N/A'}</td>
-                            <td>${boleto.arquivo_nome || 'N/A'}</td>
-                            <td>${formatarTamanho(boleto.tamanho || 0)}</td>
-                            <td><span class="status-badge status-${statusClass}">${statusTexto}</span></td>
-                            <td><span class="status-badge status-${disparoClass}">${disparoTexto}</span></td>
-                            <td>
-                                <button class="action-btn" onclick="baixarBoleto('${boleto.arquivo_nome}')">📥 Baixar</button>
-                            </td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
+                    renderizarBoletos(data.boletos);
 
                     // Criar paginação
                     criarPaginacao('paginacaoBaixados', data.pagina_atual, data.total_paginas, (novaPagina) => {
@@ -626,17 +641,87 @@
             }
         }
 
+        // Função para renderizar boletos
+        function renderizarBoletos(boletos) {
+            const tbody = document.getElementById('tabelaBaixados');
+            tbody.innerHTML = '';
+
+            if (boletos.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty-state">
+                            <p>Nenhum boleto encontrado.</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            boletos.forEach(boleto => {
+                const tr = document.createElement('tr');
+
+                const statusClass = 'sucesso';
+                const statusTexto = 'Baixado';
+
+                let disparoClass = 'pendente';
+                let disparoTexto = 'Pendente';
+                if (boleto.status_envio === 'enviado') {
+                    disparoClass = 'enviado';
+                    disparoTexto = 'Enviado';
+                } else if (boleto.status_envio === 'erro') {
+                    disparoClass = 'erro';
+                    disparoTexto = 'Erro';
+                }
+
+                tr.innerHTML = `
+                    <td>
+                        <strong>${boleto.cliente_nome || 'N/A'}</strong><br>
+                        <small style="color: #888;">CPF: ${boleto.cpf || 'N/A'}</small>
+                    </td>
+                    <td>${boleto.valor ? 'R$ ' + boleto.valor.toFixed(2) : 'N/A'}</td>
+                    <td>${boleto.vencimento || 'N/A'}</td>
+                    <td>${boleto.arquivo_nome || 'N/A'}</td>
+                    <td>${formatarTamanho(boleto.tamanho || 0)}</td>
+                    <td><span class="status-badge status-${statusClass}">${statusTexto}</span></td>
+                    <td><span class="status-badge status-${disparoClass}">${disparoTexto}</span></td>
+                    <td>
+                        <button class="action-btn" onclick="baixarBoleto('${boleto.arquivo_nome}')">📥 Baixar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Função para busca local de boletos
+        function buscarBoletos(termo) {
+            if (!termo || termo.trim() === '') {
+                renderizarBoletos(boletosOriginal);
+                return;
+            }
+
+            const termoLower = termo.toLowerCase().trim();
+            const boletosFiltrados = boletosOriginal.filter(boleto => {
+                const nome = (boleto.cliente_nome || '').toLowerCase();
+                const cpf = (boleto.cpf || '').replace(/\D/g, '');
+                const termoSemMascara = termo.replace(/\D/g, '');
+
+                return nome.includes(termoLower) || cpf.includes(termoSemMascara);
+            });
+
+            renderizarBoletos(boletosFiltrados);
+        }
+
         // Função para carregar erros - sem boleto
-        async function carregarErrosSemBoleto() {
+        async function carregarErrosSemBoleto(page = 1) {
             try {
-                const response = await fetch('/api/boletos/erros/sem-boleto');
+                const response = await fetch(`/api/boletos/erros/sem-boleto?page=${page}`);
                 const data = await response.json();
 
                 const tbody = document.getElementById('tabelaSemBoleto');
                 tbody.innerHTML = '';
 
                 if (data.success && data.erros && data.erros.length > 0) {
-                    document.getElementById('countSemBoleto').textContent = data.erros.length;
+                    document.getElementById('countSemBoleto').textContent = data.total || data.erros.length;
 
                     data.erros.forEach(erro => {
                         const tr = document.createElement('tr');
@@ -653,6 +738,14 @@
                         `;
                         tbody.appendChild(tr);
                     });
+
+                    // Criar paginação
+                    if (data.pagina_atual && data.total_paginas) {
+                        criarPaginacao('paginacaoSemBoleto', data.pagina_atual, data.total_paginas, (novaPagina) => {
+                            paginaAtualSemBoleto = novaPagina;
+                            carregarErrosSemBoleto(novaPagina);
+                        });
+                    }
                 } else {
                     document.getElementById('countSemBoleto').textContent = '0';
                     tbody.innerHTML = `
@@ -676,16 +769,16 @@
         }
 
         // Função para carregar erros - CPF não encontrado
-        async function carregarErrosCpfNaoEncontrado() {
+        async function carregarErrosCpfNaoEncontrado(page = 1) {
             try {
-                const response = await fetch('/api/boletos/erros/cpf-nao-encontrado');
+                const response = await fetch(`/api/boletos/erros/cpf-nao-encontrado?page=${page}`);
                 const data = await response.json();
 
                 const tbody = document.getElementById('tabelaCpfNaoEncontrado');
                 tbody.innerHTML = '';
 
                 if (data.success && data.erros && data.erros.length > 0) {
-                    document.getElementById('countCpfNaoEncontrado').textContent = data.erros.length;
+                    document.getElementById('countCpfNaoEncontrado').textContent = data.total || data.erros.length;
 
                     data.erros.forEach(erro => {
                         const tr = document.createElement('tr');
@@ -699,6 +792,14 @@
                         `;
                         tbody.appendChild(tr);
                     });
+
+                    // Criar paginação
+                    if (data.pagina_atual && data.total_paginas) {
+                        criarPaginacao('paginacaoCpfNaoEncontrado', data.pagina_atual, data.total_paginas, (novaPagina) => {
+                            paginaAtualCpfNaoEncontrado = novaPagina;
+                            carregarErrosCpfNaoEncontrado(novaPagina);
+                        });
+                    }
                 } else {
                     document.getElementById('countCpfNaoEncontrado').textContent = '0';
                     tbody.innerHTML = `
@@ -834,6 +935,14 @@
         document.getElementById('filterStatusEnvio').addEventListener('change', (e) => {
             paginaAtualBaixados = 1;
             carregarBoletosBaixados(1, e.target.value);
+        });
+
+        // Event listener para busca com debounce
+        document.getElementById('searchBaixados').addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                buscarBoletos(e.target.value);
+            }, 500);
         });
 
         // Inicialização ao carregar a página
