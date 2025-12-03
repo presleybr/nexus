@@ -13,4 +13,5 @@ qrcode==7.4.2
 apscheduler==3.11.1
 pytz==2025.2
 pdfplumber>=0.10.0
+# Anti-bot detection library (v2025-12-03)
 playwright-stealth==1.0.6

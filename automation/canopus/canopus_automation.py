@@ -20,13 +20,6 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError
 )
 
-try:
-    from playwright_stealth import stealth_async
-    STEALTH_AVAILABLE = True
-except ImportError:
-    STEALTH_AVAILABLE = False
-    logger.warning("⚠️ playwright-stealth não disponível - detecção de bot pode ocorrer")
-
 from canopus_config import CanopusConfig
 import pandas as pd
 
@@ -48,6 +41,15 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
+
+# Tentar importar playwright-stealth (APÓS configurar o logger)
+try:
+    from playwright_stealth import stealth_async
+    STEALTH_AVAILABLE = True
+    logger.info("✅ playwright-stealth disponível")
+except ImportError:
+    STEALTH_AVAILABLE = False
+    logger.warning("⚠️ playwright-stealth não disponível - detecção de bot pode ocorrer")
 
 
 # ============================================================================
