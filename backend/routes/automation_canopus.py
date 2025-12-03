@@ -4362,17 +4362,377 @@ def baixar_boletos_http():
 
     data = request.get_json() or {}
     ponto_venda = data.get('ponto_venda', '24627')
+    mes = data.get('mes')
+    ano = data.get('ano')
+    forcar_todos = data.get('forcar_todos', False)
+    reprocessar_erros = data.get('reprocessar_erros', True)
 
-    logger.info(f"🌐 MODO HTTP - PV: {ponto_venda}")
+    logger.info(f"🌐 MODO HTTP - PV: {ponto_venda}, Mês: {mes}, Ano: {ano}")
+    logger.info(f"📋 Forçar todos: {forcar_todos}, Reprocessar erros: {reprocessar_erros}")
 
-    # Por enquanto retornar placeholder - implementação completa virá em seguida
+    # Buscar clientes do ponto de venda
+    logger.info(f"🔍 Buscando clientes do PV {ponto_venda}...")
+
+    try:
+        with db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute("""
+                    SELECT DISTINCT c.cpf, c.nome_completo as nome
+                    FROM clientes_finais c
+                    WHERE c.ponto_venda = %s AND c.ativo = TRUE
+                    ORDER BY c.nome_completo
+                """, (ponto_venda,))
+
+                clientes = cur.fetchall()
+                logger.info(f"✅ Query executada. Resultados: {len(clientes)}")
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao buscar clientes: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Erro ao buscar clientes: {str(e)}'
+        }), 500
+
+    if not clientes:
+        logger.warning(f"⚠️ Nenhum cliente encontrado no PV {ponto_venda}")
+        return jsonify({
+            'success': False,
+            'error': f'Nenhum cliente encontrado no ponto de venda {ponto_venda}'
+        }), 404
+
+    logger.info(f"📋 Encontrados {len(clientes)} clientes para processar")
+
+    # Filtrar clientes baseado em downloads anteriores
+    clientes_filtrados = clientes
+    total_ja_baixados = 0
+
+    if not forcar_todos:
+        logger.info("🔍 FILTRANDO CLIENTES - Ignorando já baixados com sucesso")
+
+        try:
+            with db_connection() as conn_filter:
+                with conn_filter.cursor(row_factory=dict_row) as cur_filter:
+                    # Buscar CPFs já baixados com SUCESSO
+                    cur_filter.execute("""
+                        SELECT DISTINCT cpf
+                        FROM downloads_canopus
+                        WHERE status = 'sucesso'
+                        AND cpf IN (
+                            SELECT cpf FROM clientes_finais
+                            WHERE ponto_venda = %s AND ativo = TRUE
+                        )
+                    """, (ponto_venda,))
+
+                    cpfs_sucesso = set(row['cpf'] for row in cur_filter.fetchall())
+                    logger.info(f"✅ Encontrados {len(cpfs_sucesso)} CPFs já baixados")
+
+                    # Buscar CPFs com ERRO anterior
+                    cpfs_erro = set()
+                    if not reprocessar_erros:
+                        cur_filter.execute("""
+                            SELECT DISTINCT cpf
+                            FROM downloads_canopus
+                            WHERE status IN ('erro', 'sem_boleto')
+                            AND cpf IN (
+                                SELECT cpf FROM clientes_finais
+                                WHERE ponto_venda = %s AND ativo = TRUE
+                            )
+                            AND cpf NOT IN (
+                                SELECT DISTINCT cpf FROM downloads_canopus WHERE status = 'sucesso'
+                            )
+                        """, (ponto_venda,))
+
+                        cpfs_erro = set(row['cpf'] for row in cur_filter.fetchall())
+                        logger.info(f"❌ Encontrados {len(cpfs_erro)} CPFs com erro (serão IGNORADOS)")
+
+                    # Filtrar lista de clientes
+                    clientes_filtrados = []
+                    for cliente in clientes:
+                        cpf = cliente['cpf']
+
+                        if cpf in cpfs_sucesso:
+                            total_ja_baixados += 1
+                            continue
+
+                        if cpf in cpfs_erro:
+                            continue
+
+                        clientes_filtrados.append(cliente)
+
+                    logger.info(f"📊 RESULTADO DA FILTRAGEM:")
+                    logger.info(f"   Total: {len(clientes)}")
+                    logger.info(f"   ✅ Já baixados: {total_ja_baixados}")
+                    logger.info(f"   ❌ Com erro: {len(cpfs_erro)}")
+                    logger.info(f"   🎯 Pendentes: {len(clientes_filtrados)}")
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao filtrar clientes: {e}")
+            clientes_filtrados = clientes
+
+    if not clientes_filtrados:
+        logger.info("✅ Todos os boletos já foram baixados!")
+        return jsonify({
+            'success': True,
+            'message': 'Todos os boletos já foram baixados',
+            'data': {
+                'total_clientes': len(clientes),
+                'ja_baixados': total_ja_baixados,
+                'pendentes': 0
+            }
+        })
+
+    cpfs = [cliente['cpf'] for cliente in clientes_filtrados]
+    logger.info(f"🎯 CPFs a processar: {len(cpfs)}")
+
+    # Executar downloads em background usando threading
+    import threading
+    import time
+    import random
+
+    def processar_downloads_http_background():
+        """Thread background para processar downloads via HTTP com ANTI-DETECÇÃO"""
+        logger.info("=" * 80)
+        logger.info("🌐 THREAD HTTP INICIADA (MODO STEALTH)")
+        logger.info(f"📊 Total de CPFs: {len(cpfs)}")
+        logger.info("=" * 80)
+
+        # Iniciar rastreamento
+        iniciar_execucao(ponto_venda, len(cpfs))
+        atualizar_status(etapa='Inicializando cliente HTTP stealth...', progresso=0)
+
+        # Configurar sys.path para imports
+        import sys
+        from pathlib import Path
+        import os
+
+        backend_path = Path(__file__).resolve().parent.parent
+        root_path = backend_path.parent
+        automation_path = root_path / "automation" / "canopus"
+
+        if str(automation_path) not in sys.path:
+            sys.path.insert(0, str(automation_path))
+            logger.info(f"📂 Path adicionado: {automation_path}")
+
+        # Importar cliente HTTP
+        try:
+            from canopus_http_client import CanopusHTTPClient
+            logger.info("✅ CanopusHTTPClient importado")
+        except ImportError as e:
+            logger.error(f"❌ Erro ao importar CanopusHTTPClient: {e}")
+            atualizar_status(etapa='Erro: CanopusHTTPClient não disponível', erro=str(e))
+            finalizar_execucao(sucesso=False)
+            return
+
+        atualizar_status(etapa='Configurando diretórios...')
+
+        # Pasta de destino
+        base_dir = os.getenv('DOWNLOAD_BASE_DIR', str(root_path / 'automation' / 'canopus' / 'downloads'))
+        pasta_destino = Path(base_dir) / 'Danner'
+        pasta_destino.mkdir(parents=True, exist_ok=True)
+        logger.info(f"📁 Pasta de destino: {pasta_destino}")
+
+        # Buscar credenciais
+        try:
+            atualizar_status(etapa='Buscando credenciais...')
+            logger.info(f"🔑 Buscando credenciais do PV {ponto_venda}...")
+
+            with db_connection() as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("""
+                        SELECT usuario, senha, codigo_empresa, ponto_venda
+                        FROM credenciais_canopus
+                        WHERE ponto_venda = %s AND ativo = TRUE
+                        LIMIT 1
+                    """, (ponto_venda,))
+
+                    credencial_row = cur.fetchone()
+
+                    if not credencial_row:
+                        logger.error(f"❌ Credenciais não encontradas para PV {ponto_venda}")
+                        atualizar_status(etapa='Erro: credenciais não encontradas', erro='Credenciais não encontradas')
+                        finalizar_execucao(sucesso=False)
+                        return
+
+                    usuario = credencial_row['usuario']
+                    senha = credencial_row['senha']
+                    codigo_empresa = credencial_row.get('codigo_empresa', '0101')
+
+                    # Canopus requer PV com zeros à esquerda (10 dígitos)
+                    usuario_login = ponto_venda.zfill(10)
+
+                    logger.info(f"✅ Credenciais obtidas")
+                    logger.info(f"   Usuário (login): {usuario_login}")
+                    logger.info(f"🔐 Senha: {'*' * len(senha)}")
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar credenciais: {e}")
+            logger.exception("Traceback:")
+            atualizar_status(etapa='Erro ao buscar credenciais', erro=str(e))
+            finalizar_execucao(sucesso=False)
+            return
+
+        # Criar cliente HTTP
+        logger.info("🌐 Criando cliente HTTP STEALTH...")
+        atualizar_status(etapa='Inicializando conexão HTTP stealth...')
+
+        client = CanopusHTTPClient(timeout=30)
+
+        try:
+            # ANTI-DETECÇÃO: Delay inicial aleatório (simula humano lendo a página)
+            delay_inicial = random.uniform(2.0, 4.0)
+            logger.info(f"🕐 Delay inicial (simula leitura): {delay_inicial:.1f}s")
+            time.sleep(delay_inicial)
+
+            # Fazer login
+            atualizar_status(etapa=f'Fazendo login HTTP stealth (PV: {usuario_login})...')
+            logger.info("=" * 80)
+            logger.info("🔐 FAZENDO LOGIN HTTP STEALTH")
+            logger.info(f"👤 Usuário: {usuario_login}")
+            logger.info("=" * 80)
+
+            if not client.login(usuario_login, senha):
+                logger.error("❌ FALHA NO LOGIN HTTP")
+                atualizar_status(etapa='Falha no login HTTP', erro='Login falhou')
+                finalizar_execucao(sucesso=False)
+                return
+
+            logger.info("✅ LOGIN HTTP REALIZADO COM SUCESSO!")
+
+            # ANTI-DETECÇÃO: Delay após login (simula navegação)
+            delay_pos_login = random.uniform(1.5, 3.0)
+            logger.info(f"🕐 Delay pós-login: {delay_pos_login:.1f}s")
+            time.sleep(delay_pos_login)
+
+            atualizar_status(etapa='Login HTTP stealth OK! Processando clientes...')
+
+            # Processar cada CPF com ANTI-DETECÇÃO
+            for idx, cpf in enumerate(cpfs, 1):
+                # Verificar pausa
+                global execution_status
+                if execution_status.get('pausado', False):
+                    logger.info(f"⏸️ PAUSA SOLICITADA após cliente {idx - 1}/{len(cpfs)}")
+                    atualizar_status(
+                        etapa=f'PAUSADO - Processados: {idx - 1}/{len(cpfs)}',
+                        progresso=idx - 1
+                    )
+                    execution_status['ativo'] = False
+
+                    # Loop de espera
+                    while execution_status.get('pausado', False):
+                        time.sleep(2)
+
+                    logger.info(f"▶️ RETOMANDO do cliente {idx}/{len(cpfs)}")
+                    execution_status['ativo'] = True
+
+                logger.info("")
+                logger.info("=" * 80)
+                logger.info(f"📄 PROCESSANDO CLIENTE {idx}/{len(cpfs)} (HTTP STEALTH)")
+                logger.info(f"   CPF: {cpf}")
+                logger.info("=" * 80)
+
+                atualizar_status(
+                    etapa=f'Processando via HTTP stealth: {idx}/{len(cpfs)} - CPF: {cpf}',
+                    progresso=idx,
+                    total=len(cpfs)
+                )
+
+                try:
+                    # ANTI-DETECÇÃO: Delay entre clientes (simula humano)
+                    # Primeiro cliente: menor delay
+                    # Demais: delay maior e variável
+                    if idx == 1:
+                        delay_entre = random.uniform(1.0, 2.0)
+                    else:
+                        delay_entre = random.uniform(3.0, 8.0)  # 3-8 segundos (muito humano)
+
+                    logger.info(f"🕐 Delay anti-detecção: {delay_entre:.1f}s (simula humano)")
+                    time.sleep(delay_entre)
+
+                    # Buscar cliente
+                    logger.info(f"🔍 Buscando CPF: {cpf}")
+                    cliente_result = client.buscar_cpf(cpf)
+
+                    if not cliente_result:
+                        logger.warning(f"⚠️ Cliente não encontrado: {cpf}")
+                        registrar_download(cpf, 'cpf_nao_encontrado', None, error='Cliente não encontrado')
+                        continue
+
+                    # ANTI-DETECÇÃO: Delay após busca
+                    delay_busca = random.uniform(0.8, 1.5)
+                    logger.info(f"🕐 Delay pós-busca: {delay_busca:.1f}s")
+                    time.sleep(delay_busca)
+
+                    # Acessar cliente
+                    logger.info(f"📂 Acessando cliente...")
+                    if not client.acessar_cliente(cliente_result['link_elemento']):
+                        logger.error(f"❌ Falha ao acessar cliente: {cpf}")
+                        registrar_download(cpf, 'erro', None, error='Falha ao acessar cliente')
+                        continue
+
+                    # ANTI-DETECÇÃO: Delay após acessar (simula leitura da página)
+                    delay_acesso = random.uniform(1.2, 2.5)
+                    logger.info(f"🕐 Delay pós-acesso: {delay_acesso:.1f}s")
+                    time.sleep(delay_acesso)
+
+                    # Emitir boleto
+                    logger.info(f"📄 Emitindo boleto...")
+                    pdf_bytes = client.emitir_boleto()
+
+                    if not pdf_bytes:
+                        logger.warning(f"⚠️ Boleto não disponível: {cpf}")
+                        registrar_download(cpf, 'sem_boleto', None, error='Boleto não disponível')
+                        continue
+
+                    # Salvar PDF
+                    arquivo_path = client.salvar_pdf(pdf_bytes, cpf, consultor='Danner')
+                    tamanho_kb = len(pdf_bytes) / 1024
+
+                    logger.info(f"✅ BOLETO BAIXADO COM SUCESSO!")
+                    logger.info(f"   Arquivo: {arquivo_path}")
+                    logger.info(f"   Tamanho: {tamanho_kb:.1f} KB")
+
+                    # Registrar sucesso
+                    registrar_download(cpf, 'sucesso', arquivo_path, tamanho_kb=tamanho_kb)
+
+                except Exception as e:
+                    logger.error(f"❌ Erro ao processar CPF {cpf}: {e}")
+                    logger.exception("Traceback:")
+                    registrar_download(cpf, 'erro', None, error=str(e))
+
+            # Finalizar
+            logger.info("=" * 80)
+            logger.info("✅ PROCESSAMENTO HTTP STEALTH CONCLUÍDO!")
+            logger.info("=" * 80)
+            atualizar_status(etapa='Processamento HTTP concluído!', progresso=len(cpfs))
+            finalizar_execucao(sucesso=True)
+
+        except Exception as e:
+            logger.error(f"❌ Erro crítico no processamento HTTP: {e}")
+            logger.exception("Traceback completo:")
+            atualizar_status(etapa='Erro crítico', erro=str(e))
+            finalizar_execucao(sucesso=False)
+
+    # Iniciar thread
+    logger.info("🚀 Iniciando thread HTTP STEALTH em background...")
+    thread = threading.Thread(target=processar_downloads_http_background, daemon=True)
+    thread.start()
+
+    logger.info("✅ Thread HTTP STEALTH iniciada com sucesso!")
     return jsonify({
         'success': True,
-        'message': '🌐 Modo HTTP disponível! Use /baixar-boletos-ponto-venda para Playwright',
-        'info': {
+        'message': 'Processamento HTTP STEALTH iniciado em background',
+        'data': {
+            'metodo': 'HTTP (STEALTH MODE)',
             'ponto_venda': ponto_venda,
-            'metodo': 'HTTP (requisições diretas)',
-            'performance_esperada': '5-10x mais rápido que Playwright'
+            'total_clientes': len(clientes),
+            'ja_baixados': total_ja_baixados,
+            'pendentes': len(clientes_filtrados),
+            'cpfs_pendentes': len(cpfs),
+            'anti_deteccao': {
+                'delays_aleatorios': '3-8s entre clientes',
+                'comportamento_humano': 'Simulado',
+                'headers_realistas': 'Ativados'
+            }
         }
     })
 
