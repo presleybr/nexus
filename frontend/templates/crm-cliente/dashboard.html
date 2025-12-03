@@ -429,6 +429,7 @@
                     <p style="color: var(--cor-texto-secundario);">Adicione novos clientes ao sistema</p>
                 </div>
 
+                <!-- REMOVIDO - Botões perigosos não devem aparecer para o cliente final
                 <div class="card" style="cursor: pointer; border-left: 4px solid #f59e0b;" onclick="resetarDados()">
                     <div class="card-header">
                         <span class="card-title">🗑️ Resetar Dados</span>
@@ -444,6 +445,7 @@
                     </div>
                     <p style="color: var(--cor-texto-secundario);">Limpa dados antigos e reimporta do Excel + PDFs</p>
                 </div>
+                -->
 
                 <div class="card" style="cursor: pointer;" onclick="window.location.href='/crm/disparos'">
                     <div class="card-header">
@@ -725,6 +727,7 @@
             window.open(`/api/automation/download-boleto?nome=${encodeURIComponent(nomeArquivo)}`, '_blank');
         }
 
+        /* REMOVIDO - Funções perigosas não devem estar disponíveis para o cliente final
         // Resetar e Reimportar Tudo
         async function resetarDados() {
             if (!confirm('⚠️ ATENÇÃO: Esta ação irá DELETAR TODOS OS CLIENTES E BOLETOS existentes no banco de dados!\n\n🛑 Esta ação NÃO pode ser desfeita!\n\n❌ Os dados serão PERMANENTEMENTE APAGADOS!\n\nDeseja continuar?')) {
@@ -826,6 +829,7 @@
                 container.innerHTML = `<div class="empty-state"><p>Erro de conexão. Tente novamente.</p></div>`;
             }
         }
+        */
 
         // Inicializar ao carregar a página
         document.addEventListener('DOMContentLoaded', function() {
