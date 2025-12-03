@@ -263,6 +263,76 @@ def listar_erros_cpf_nao_encontrado():
         return jsonify({'success': False, 'erro': str(e)}), 500
 
 
+@boletos_api_bp.route('/ultimos-processados', methods=['GET'])
+@login_required
+def listar_ultimos_processados():
+    """
+    Lista últimos processados com resumo por status
+    """
+    try:
+        # Buscar todos os downloads processados
+        processados = db.execute_query("""
+            SELECT
+                dc.cpf,
+                cf.nome_completo as cliente_nome,
+                dc.status,
+                dc.nome_arquivo,
+                dc.mensagem_erro,
+                dc.data_download
+            FROM downloads_canopus dc
+            LEFT JOIN clientes_finais cf ON dc.cpf = cf.cpf
+            ORDER BY dc.data_download DESC
+            LIMIT 100
+        """)
+
+        # Contar por status
+        sucesso = 0
+        erro_cpf = 0
+        sem_boleto = 0
+
+        lista = []
+        for p in processados:
+            if p['status'] == 'sucesso':
+                sucesso += 1
+                icone = '✅'
+                cor = '#34a853'
+            elif p['status'] == 'sem_boleto':
+                sem_boleto += 1
+                icone = '⚠️'
+                cor = '#fbbc04'
+            else:  # erro
+                erro_cpf += 1
+                icone = '❌'
+                cor = '#ea4335'
+
+            lista.append({
+                'cpf': p['cpf'],
+                'cliente_nome': p['cliente_nome'],
+                'status': p['status'],
+                'arquivo': p['nome_arquivo'],
+                'mensagem_erro': p['mensagem_erro'],
+                'data': p['data_download'].isoformat() if p['data_download'] else None,
+                'icone': icone,
+                'cor': cor
+            })
+
+        return jsonify({
+            'success': True,
+            'resumo': {
+                'sucesso': sucesso,
+                'erro': erro_cpf,
+                'sem_boleto': sem_boleto
+            },
+            'lista': lista
+        })
+
+    except Exception as e:
+        logger.error(f"Erro ao listar últimos processados: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'erro': str(e)}), 500
+
+
 @boletos_api_bp.route('/historico', methods=['GET'])
 @login_required
 def listar_historico():

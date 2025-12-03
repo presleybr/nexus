@@ -355,6 +355,21 @@
                 </div>
             </div>
 
+            <!-- Card Últimos Processados -->
+            <div class="boletos-table" style="margin-top: 2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3>📋 Últimos Processados</h3>
+                    <div style="display: flex; gap: 1rem; font-size: 0.9rem;">
+                        <span style="color: #34a853;">✅ <strong id="countSucesso">0</strong></span>
+                        <span style="color: #ea4335;">❌ <strong id="countErro">0</strong></span>
+                        <span style="color: #fbbc04;">⚠️ <strong id="countSemBoleto2">0</strong></span>
+                    </div>
+                </div>
+                <div id="listaUltimosProcessados" style="max-height: 300px; overflow-y: auto; background: #222; border-radius: 8px; padding: 1rem;">
+                    <p style="color: #888; text-align: center;">Carregando...</p>
+                </div>
+            </div>
+
             <!-- Card: Boletos Baixados -->
             <div class="boletos-table">
                 <div class="table-header-actions">
@@ -497,6 +512,47 @@
             }
         }
 
+        // Função para carregar últimos processados
+        async function carregarUltimosProcessados() {
+            try {
+                const response = await fetch('/api/boletos/ultimos-processados');
+                const data = await response.json();
+
+                if (data.success) {
+                    // Atualizar contadores
+                    document.getElementById('countSucesso').textContent = data.resumo.sucesso;
+                    document.getElementById('countErro').textContent = data.resumo.erro;
+                    document.getElementById('countSemBoleto2').textContent = data.resumo.sem_boleto;
+
+                    // Renderizar lista
+                    const lista = document.getElementById('listaUltimosProcessados');
+                    if (data.lista && data.lista.length > 0) {
+                        let html = '';
+                        data.lista.forEach(item => {
+                            html += `
+                                <div style="padding: 0.5rem; margin-bottom: 0.25rem; background: rgba(0,0,0,0.3); border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-size: 1rem;">${item.icone}</span>
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="color: #fff; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            ${item.cliente_nome || item.cpf}
+                                        </div>
+                                        <div style="color: ${item.cor}; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            ${item.arquivo || item.mensagem_erro || item.status}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        lista.innerHTML = html;
+                    } else {
+                        lista.innerHTML = '<p style="color: #888; text-align: center;">Nenhum processamento realizado ainda.</p>';
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao carregar últimos processados:', error);
+            }
+        }
+
         // Função para carregar boletos baixados
         async function carregarBoletosBaixados(page = 1, status_envio = 'todos') {
             try {
@@ -512,8 +568,8 @@
                     data.boletos.forEach(boleto => {
                         const tr = document.createElement('tr');
 
-                        const statusClass = boleto.status_processamento === 'processado' ? 'sucesso' : 'pendente';
-                        const statusTexto = boleto.status_processamento === 'processado' ? 'Processado' : 'Baixado';
+                        const statusClass = 'sucesso';
+                        const statusTexto = 'Baixado';
 
                         let disparoClass = 'pendente';
                         let disparoTexto = 'Pendente';
@@ -783,6 +839,7 @@
         // Inicialização ao carregar a página
         document.addEventListener('DOMContentLoaded', function() {
             carregarResumo();
+            carregarUltimosProcessados();
             carregarBoletosBaixados();
             carregarErrosSemBoleto();
             carregarErrosCpfNaoEncontrado();
@@ -791,6 +848,7 @@
             // Recarregar dados a cada 30 segundos
             setInterval(() => {
                 carregarResumo();
+                carregarUltimosProcessados();
                 carregarBoletosBaixados(paginaAtualBaixados, document.getElementById('filterStatusEnvio').value);
             }, 30000);
         });
