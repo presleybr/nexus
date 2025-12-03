@@ -259,7 +259,7 @@ def execute_query(query: str, params: Optional[Tuple] = None, fetch: bool = Fals
     """
     conn = None
     try:
-        conn = get_db_connection()
+        conn = Database.get_connection()
 
         with conn.cursor(row_factory=dict_row) as cursor:
             if params:
@@ -299,7 +299,7 @@ def execute_many(query: str, params_list: List[Tuple]) -> int:
     """
     conn = None
     try:
-        conn = get_db_connection()
+        conn = Database.get_connection()
 
         with conn.cursor() as cursor:
             cursor.executemany(query, params_list)
@@ -329,7 +329,7 @@ def fetch_one(query: str, params: Optional[Tuple] = None) -> Optional[Dict]:
     """
     conn = None
     try:
-        conn = get_db_connection()
+        conn = Database.get_connection()
 
         with conn.cursor(row_factory=dict_row) as cursor:
             if params:
@@ -361,7 +361,7 @@ def insert_and_return_id(query: str, params: Tuple) -> int:
     """
     conn = None
     try:
-        conn = get_db_connection()
+        conn = Database.get_connection()
 
         with conn.cursor() as cursor:
             cursor.execute(query, params)
@@ -462,7 +462,7 @@ def init_schema():
         with open(schema_path, 'r', encoding='utf-8') as f:
             schema_sql = f.read()
 
-        conn = get_db_connection()
+        conn = Database.get_connection()
 
         try:
             with conn.cursor() as cursor:
