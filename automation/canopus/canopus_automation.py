@@ -287,6 +287,10 @@ class CanopusAutomation:
         self.ponto_venda_atual = None
         self.usuario_atual = None
 
+        # Credenciais para re-login automático
+        self.senha_atual = None
+        self.codigo_empresa_atual = None
+
         # OTIMIZAÇÃO: Flag para reutilizar browser entre clientes
         self.browser_iniciado = False
         self.clientes_processados = 0
@@ -610,6 +614,9 @@ class CanopusAutomation:
                 self.empresa_atual = codigo_empresa
                 self.ponto_venda_atual = ponto_venda
                 self.usuario_atual = usuario
+                # Salvar credenciais para re-login automático
+                self.senha_atual = senha
+                self.codigo_empresa_atual = codigo_empresa
                 return True
 
             # Verificar mensagem de erro
@@ -648,6 +655,73 @@ class CanopusAutomation:
         self.empresa_atual = codigo_empresa
         return True
 
+    async def _verificar_sessao_ativa(self) -> bool:
+        """
+        Verifica se a sessão ainda está ativa
+
+        Returns:
+            True se sessão ativa, False se expirada
+        """
+        try:
+            # Verificar se ainda consegue acessar elemento que só aparece quando logado
+            icone_atendimento = self.config.SELECTORS['busca']['icone_atendimento']
+            elemento = await self.page.query_selector(icone_atendimento)
+
+            if elemento is None:
+                logger.warning("⚠️ Elemento de atendimento não encontrado - sessão pode ter expirado")
+                return False
+
+            # Verificar se não voltou para tela de login
+            url_atual = self.page.url
+            if 'login' in url_atual.lower():
+                logger.warning("⚠️ Detectada página de login - sessão expirou")
+                return False
+
+            return True
+        except Exception as e:
+            logger.error(f"❌ Erro ao verificar sessão: {e}")
+            return False
+
+    async def _garantir_login(self) -> bool:
+        """
+        Garante que está logado, refazendo login se necessário
+
+        Returns:
+            True se está logado (ou conseguiu refazer login)
+        """
+        # Se nunca fez login, precisa das credenciais
+        if not self.logado and (not self.usuario_atual or not self.senha_atual):
+            logger.error("❌ Nunca fez login - credenciais não disponíveis")
+            return False
+
+        # Se já está logado, verificar se sessão ainda está ativa
+        if self.logado:
+            sessao_ativa = await self._verificar_sessao_ativa()
+
+            if sessao_ativa:
+                logger.debug("✅ Sessão ainda ativa")
+                return True
+
+            # Sessão expirou - precisa refazer login
+            logger.warning("⚠️ SESSÃO EXPIRADA - Refazendo login automaticamente...")
+            self.logado = False
+
+        # Refazer login com credenciais salvas
+        logger.info(f"🔄 Refazendo login como {self.usuario_atual}...")
+        sucesso = await self.login(
+            usuario=self.usuario_atual,
+            senha=self.senha_atual,
+            codigo_empresa=self.codigo_empresa_atual,
+            ponto_venda=self.ponto_venda_atual
+        )
+
+        if sucesso:
+            logger.info("✅ Re-login realizado com sucesso!")
+        else:
+            logger.error("❌ Falha ao refazer login")
+
+        return sucesso
+
     # ========================================================================
     # MÉTODOS DE BUSCA DE CLIENTE
     # ========================================================================
@@ -657,6 +731,7 @@ class CanopusAutomation:
         Navega para a página de busca avançada
 
         Fluxo:
+        0. Garantir que está logado (refaz login se sessão expirou)
         1. Clicar no ícone de Atendimento (pessoa)
         2. Clicar em "Busca avançada"
 
@@ -664,6 +739,12 @@ class CanopusAutomation:
             True se navegou com sucesso
         """
         logger.info("🔍 Navegando para busca avançada...")
+
+        # IMPORTANTE: Garantir login antes de navegar
+        login_ok = await self._garantir_login()
+        if not login_ok:
+            logger.error("❌ Falha ao garantir login - impossível navegar")
+            return False
 
         try:
             # 1. Clicar no ícone de Atendimento (pessoa)
@@ -693,6 +774,34 @@ class CanopusAutomation:
         except Exception as e:
             logger.error(f"❌ Erro ao navegar para busca: {e}")
             await self.screenshot("erro_navegar_busca")
+
+            # RETRY: Tentar refazer login e navegar novamente
+            logger.warning("🔄 Tentando refazer login e navegar novamente...")
+            self.logado = False
+            login_ok = await self._garantir_login()
+
+            if login_ok:
+                try:
+                    # Tentar navegar novamente após re-login
+                    icone_atendimento = self.config.SELECTORS['busca']['icone_atendimento']
+                    await self.page.wait_for_selector(icone_atendimento, state='visible', timeout=15000)
+                    await self.page.click(icone_atendimento)
+
+                    botao_busca_avancada = self.config.SELECTORS['busca']['botao_busca_avancada']
+                    await self.page.wait_for_selector(botao_busca_avancada, state='visible', timeout=15000)
+                    await self.page.click(botao_busca_avancada)
+
+                    await self.page.wait_for_selector(
+                        self.config.SELECTORS['busca']['cpf_input'],
+                        state='visible',
+                        timeout=15000
+                    )
+
+                    logger.info("✅ Navegado para busca após re-login")
+                    return True
+                except Exception as e2:
+                    logger.error(f"❌ Falha mesmo após re-login: {e2}")
+
             return False
 
     async def buscar_cliente_cpf(self, cpf: str) -> Optional[Dict[str, Any]]:
