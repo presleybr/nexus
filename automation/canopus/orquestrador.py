@@ -33,6 +33,7 @@ if str(canopus_path) not in sys.path:
 from canopus_config import CanopusConfig
 from excel_importer import ExcelImporter
 from canopus_automation import CanopusAutomation
+from canopus_automation_turbo import CanopusAutomationTurbo
 from db_config import get_connection_string, get_connection_params
 
 logger = logging.getLogger(__name__)
