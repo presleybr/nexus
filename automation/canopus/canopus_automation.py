@@ -1435,9 +1435,9 @@ class CanopusAutomation:
                 logger.info("✅ Clique executado")
                 sys.stdout.flush()
 
-                # Aguardar nova aba ser capturada (até 3 segundos)
+                # Aguardar nova aba ser capturada (até 5 segundos - aumentado para Render)
                 contador = 0
-                while not nova_aba_pdf and contador < 30:  # 3 segundos
+                while not nova_aba_pdf and contador < 50:  # 5 segundos
                     await asyncio.sleep(0.1)
                     contador += 1
                     # Log a cada segundo
@@ -1454,9 +1454,13 @@ class CanopusAutomation:
                 sys.stdout.flush()
 
                 if not nova_aba_pdf:
-                    logger.error("❌ Nova aba com PDF não abriu")
+                    logger.error("❌ Nova aba com PDF não abriu após 5 segundos")
+                    logger.error(f"   Total de abas no contexto: {len(self.context.pages)}")
+                    logger.error(f"   URLs das abas:")
+                    for idx, pag in enumerate(self.context.pages):
+                        logger.error(f"     [{idx}] {pag.url}")
                     sys.stdout.flush()
-                    raise Exception("Nova aba com PDF não abriu")
+                    raise Exception("Nova aba com PDF não abriu - possível bloqueio de popup")
 
                 logger.info(f"✅ Nova aba capturada: {nova_aba_pdf.url[:80] if nova_aba_pdf.url else 'carregando...'}")
                 sys.stdout.flush()
@@ -1471,11 +1475,11 @@ class CanopusAutomation:
                     # CRÍTICO: Aguardar PDF REAL (170KB), não HTML redirect (678 bytes)!
                     TAMANHO_MINIMO_PDF_REAL = 150000  # 150KB - boletos Canopus têm ~170KB
 
-                    logger.info("⏳ Aguardando interceptador capturar PDF REAL (até 20s)...")
+                    logger.info("⏳ Aguardando interceptador capturar PDF REAL (até 30s - aumentado para Render)...")
                     logger.info(f"   Tamanho mínimo: {TAMANHO_MINIMO_PDF_REAL/1024:.0f} KB (ignora HTMLs de 678 bytes)")
                     sys.stdout.flush()
 
-                    for tentativa in range(200):  # 200 x 100ms = 20 segundos
+                    for tentativa in range(300):  # 300 x 100ms = 30 segundos
                         # Só aceitar se for PDF REAL (> 150KB), não HTML pequeno!
                         if pdf_bytes_interceptado and len(pdf_bytes_interceptado) > TAMANHO_MINIMO_PDF_REAL:
                             pdf_bytes = pdf_bytes_interceptado
@@ -1507,8 +1511,10 @@ class CanopusAutomation:
                             logger.warning(f"⚠️ PDF interceptado: {tamanho_kb:.1f} KB")
                         sys.stdout.flush()
                     else:
-                        logger.warning(f"⚠️ Nenhum PDF foi interceptado após 20s de espera")
+                        logger.warning(f"⚠️ Nenhum PDF foi interceptado após 30s de espera")
                         logger.info(f"📊 Respostas capturadas: {len(todas_respostas_pdf)}")
+                        for idx, resp in enumerate(todas_respostas_pdf):
+                            logger.info(f"   [{idx+1}] URL: {resp['url'][:80]}... | Tamanho: {resp['tamanho']/1024:.1f} KB | Type: {resp['content_type']}")
                         sys.stdout.flush()
 
                     # Nota: route handler será removido no bloco finally (sempre executado)
@@ -1525,12 +1531,12 @@ class CanopusAutomation:
                             sys.stdout.flush()
 
                             # CRÍTICO: Aguardar a aba navegar de about:blank para URL real
-                            # Tentar até 10 segundos
+                            # Tentar até 15 segundos (aumentado para Render)
                             logger.info("🔍 DEBUG: Iniciando aguardo de navegação da aba popup...")
                             sys.stdout.flush()
 
                             url_navegada = False
-                            for i in range(50):  # 50 x 200ms = 10 segundos
+                            for i in range(75):  # 75 x 200ms = 15 segundos
                                 url_atual = nova_aba_pdf.url
                                 if url_atual and url_atual != 'about:blank':
                                     logger.info(f"✅ Aba navegou para: {url_atual[:100]}")
@@ -1547,7 +1553,7 @@ class CanopusAutomation:
                                 try:
                                     logger.info("🔍 DEBUG: Aguardando load state 'networkidle'...")
                                     sys.stdout.flush()
-                                    await nova_aba_pdf.wait_for_load_state('networkidle', timeout=5000)
+                                    await nova_aba_pdf.wait_for_load_state('networkidle', timeout=10000)
                                     logger.info("✅ Load state 'networkidle' alcançado!")
                                     sys.stdout.flush()
                                 except Exception as e_load:
@@ -1646,7 +1652,7 @@ class CanopusAutomation:
                         sys.stdout.flush()
 
                         try:
-                            nova_aba_controlada.set_default_timeout(30000)  # 30 segundos (aumentado)
+                            nova_aba_controlada.set_default_timeout(45000)  # 45 segundos (aumentado para Render)
 
                             pdf_data = await nova_aba_controlada.evaluate("""
                                 async () => {
