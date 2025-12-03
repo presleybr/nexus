@@ -2846,78 +2846,78 @@ def importar_planilha_dener():
                         cliente_nexus_id = cliente_nexus_row['id'] if cliente_nexus_row else None
 
                         if existing:
-                        # ========== ATUALIZAR CLIENTE EXISTENTE ==========
-                        cliente_id = existing['id']
-                        logger.info(f"   🔄 Atualizando cliente existente (ID: {cliente_id}): {nome}")
+                            # ========== ATUALIZAR CLIENTE EXISTENTE ==========
+                            cliente_id = existing['id']
+                            logger.info(f"   🔄 Atualizando cliente existente (ID: {cliente_id}): {nome}")
 
-                        cur.execute("""
-                            UPDATE clientes_finais
-                            SET nome_completo = %s,
-                                ponto_venda = %s,
-                                numero_contrato = %s,
-                                consultor_id = %s,
-                                updated_at = CURRENT_TIMESTAMP
-                            WHERE id = %s
-                        """, (nome, ponto_venda, numero_contrato, consultor_id, cliente_id))
+                            cur.execute("""
+                                UPDATE clientes_finais
+                                SET nome_completo = %s,
+                                    ponto_venda = %s,
+                                    numero_contrato = %s,
+                                    consultor_id = %s,
+                                    updated_at = CURRENT_TIMESTAMP
+                                WHERE id = %s
+                            """, (nome, ponto_venda, numero_contrato, consultor_id, cliente_id))
 
-                        atualizados += 1
-                        logger.debug(f"   ✅ Cliente atualizado!")
+                            atualizados += 1
+                            logger.debug(f"   ✅ Cliente atualizado!")
 
-                    else:
-                        # ========== INSERIR NOVO CLIENTE ==========
-                        logger.info(f"   ➕ Criando novo cliente: {nome} (CPF: {cpf_formatado}, PV: {ponto_venda})")
+                        else:
+                            # ========== INSERIR NOVO CLIENTE ==========
+                            logger.info(f"   ➕ Criando novo cliente: {nome} (CPF: {cpf_formatado}, PV: {ponto_venda})")
 
-                        # Dados básicos obrigatórios
-                        whatsapp = '5567999999999'  # Placeholder
-                        telefone_celular = whatsapp
+                            # Dados básicos obrigatórios
+                            whatsapp = '5567999999999'  # Placeholder
+                            telefone_celular = whatsapp
 
-                        cur.execute("""
-                            INSERT INTO clientes_finais (
-                                cliente_nexus_id,
-                                nome_completo,
-                                cpf,
-                                telefone_celular,
-                                whatsapp,
-                                numero_contrato,
-                                grupo_consorcio,
-                                cota_consorcio,
-                                valor_credito,
-                                valor_parcela,
-                                prazo_meses,
-                                data_adesao,
-                                status_contrato,
-                                origem,
-                                ativo,
-                                created_at,
-                                updated_at,
-                                consultor_id,
-                                ponto_venda
-                            ) VALUES (
-                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, %s, %s
-                            )
-                        """, (
-                            cliente_nexus_id,  # 1. cliente_nexus_id
-                            nome,  # 2. nome_completo
-                            cpf,  # 3. cpf
-                            telefone_celular,  # 4. telefone_celular
-                            whatsapp,  # 5. whatsapp
-                            numero_contrato,  # 6. numero_contrato
-                            '0000',  # 7. grupo_consorcio (padrão)
-                            '001',  # 8. cota_consorcio (padrão)
-                            0.00,  # 9. valor_credito
-                            0.00,  # 10. valor_parcela
-                            80,  # 11. prazo_meses (padrão)
-                            datetime.now().date(),  # 12. data_adesao
-                            'ATIVO',  # 13. status_contrato
-                            f'PLANILHA_DENER_PV{ponto_venda}',  # 14. origem
-                            True,  # 15. ativo
-                            consultor_id,  # 16. consultor_id
-                            ponto_venda  # 17. ponto_venda
-                        ))
+                            cur.execute("""
+                                INSERT INTO clientes_finais (
+                                    cliente_nexus_id,
+                                    nome_completo,
+                                    cpf,
+                                    telefone_celular,
+                                    whatsapp,
+                                    numero_contrato,
+                                    grupo_consorcio,
+                                    cota_consorcio,
+                                    valor_credito,
+                                    valor_parcela,
+                                    prazo_meses,
+                                    data_adesao,
+                                    status_contrato,
+                                    origem,
+                                    ativo,
+                                    created_at,
+                                    updated_at,
+                                    consultor_id,
+                                    ponto_venda
+                                ) VALUES (
+                                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                    %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, %s, %s
+                                )
+                            """, (
+                                cliente_nexus_id,  # 1. cliente_nexus_id
+                                nome,  # 2. nome_completo
+                                cpf,  # 3. cpf
+                                telefone_celular,  # 4. telefone_celular
+                                whatsapp,  # 5. whatsapp
+                                numero_contrato,  # 6. numero_contrato
+                                '0000',  # 7. grupo_consorcio (padrão)
+                                '001',  # 8. cota_consorcio (padrão)
+                                0.00,  # 9. valor_credito
+                                0.00,  # 10. valor_parcela
+                                80,  # 11. prazo_meses (padrão)
+                                datetime.now().date(),  # 12. data_adesao
+                                'ATIVO',  # 13. status_contrato
+                                f'PLANILHA_DENER_PV{ponto_venda}',  # 14. origem
+                                True,  # 15. ativo
+                                consultor_id,  # 16. consultor_id
+                                ponto_venda  # 17. ponto_venda
+                            ))
 
-                        importados += 1
-                        logger.debug(f"   ✅ Cliente criado!")
+                            importados += 1
+                            logger.debug(f"   ✅ Cliente criado!")
 
                     conn.commit()
 
