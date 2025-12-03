@@ -1,24 +1,11 @@
 """
-Automação Canopus usando Playwright Async - VERSÃO OTIMIZADA
+Automação Canopus usando Playwright Async
 Bot para download automatizado de boletos do sistema Canopus
-
-OTIMIZAÇÕES IMPLEMENTADAS:
-- Bloqueio de recursos desnecessários (imagens, CSS, fonts, analytics)
-- Reutilização de browser entre clientes
-- Substituição de sleeps fixos por waits inteligentes
-- Manutenção de sessão de login
-- Browser args otimizados para máxima velocidade
-- Timeouts reduzidos e agressivos
-
-PERFORMANCE ESPERADA:
-- Antes: 30-60s por boleto
-- Depois: 8-15s por boleto
 """
 
 import asyncio
 import logging
 import sys
-import os
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime
@@ -30,8 +17,7 @@ from playwright.async_api import (
     BrowserContext,
     Page,
     Download,
-    TimeoutError as PlaywrightTimeoutError,
-    Route
+    TimeoutError as PlaywrightTimeoutError
 )
 
 from canopus_config import CanopusConfig
@@ -58,44 +44,6 @@ if not logger.handlers:
 
 
 # ============================================================================
-# OTIMIZAÇÃO: BLOQUEIO DE RECURSOS DESNECESSÁRIOS
-# ============================================================================
-
-async def bloquear_recursos_desnecessarios(route: Route):
-    """
-    Bloqueia APENAS analytics/tracking para acelerar
-
-    IMPORTANTE: NÃO bloqueia imagens, CSS, fonts (causava detecção de bot)
-    Bloqueia APENAS analytics/tracking que não são necessários
-    """
-    url = route.request.url.lower()
-    resource_type = route.request.resource_type
-
-    # Bloquear APENAS analytics/tracking (não imagens/CSS/fonts)
-    blocked_domains = [
-        'google-analytics.com',
-        'googletagmanager.com',
-        'facebook.com',
-        'doubleclick.net',
-        'analytics',
-        'tracking',
-        'hotjar',
-        'clarity',
-        'mouseflow',
-        'mixpanel'
-    ]
-
-    # Bloquear por domínio (APENAS analytics)
-    for domain in blocked_domains:
-        if domain in url:
-            await route.abort()
-            return
-
-    # Permitir TUDO (imagens, CSS, JS, XHR, etc.)
-    await route.continue_()
-
-
-# ============================================================================
 # FUNÇÕES AUXILIARES
 # ============================================================================
 
@@ -109,7 +57,6 @@ def buscar_cliente_banco(cpf: str) -> Optional[Dict[str, Any]]:
     Returns:
         Dicionário com nome e outras informações ou None se não encontrado
     """
-    conn = None
     try:
         import psycopg
         from psycopg.rows import dict_row
@@ -138,6 +85,8 @@ def buscar_cliente_banco(cpf: str) -> Optional[Dict[str, Any]]:
 
             resultado = cur.fetchone()
 
+        conn.close()
+
         if resultado:
             logger.info(f"✅ DEBUG: Cliente encontrado - Nome: {resultado['nome_completo']}")
             sys.stdout.flush()
@@ -158,15 +107,6 @@ def buscar_cliente_banco(cpf: str) -> Optional[Dict[str, Any]]:
         traceback.print_exc()
         sys.stdout.flush()
         return None
-
-    finally:
-        # CRÍTICO: Garantir que conexão SEMPRE seja fechada
-        if conn:
-            try:
-                conn.close()
-                logger.debug("🔒 Conexão DB fechada com sucesso")
-            except Exception as e_close:
-                logger.error(f"❌ Erro ao fechar conexão: {e_close}")
 
 
 def buscar_cliente_planilha(cpf: str, planilha_path: Path = None) -> Optional[Dict[str, Any]]:
@@ -282,14 +222,6 @@ class CanopusAutomation:
         self.ponto_venda_atual = None
         self.usuario_atual = None
 
-        # Credenciais para re-login automático
-        self.senha_atual = None
-        self.codigo_empresa_atual = None
-
-        # OTIMIZAÇÃO: Flag para reutilizar browser entre clientes
-        self.browser_iniciado = False
-        self.clientes_processados = 0
-
         # Estatísticas
         self.stats = {
             'downloads_sucesso': 0,
@@ -298,8 +230,6 @@ class CanopusAutomation:
             'sem_boleto': 0,
             'inicio_sessao': None,
             'fim_sessao': None,
-            'tempo_total_segundos': 0,
-            'tempo_medio_por_boleto': 0,
         }
 
     # ========================================================================
@@ -307,21 +237,8 @@ class CanopusAutomation:
     # ========================================================================
 
     async def iniciar_navegador(self):
-        """
-        Inicia o navegador Playwright com configurações OTIMIZADAS
-
-        OTIMIZAÇÕES:
-        - Browser args agressivos (desabilita imagens, GPU, extensions)
-        - Bloqueio de recursos desnecessários via route handler
-        - Timeouts reduzidos (15s navegação, 10s elementos)
-        - Reutilização: só inicia se não estiver iniciado
-        """
-        # OTIMIZAÇÃO: Não reiniciar se já estiver iniciado
-        if self.browser_iniciado and self.browser and self.page:
-            logger.info("♻️  Browser já iniciado - reutilizando sessão existente")
-            return
-
-        logger.info("🌐 Iniciando navegador OTIMIZADO...")
+        """Inicia o navegador Playwright"""
+        logger.info("🌐 Iniciando navegador...")
 
         try:
             # Iniciar Playwright
@@ -334,44 +251,40 @@ class CanopusAutomation:
             # Configurações do navegador
             pw_config = self.config.PLAYWRIGHT_CONFIG
 
-            # IMPORTANTE: Browser args MÍNIMOS para evitar detecção de bot
-            # Removido: --single-process, --blink-settings=imagesEnabled=false
-            # Esses argumentos causavam detecção de bot e CAPTCHA
-            browser_args = [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
+            # Argumentos anti-detecção extras
+            anti_detection_args = [
                 '--disable-blink-features=AutomationControlled',
-                '--disable-infobars',
-                '--window-size=1920,1080',
-                '--start-maximized',
+                '--disable-dev-shm-usage',
             ]
 
-            # Logs mínimos (apenas se necessário)
-            if os.getenv('DEBUG_BROWSER') == 'true':
-                browser_args.extend([
-                    '--enable-logging=stderr',
-                    '--v=1',
-                ])
+            # Argumentos para FORÇAR logs do Chromium
+            chromium_log_args = [
+                '--enable-logging=stderr',  # Logs para stderr
+                '--v=2',  # Verbose level 2 (mais detalhado)
+                '--log-level=0',  # Log level 0 = INFO
+            ]
 
             # Lançar navegador
-            logger.info(f"🚀 Lançando navegador (headless={self.headless})...")
+            logger.info(f"🌐 Lançando navegador (headless={self.headless})...")
             sys.stdout.flush()
 
             if pw_config['browser_type'] == 'firefox':
                 self.browser = await self.playwright.firefox.launch(
                     headless=self.headless,
-                    args=['--no-remote']
+                    slow_mo=pw_config['slow_mo']
                 )
             elif pw_config['browser_type'] == 'webkit':
                 self.browser = await self.playwright.webkit.launch(
-                    headless=self.headless
+                    headless=self.headless,
+                    slow_mo=pw_config['slow_mo']
                 )
             else:  # chromium (padrão)
                 self.browser = await self.playwright.chromium.launch(
                     headless=self.headless,
-                    args=browser_args,
-                    chromium_sandbox=False
+                    args=pw_config['browser_args'] + anti_detection_args + chromium_log_args,
+                    slow_mo=pw_config['slow_mo'],
+                    # Forçar logs do Chromium para stderr (que será capturado)
+                    chromium_sandbox=False  # Desabilitar sandbox para melhor logging
                 )
 
             logger.info("✅ Navegador lançado com sucesso")
@@ -387,44 +300,23 @@ class CanopusAutomation:
                 accept_downloads=pw_config['accept_downloads'],
                 locale='pt-BR',
                 timezone_id='America/Sao_Paulo',
-                # OTIMIZAÇÃO: Ignorar erros HTTPS para acelerar
-                ignore_https_errors=True,
             )
 
-            # Script anti-detecção MELHORADO (executado em todas as páginas)
+            # Script anti-detecção (executado em todas as páginas)
             await self.context.add_init_script("""
-                // Remover webdriver (indicador de automação)
+                // Remover webdriver flag
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
                 });
 
-                // Simular plugins reais do Chrome
+                // Sobrescrever plugins
                 Object.defineProperty(navigator, 'plugins', {
-                    get: () => [
-                        {name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer'},
-                        {name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai'},
-                        {name: 'Native Client', filename: 'internal-nacl-plugin'}
-                    ]
+                    get: () => [1, 2, 3, 4, 5]
                 });
 
-                // Adicionar chrome object (browsers normais têm)
-                window.chrome = {
-                    runtime: {},
-                    loadTimes: function() {},
-                    csi: function() {}
-                };
-
-                // Adicionar navigator.languages
-                Object.defineProperty(navigator, 'languages', {
-                    get: () => ['pt-BR', 'pt', 'en-US', 'en']
-                });
+                // Chrome runtime
+                window.chrome = { runtime: {} };
             """)
-
-            # Bloqueio seletivo de analytics (não bloqueia imagens/CSS para evitar detecção)
-            logger.info("🚫 Registrando bloqueio de analytics/tracking...")
-            await self.context.route("**/*", bloquear_recursos_desnecessarios)
-            logger.info("✅ Bloqueio ativo APENAS para analytics (imagens/CSS permitidos)")
-            sys.stdout.flush()
 
             # Criar página
             logger.info("📄 Criando nova página...")
@@ -439,21 +331,20 @@ class CanopusAutomation:
 
             # CRÍTICO: Funções reais ao invés de lambdas para poder fazer flush
             def log_console(msg):
-                logger.debug(f"🖥️  [BROWSER] [{msg.type}] {msg.text}")
+                logger.info(f"🖥️  [BROWSER CONSOLE] [{msg.type}] {msg.text}")
                 sys.stdout.flush()
 
             def log_page_error(exc):
                 logger.error(f"❌ [BROWSER ERROR] {exc}")
                 sys.stdout.flush()
 
-            # OTIMIZAÇÃO: Remover logs de request/response (muito verboso)
-            # def log_request(req):
-            #     logger.debug(f"📤 [REQUEST] {req.method} {req.url}")
-            #     sys.stdout.flush()
+            def log_request(req):
+                logger.debug(f"📤 [REQUEST] {req.method} {req.url}")
+                sys.stdout.flush()
 
-            # def log_response(res):
-            #     logger.debug(f"📥 [RESPONSE] {res.status} {res.url}")
-            #     sys.stdout.flush()
+            def log_response(res):
+                logger.debug(f"📥 [RESPONSE] {res.status} {res.url}")
+                sys.stdout.flush()
 
             # Listener de console - captura TODOS os console.log, console.warn, console.error da página
             self.page.on("console", log_console)
@@ -461,28 +352,24 @@ class CanopusAutomation:
             # Listener de erros de página - captura erros JavaScript e outros
             self.page.on("pageerror", log_page_error)
 
-            # OTIMIZAÇÃO: Não logar todas as requests/responses (muito lento)
-            # self.page.on("request", log_request)
-            # self.page.on("response", log_response)
+            # Listener de requests - útil para debug de chamadas de rede
+            self.page.on("request", log_request)
 
-            logger.info("✅ Listeners configurados")
+            # Listener de responses - útil para debug de respostas
+            self.page.on("response", log_response)
+
+            logger.info("✅ Listeners configurados para logging em tempo real com flush")
             sys.stdout.flush()
 
-            # OTIMIZAÇÃO: Timeouts agressivos (15s navegação, 10s elementos)
-            timeout_nav = 15000  # 15 segundos (antes era config que podia ser 60s)
+            # Configurar timeouts
+            timeout_nav = self.config.TIMEOUTS['navegacao']
             self.page.set_default_timeout(timeout_nav)
-            self.page.set_default_navigation_timeout(15000)
-            logger.info(f"⏱️ Timeouts OTIMIZADOS: navegação=15s, elementos=15s")
+            logger.info(f"⏱️ Timeout configurado: {timeout_nav}ms")
             sys.stdout.flush()
 
-            logger.info("✅ Navegador OTIMIZADO iniciado com sucesso!")
+            logger.info("✅ Navegador iniciado com sucesso!")
             sys.stdout.flush()
-
-            # Marcar como iniciado
-            self.browser_iniciado = True
-
-            if not self.stats['inicio_sessao']:
-                self.stats['inicio_sessao'] = datetime.now()
+            self.stats['inicio_sessao'] = datetime.now()
 
         except Exception as e:
             logger.error(f"❌ Erro ao iniciar navegador: {e}")
@@ -554,12 +441,8 @@ class CanopusAutomation:
         try:
             # Navegar para página de login
             logger.info(f"Navegando para: {self.config.URLS['login']}")
-            # OTIMIZAÇÃO: usar 'domcontentloaded' ao invés de 'load' (mais rápido)
-            await self.page.goto(
-                self.config.URLS['login'],
-                wait_until='domcontentloaded',
-                timeout=15000
-            )
+            await self.page.goto(self.config.URLS['login'])
+            await self._delay_humanizado()
 
             # Screenshot antes do login
             await self.screenshot("antes_login")
@@ -567,70 +450,14 @@ class CanopusAutomation:
             # Preencher usuário
             logger.info("Preenchendo usuário...")
             usuario_input = self.config.SELECTORS['login']['usuario_input']
-            await self.page.wait_for_selector(usuario_input, state='visible', timeout=10000)
             await self.page.fill(usuario_input, usuario)
-            logger.info(f"✅ Usuário preenchido: {usuario}")
-
-            # Pequeno delay para garantir que o campo foi preenchido
-            await asyncio.sleep(0.3)
+            await self._delay_humanizado(0.3, 0.7)
 
             # Preencher senha
             logger.info("Preenchendo senha...")
             senha_input = self.config.SELECTORS['login']['senha_input']
-            await self.page.wait_for_selector(senha_input, state='visible', timeout=10000)
             await self.page.fill(senha_input, senha)
-            logger.info("✅ Senha preenchida")
-
-            # Pequeno delay para garantir que o campo foi preenchido
-            await asyncio.sleep(0.3)
-
-            # NOVO: Verificar se existe campo de segurança/CAPTCHA
-            logger.info("🔍 Verificando se existe campo de segurança...")
-            try:
-                # Buscar por possíveis campos de segurança
-                security_selectors = [
-                    'input[name*="captcha" i]',
-                    'input[name*="token" i]',
-                    'input[name*="segur" i]',
-                    'input[name*="caracteres" i]',
-                    'input[id*="captcha" i]',
-                    'input[id*="token" i]',
-                    'input[id*="segur" i]',
-                ]
-
-                security_field = None
-                for selector in security_selectors:
-                    field = await self.page.query_selector(selector)
-                    if field:
-                        field_id = await field.get_attribute('id')
-                        field_name = await field.get_attribute('name')
-                        field_type = await field.get_attribute('type')
-                        logger.info(f"⚠️ CAMPO DE SEGURANÇA ENCONTRADO:")
-                        logger.info(f"   Selector: {selector}")
-                        logger.info(f"   ID: {field_id}")
-                        logger.info(f"   Name: {field_name}")
-                        logger.info(f"   Type: {field_type}")
-                        security_field = field
-                        break
-
-                # Verificar se há texto mencionando segurança na página
-                page_text = await self.page.evaluate("() => document.body.innerText")
-                if 'segur' in page_text.lower() or 'caracteres' in page_text.lower():
-                    logger.warning("⚠️ TEXTO DE SEGURANÇA DETECTADO NA PÁGINA")
-                    # Extrair e mostrar o trecho relevante
-                    lines = page_text.split('\n')
-                    for i, line in enumerate(lines):
-                        if 'segur' in line.lower() or 'caracteres' in line.lower():
-                            logger.warning(f"   Linha {i}: {line.strip()}")
-
-                if not security_field:
-                    logger.info("✅ Nenhum campo de segurança detectado - procedendo com login normal")
-                else:
-                    logger.error("❌ CAMPO DE SEGURANÇA PRESENTE - LOGIN PODE FALHAR")
-                    logger.error("   Este campo precisa ser preenchido mas não temos a lógica para isso ainda")
-
-            except Exception as e_sec:
-                logger.warning(f"⚠️ Erro ao verificar campo de segurança: {e_sec}")
+            await self._delay_humanizado(0.5, 1.0)
 
             # Screenshot antes de clicar
             await self.screenshot("antes_clicar_login")
@@ -638,49 +465,11 @@ class CanopusAutomation:
             # Clicar em entrar
             logger.info("Clicando no botão Login...")
             botao_entrar = self.config.SELECTORS['login']['botao_entrar']
-
-            # Aguardar botão estar realmente pronto
-            await self.page.wait_for_selector(botao_entrar, state='visible', timeout=10000)
-
-            # Verificar se botão está enabled
-            is_enabled = await self.page.evaluate(f"""
-                () => {{
-                    const btn = document.querySelector('{botao_entrar}');
-                    if (!btn) return false;
-                    return !btn.disabled;
-                }}
-            """)
-            logger.info(f"Botão Login enabled: {is_enabled}")
-
-            # Clicar no botão
             await self.page.click(botao_entrar)
-            logger.info("✅ Clique executado no botão Login")
 
-            # IMPORTANTE: Aguardar navegação ou resposta do servidor
-            logger.info("Aguardando resposta do servidor após login...")
-
-            # Tentar múltiplas estratégias de detecção de sucesso
-            login_sucesso = False
-
-            try:
-                # Estratégia 1: Aguardar URL mudar (mais confiável)
-                logger.info("Tentando detectar mudança de URL...")
-                await self.page.wait_for_url(
-                    lambda url: 'login' not in url.lower(),
-                    timeout=15000
-                )
-                login_sucesso = True
-                logger.info("✅ URL mudou - login detectado")
-            except Exception as e_url:
-                logger.warning(f"⚠️ URL não mudou: {e_url}")
-
-                # Estratégia 2: Aguardar networkidle
-                try:
-                    logger.info("Aguardando network idle...")
-                    await self.page.wait_for_load_state('networkidle', timeout=15000)
-                    logger.info("✅ Network idle alcançado")
-                except Exception as e_network:
-                    logger.warning(f"⚠️ Network idle não alcançado: {e_network}")
+            # Aguardar navegação após login
+            logger.info("Aguardando navegação...")
+            await asyncio.sleep(self.config.DELAYS['apos_login'])
 
             # Screenshot após login
             await self.screenshot("apos_login")
@@ -689,109 +478,25 @@ class CanopusAutomation:
             url_atual = self.page.url
             logger.info(f"URL após login: {url_atual}")
 
-            # DEBUG: Capturar título da página
-            titulo = await self.page.title()
-            logger.info(f"Título da página: {titulo}")
-
-            # Verificar múltiplos sinais de sucesso
-            if 'login' not in url_atual.lower() or login_sucesso:
+            if 'login' not in url_atual.lower():
                 logger.info("✅ Login realizado com sucesso!")
                 self.logado = True
                 self.empresa_atual = codigo_empresa
                 self.ponto_venda_atual = ponto_venda
                 self.usuario_atual = usuario
-                # Salvar credenciais para re-login automático
-                self.senha_atual = senha
-                self.codigo_empresa_atual = codigo_empresa
                 return True
 
-            # Login falhou - tentar capturar mensagem de erro
-            logger.error("⚠️ Login parece ter falhado - investigando...")
-
-            # Verificar mensagem de erro na página
+            # Verificar mensagem de erro
             try:
-                erro_selector = self.config.SELECTORS['login'].get('erro_login', '.erro, .alert, .error')
+                erro_selector = self.config.SELECTORS['login']['erro_login']
                 erro_element = await self.page.query_selector(erro_selector)
 
                 if erro_element:
                     mensagem_erro = await erro_element.text_content()
-                    logger.error(f"❌ Mensagem de erro encontrada: {mensagem_erro}")
-                else:
-                    logger.warning("⚠️ Nenhuma mensagem de erro encontrada na página")
+                    logger.error(f"❌ Erro no login: {mensagem_erro}")
 
-            except Exception as e_erro:
-                logger.warning(f"⚠️ Erro ao buscar mensagem de erro: {e_erro}")
-
-            # DEBUG: Capturar HTML da página para análise
-            try:
-                html_snippet = await self.page.evaluate("""
-                    () => {
-                        // Capturar primeiro 500 caracteres do body
-                        return document.body ? document.body.innerText.substring(0, 500) : 'N/A';
-                    }
-                """)
-                logger.info(f"📄 Conteúdo da página (primeiros 500 chars): {html_snippet}")
-
-                # CRÍTICO: Detectar campo de segurança APÓS tentativa de login
-                if 'segur' in html_snippet.lower() or 'caracteres' in html_snippet.lower():
-                    logger.error("🚨 CAMPO DE SEGURANÇA DETECTADO APÓS LOGIN!")
-                    logger.error("   O sistema está solicitando verificação de segurança")
-
-                    # Mapear TODOS os inputs visíveis na página
-                    all_inputs = await self.page.query_selector_all('input[type="text"], input[type="password"], input:not([type])')
-                    logger.info(f"   Total de inputs encontrados: {len(all_inputs)}")
-
-                    for idx, inp in enumerate(all_inputs):
-                        is_visible = await inp.is_visible()
-                        if is_visible:
-                            inp_id = await inp.get_attribute('id') or ''
-                            inp_name = await inp.get_attribute('name') or ''
-                            inp_type = await inp.get_attribute('type') or ''
-                            inp_value = await inp.get_attribute('value') or ''
-                            logger.info(f"   Input visível #{idx}:")
-                            logger.info(f"      ID: {inp_id}")
-                            logger.info(f"      Name: {inp_name}")
-                            logger.info(f"      Type: {inp_type}")
-                            logger.info(f"      Value: {inp_value[:20] if inp_value else '(vazio)'}")
-
-                    # Verificar se há imagens de CAPTCHA
-                    all_images = await self.page.query_selector_all('img')
-                    logger.info(f"   Total de imagens encontradas: {len(all_images)}")
-                    for idx, img in enumerate(all_images):
-                        is_visible = await img.is_visible()
-                        if is_visible:
-                            img_src = await img.get_attribute('src') or ''
-                            img_id = await img.get_attribute('id') or ''
-                            img_alt = await img.get_attribute('alt') or ''
-                            if 'captcha' in img_src.lower() or 'captcha' in img_id.lower() or 'segur' in img_src.lower():
-                                logger.error(f"   🖼️  IMAGEM DE CAPTCHA ENCONTRADA #{idx}:")
-                                logger.error(f"      SRC: {img_src}")
-                                logger.error(f"      ID: {img_id}")
-                                logger.error(f"      ALT: {img_alt}")
-
-            except Exception as e_html:
-                logger.warning(f"⚠️ Erro ao capturar HTML: {e_html}")
-
-            # DEBUG: Verificar se há elementos esperados da página interna
-            try:
-                # Tentar encontrar o ícone de atendimento (só aparece após login)
-                icone_atendimento = self.config.SELECTORS['busca']['icone_atendimento']
-                has_icon = await self.page.query_selector(icone_atendimento)
-
-                if has_icon:
-                    logger.info("✅ DESCOBERTA: Ícone de atendimento encontrado! Login pode ter funcionado!")
-                    self.logado = True
-                    self.empresa_atual = codigo_empresa
-                    self.ponto_venda_atual = ponto_venda
-                    self.usuario_atual = usuario
-                    self.senha_atual = senha
-                    self.codigo_empresa_atual = codigo_empresa
-                    return True
-                else:
-                    logger.warning("⚠️ Ícone de atendimento NÃO encontrado")
-
-            except Exception as e_icon:
-                logger.warning(f"⚠️ Erro ao verificar ícone: {e_icon}")
+            except:
+                pass
 
             logger.error("❌ Login falhou")
             await self.screenshot("login_falhou")
@@ -817,73 +522,6 @@ class CanopusAutomation:
         self.empresa_atual = codigo_empresa
         return True
 
-    async def _verificar_sessao_ativa(self) -> bool:
-        """
-        Verifica se a sessão ainda está ativa
-
-        Returns:
-            True se sessão ativa, False se expirada
-        """
-        try:
-            # Verificar se ainda consegue acessar elemento que só aparece quando logado
-            icone_atendimento = self.config.SELECTORS['busca']['icone_atendimento']
-            elemento = await self.page.query_selector(icone_atendimento)
-
-            if elemento is None:
-                logger.warning("⚠️ Elemento de atendimento não encontrado - sessão pode ter expirado")
-                return False
-
-            # Verificar se não voltou para tela de login
-            url_atual = self.page.url
-            if 'login' in url_atual.lower():
-                logger.warning("⚠️ Detectada página de login - sessão expirou")
-                return False
-
-            return True
-        except Exception as e:
-            logger.error(f"❌ Erro ao verificar sessão: {e}")
-            return False
-
-    async def _garantir_login(self) -> bool:
-        """
-        Garante que está logado, refazendo login se necessário
-
-        Returns:
-            True se está logado (ou conseguiu refazer login)
-        """
-        # Se nunca fez login, precisa das credenciais
-        if not self.logado and (not self.usuario_atual or not self.senha_atual):
-            logger.error("❌ Nunca fez login - credenciais não disponíveis")
-            return False
-
-        # Se já está logado, verificar se sessão ainda está ativa
-        if self.logado:
-            sessao_ativa = await self._verificar_sessao_ativa()
-
-            if sessao_ativa:
-                logger.debug("✅ Sessão ainda ativa")
-                return True
-
-            # Sessão expirou - precisa refazer login
-            logger.warning("⚠️ SESSÃO EXPIRADA - Refazendo login automaticamente...")
-            self.logado = False
-
-        # Refazer login com credenciais salvas
-        logger.info(f"🔄 Refazendo login como {self.usuario_atual}...")
-        sucesso = await self.login(
-            usuario=self.usuario_atual,
-            senha=self.senha_atual,
-            codigo_empresa=self.codigo_empresa_atual,
-            ponto_venda=self.ponto_venda_atual
-        )
-
-        if sucesso:
-            logger.info("✅ Re-login realizado com sucesso!")
-        else:
-            logger.error("❌ Falha ao refazer login")
-
-        return sucesso
-
     # ========================================================================
     # MÉTODOS DE BUSCA DE CLIENTE
     # ========================================================================
@@ -893,7 +531,6 @@ class CanopusAutomation:
         Navega para a página de busca avançada
 
         Fluxo:
-        0. Garantir que está logado (refaz login se sessão expirou)
         1. Clicar no ícone de Atendimento (pessoa)
         2. Clicar em "Busca avançada"
 
@@ -902,32 +539,19 @@ class CanopusAutomation:
         """
         logger.info("🔍 Navegando para busca avançada...")
 
-        # IMPORTANTE: Garantir login antes de navegar
-        login_ok = await self._garantir_login()
-        if not login_ok:
-            logger.error("❌ Falha ao garantir login - impossível navegar")
-            return False
-
         try:
             # 1. Clicar no ícone de Atendimento (pessoa)
             logger.info("Clicando no ícone de Atendimento...")
             icone_atendimento = self.config.SELECTORS['busca']['icone_atendimento']
-            await self.page.wait_for_selector(icone_atendimento, state='visible', timeout=10000)
             await self.page.click(icone_atendimento)
-            # OTIMIZAÇÃO: Remover delay fixo
+            await self._delay_humanizado(1.0, 2.0)
+            await self.screenshot("apos_clicar_atendimento")
 
             # 2. Clicar em "Busca avançada"
             logger.info("Clicando em 'Busca avançada'...")
             botao_busca_avancada = self.config.SELECTORS['busca']['botao_busca_avancada']
-            # OTIMIZAÇÃO: Aguardar botão aparecer antes de clicar
-            await self.page.wait_for_selector(botao_busca_avancada, state='visible', timeout=10000)
             await self.page.click(botao_busca_avancada)
-            # OTIMIZAÇÃO: Aguardar página de busca carregar (detectar campo CPF)
-            await self.page.wait_for_selector(
-                self.config.SELECTORS['busca']['cpf_input'],
-                state='visible',
-                timeout=10000
-            )
+            await self._delay_humanizado(1.0, 2.0)
             await self.screenshot("apos_busca_avancada")
 
             logger.info("✅ Navegado para busca avançada")
@@ -936,34 +560,6 @@ class CanopusAutomation:
         except Exception as e:
             logger.error(f"❌ Erro ao navegar para busca: {e}")
             await self.screenshot("erro_navegar_busca")
-
-            # RETRY: Tentar refazer login e navegar novamente
-            logger.warning("🔄 Tentando refazer login e navegar novamente...")
-            self.logado = False
-            login_ok = await self._garantir_login()
-
-            if login_ok:
-                try:
-                    # Tentar navegar novamente após re-login
-                    icone_atendimento = self.config.SELECTORS['busca']['icone_atendimento']
-                    await self.page.wait_for_selector(icone_atendimento, state='visible', timeout=15000)
-                    await self.page.click(icone_atendimento)
-
-                    botao_busca_avancada = self.config.SELECTORS['busca']['botao_busca_avancada']
-                    await self.page.wait_for_selector(botao_busca_avancada, state='visible', timeout=15000)
-                    await self.page.click(botao_busca_avancada)
-
-                    await self.page.wait_for_selector(
-                        self.config.SELECTORS['busca']['cpf_input'],
-                        state='visible',
-                        timeout=15000
-                    )
-
-                    logger.info("✅ Navegado para busca após re-login")
-                    return True
-                except Exception as e2:
-                    logger.error(f"❌ Falha mesmo após re-login: {e2}")
-
             return False
 
     async def buscar_cliente_cpf(self, cpf: str) -> Optional[Dict[str, Any]]:
@@ -994,9 +590,8 @@ class CanopusAutomation:
             # RETRY: Tentar até 3 vezes se o seletor não aparecer
             for tentativa_select in range(3):
                 try:
-                    # CRÍTICO: Timeout reduzido para 15s (antes 60s) para evitar travamentos longos
-                    # 15s x 3 tentativas = 45s máximo (vs 180s antes)
-                    await self.page.wait_for_selector(select_tipo, timeout=15000, state='visible')
+                    # Aguardar seletor com timeout maior (60s ao invés de 30s)
+                    await self.page.wait_for_selector(select_tipo, timeout=60000, state='visible')
                     await self.page.select_option(select_tipo, value='F')  # F = CPF
                     logger.info(f"✅ Dropdown selecionado (tentativa {tentativa_select + 1})")
                     sys.stdout.flush()
@@ -1007,14 +602,14 @@ class CanopusAutomation:
                         sys.stdout.flush()
                         # Tentar navegar novamente
                         await self.navegar_busca_avancada()
-                        await asyncio.sleep(1)  # OTIMIZAÇÃO: Reduzido de 2s para 1s
+                        await asyncio.sleep(2)
                     else:
                         # Última tentativa falhou
                         logger.error(f"❌ Timeout final ao selecionar dropdown após 3 tentativas")
                         sys.stdout.flush()
                         raise
 
-            # OTIMIZAÇÃO: Remover delay humanizado
+            await self._delay_humanizado(0.5, 1.0)
             await self.screenshot("apos_selecionar_cpf")
 
             # 2. Preencher CPF no campo de busca
@@ -1022,10 +617,13 @@ class CanopusAutomation:
             sys.stdout.flush()
             cpf_input = self.config.SELECTORS['busca']['cpf_input']
 
-            # Limpar e preencher CPF
+            # Limpar campo antes
             await self.page.fill(cpf_input, '')
+            await self._delay_humanizado(0.2, 0.5)
+
+            # Preencher CPF (pode ser com ou sem formatação)
             await self.page.fill(cpf_input, cpf_formatado)
-            # OTIMIZAÇÃO: Remover delays humanizados
+            await self._delay_humanizado(0.5, 1.0)
             await self.screenshot("apos_preencher_cpf")
 
             # 3. Clicar em buscar
@@ -1034,11 +632,10 @@ class CanopusAutomation:
             botao_buscar = self.config.SELECTORS['busca']['botao_buscar']
             await self.page.click(botao_buscar)
 
-            # OTIMIZAÇÃO: Aguardar resultado aparecer ao invés de sleep fixo
+            # Aguardar resultados
             logger.info("Aguardando resultados da busca...")
             sys.stdout.flush()
-            # Aguardar tabela de resultados ou mensagem de "sem resultados"
-            await asyncio.sleep(1)  # Mínimo para não sobrecarregar
+            await asyncio.sleep(self.config.DELAYS['apos_busca'])
             await self.screenshot("resultado_busca")
 
             # Verificar se encontrou resultado
@@ -1059,20 +656,26 @@ class CanopusAutomation:
                 logger.info(f"Encontrados {len(links)} resultado(s)")
                 sys.stdout.flush()
 
-                # Clicar no ÚLTIMO link (mais recente/correto)
-                if len(links) >= 1:
-                    # Usar índice negativo -1 para pegar o último item
-                    ultimo_indice = len(links) - 1
-                    logger.info(f"Clicando no ÚLTIMO resultado (índice {ultimo_indice + 1}/{len(links)})...")
-                    sys.stdout.flush()
-
-                    await links[-1].click()  # Índice -1 = último item
-                    # OTIMIZAÇÃO: Aguardar página do cliente carregar ao invés de delay fixo
-                    await self.page.wait_for_load_state('networkidle', timeout=10000)
+                # Clicar no SEGUNDO link (índice 1) - o primeiro sempre está vazio
+                if len(links) >= 2:
+                    logger.info("Clicando no segundo resultado (com grupo/cota)...")
+                    await links[1].click()  # Índice 1 = segundo item
+                    await self._delay_humanizado(2.0, 3.0)
                     await self.screenshot("apos_clicar_cliente")
 
-                    logger.info(f"✅ Cliente acessado (último registro): {cpf_formatado}")
-                    sys.stdout.flush()
+                    logger.info(f"✅ Cliente acessado: {cpf_formatado}")
+
+                    return {
+                        'cpf': cpf_limpo,
+                        'cpf_formatado': cpf_formatado,
+                        'encontrado': True,
+                    }
+                elif len(links) == 1:
+                    # Se só tiver 1 link, clicar nele
+                    logger.info("Apenas 1 resultado encontrado, clicando...")
+                    await links[0].click()
+                    await self._delay_humanizado(2.0, 3.0)
+                    await self.screenshot("apos_clicar_cliente")
 
                     return {
                         'cpf': cpf_limpo,
@@ -1081,7 +684,6 @@ class CanopusAutomation:
                     }
                 else:
                     logger.warning("⚠️ Nenhum resultado encontrado")
-                    sys.stdout.flush()
                     await self.screenshot("sem_resultados")
                     return None
 
@@ -1127,10 +729,8 @@ class CanopusAutomation:
             menu_emissao = self.config.SELECTORS['emissao']['menu_emissao']
 
             logger.info(f"Clicando em 'Emissão de Cobrança'...")
-            await self.page.wait_for_selector(menu_emissao, state='visible', timeout=10000)
             await self.page.click(menu_emissao)
-            # OTIMIZAÇÃO: Aguardar página de emissão carregar (detectar checkboxes)
-            await self.page.wait_for_load_state('networkidle', timeout=10000)
+            await self._delay_humanizado(2.0, 3.0)
             await self.screenshot("apos_clicar_emissao")
 
             logger.info("✅ Navegado para emissão de cobrança")
@@ -1199,8 +799,7 @@ class CanopusAutomation:
             # 1. Aguardar a página de emissão carregar
             logger.info("Aguardando página de emissão carregar...")
             sys.stdout.flush()
-            # OTIMIZAÇÃO: Aguardar elemento aparecer ao invés de sleep fixo
-            await self.page.wait_for_load_state('domcontentloaded', timeout=10000)
+            await asyncio.sleep(2)
             await self.screenshot("tela_emissao")
 
             # BUSCAR INFORMAÇÕES DO CLIENTE NA PLANILHA E EXTRAIR MÊS DO BOLETO
@@ -1322,7 +921,9 @@ class CanopusAutomation:
                 await self.screenshot("timeout_checkboxes")
                 raise Exception("Checkboxes não apareceram na página")
 
-            # OTIMIZAÇÃO: Remover sleep fixo de 1 segundo
+            # Aguardar mais 1 segundo para garantir que todos carregaram
+            await asyncio.sleep(1)
+
             logger.info(f"Buscando checkboxes: {checkbox_selector}")
             sys.stdout.flush()
             checkboxes = await self.page.query_selector_all(checkbox_selector)
@@ -1336,12 +937,11 @@ class CanopusAutomation:
 
                 # Garantir que o checkbox está visível antes de clicar
                 await checkboxes[ultimo_indice].scroll_into_view_if_needed()
-                # OTIMIZAÇÃO: Reduzir wait de 0.5s para 0.2s
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.5)
 
                 await checkboxes[ultimo_indice].click()  # Índice -1 = último item
                 logger.info(f"✅ Checkbox da última cobrança clicado! (Total: {len(checkboxes)} parcelas)")
-                # OTIMIZAÇÃO: Remover sleep fixo de 1 segundo
+                await asyncio.sleep(1)
                 await self.screenshot("checkbox_selecionado")
             else:
                 logger.error("❌ Nenhum checkbox encontrado!")
@@ -1446,8 +1046,7 @@ class CanopusAutomation:
                 # Garantir que está visível
                 botao = await self.page.query_selector(botao_emitir)
                 await botao.scroll_into_view_if_needed()
-                # OTIMIZAÇÃO: Reduzir wait de 0.5s para 0.2s
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.5)
 
                 is_visible = await botao.is_visible()
                 logger.info(f"Botão visível: {is_visible}")
@@ -1597,9 +1196,9 @@ class CanopusAutomation:
                 logger.info("✅ Clique executado")
                 sys.stdout.flush()
 
-                # Aguardar nova aba ser capturada (até 5 segundos - aumentado para Render)
+                # Aguardar nova aba ser capturada (até 3 segundos)
                 contador = 0
-                while not nova_aba_pdf and contador < 50:  # 5 segundos
+                while not nova_aba_pdf and contador < 30:  # 3 segundos
                     await asyncio.sleep(0.1)
                     contador += 1
                     # Log a cada segundo
@@ -1616,13 +1215,9 @@ class CanopusAutomation:
                 sys.stdout.flush()
 
                 if not nova_aba_pdf:
-                    logger.error("❌ Nova aba com PDF não abriu após 5 segundos")
-                    logger.error(f"   Total de abas no contexto: {len(self.context.pages)}")
-                    logger.error(f"   URLs das abas:")
-                    for idx, pag in enumerate(self.context.pages):
-                        logger.error(f"     [{idx}] {pag.url}")
+                    logger.error("❌ Nova aba com PDF não abriu")
                     sys.stdout.flush()
-                    raise Exception("Nova aba com PDF não abriu - possível bloqueio de popup")
+                    raise Exception("Nova aba com PDF não abriu")
 
                 logger.info(f"✅ Nova aba capturada: {nova_aba_pdf.url[:80] if nova_aba_pdf.url else 'carregando...'}")
                 sys.stdout.flush()
@@ -1637,11 +1232,11 @@ class CanopusAutomation:
                     # CRÍTICO: Aguardar PDF REAL (170KB), não HTML redirect (678 bytes)!
                     TAMANHO_MINIMO_PDF_REAL = 150000  # 150KB - boletos Canopus têm ~170KB
 
-                    logger.info("⏳ Aguardando interceptador capturar PDF REAL (até 30s - aumentado para Render)...")
+                    logger.info("⏳ Aguardando interceptador capturar PDF REAL (até 20s)...")
                     logger.info(f"   Tamanho mínimo: {TAMANHO_MINIMO_PDF_REAL/1024:.0f} KB (ignora HTMLs de 678 bytes)")
                     sys.stdout.flush()
 
-                    for tentativa in range(300):  # 300 x 100ms = 30 segundos
+                    for tentativa in range(200):  # 200 x 100ms = 20 segundos
                         # Só aceitar se for PDF REAL (> 150KB), não HTML pequeno!
                         if pdf_bytes_interceptado and len(pdf_bytes_interceptado) > TAMANHO_MINIMO_PDF_REAL:
                             pdf_bytes = pdf_bytes_interceptado
@@ -1673,10 +1268,8 @@ class CanopusAutomation:
                             logger.warning(f"⚠️ PDF interceptado: {tamanho_kb:.1f} KB")
                         sys.stdout.flush()
                     else:
-                        logger.warning(f"⚠️ Nenhum PDF foi interceptado após 30s de espera")
+                        logger.warning(f"⚠️ Nenhum PDF foi interceptado após 20s de espera")
                         logger.info(f"📊 Respostas capturadas: {len(todas_respostas_pdf)}")
-                        for idx, resp in enumerate(todas_respostas_pdf):
-                            logger.info(f"   [{idx+1}] URL: {resp['url'][:80]}... | Tamanho: {resp['tamanho']/1024:.1f} KB | Type: {resp['content_type']}")
                         sys.stdout.flush()
 
                     # Nota: route handler será removido no bloco finally (sempre executado)
@@ -1693,12 +1286,12 @@ class CanopusAutomation:
                             sys.stdout.flush()
 
                             # CRÍTICO: Aguardar a aba navegar de about:blank para URL real
-                            # Tentar até 15 segundos (aumentado para Render)
+                            # Tentar até 10 segundos
                             logger.info("🔍 DEBUG: Iniciando aguardo de navegação da aba popup...")
                             sys.stdout.flush()
 
                             url_navegada = False
-                            for i in range(75):  # 75 x 200ms = 15 segundos
+                            for i in range(50):  # 50 x 200ms = 10 segundos
                                 url_atual = nova_aba_pdf.url
                                 if url_atual and url_atual != 'about:blank':
                                     logger.info(f"✅ Aba navegou para: {url_atual[:100]}")
@@ -1715,15 +1308,15 @@ class CanopusAutomation:
                                 try:
                                     logger.info("🔍 DEBUG: Aguardando load state 'networkidle'...")
                                     sys.stdout.flush()
-                                    await nova_aba_pdf.wait_for_load_state('networkidle', timeout=10000)
+                                    await nova_aba_pdf.wait_for_load_state('networkidle', timeout=5000)
                                     logger.info("✅ Load state 'networkidle' alcançado!")
                                     sys.stdout.flush()
                                 except Exception as e_load:
                                     logger.warning(f"⚠️ Timeout no load state (ok, continuando): {e_load}")
                                     sys.stdout.flush()
 
-                            # OTIMIZAÇÃO: Reduzir wait de 2s para 0.5s
-                            await asyncio.sleep(0.5)
+                            # Aguardar mais um pouco após navegação
+                            await asyncio.sleep(2)
 
                             # Verificar a URL atual da aba
                             url_atual = nova_aba_pdf.url
@@ -1800,7 +1393,7 @@ class CanopusAutomation:
                                 logger.info("✅ PDF carregado em nossa aba")
 
                                 # Aguardar mais um pouco para garantir que o PDF carregou
-                                await asyncio.sleep(1)  # OTIMIZAÇÃO: Reduzido de 2s para 1s
+                                await asyncio.sleep(2)
 
                                 # Tentar extrair via JavaScript desta aba
                                 nova_aba_controlada = nova_aba_nossa
@@ -1814,7 +1407,7 @@ class CanopusAutomation:
                         sys.stdout.flush()
 
                         try:
-                            nova_aba_controlada.set_default_timeout(45000)  # 45 segundos (aumentado para Render)
+                            nova_aba_controlada.set_default_timeout(30000)  # 30 segundos (aumentado)
 
                             pdf_data = await nova_aba_controlada.evaluate("""
                                 async () => {
@@ -2017,10 +1610,10 @@ class CanopusAutomation:
                     logger.info(f"📁 Caminho: {caminho_final}")
                     sys.stdout.flush()
 
-                    # OTIMIZAÇÃO: Reduzir wait de 2s para 0.5s
-                    logger.info("✅ PDF salvo com sucesso!")
+                    # AGUARDAR 2 SEGUNDOS para você VER que o PDF foi salvo
+                    logger.info("✅ PDF salvo com sucesso! Aguardando 2 segundos...")
                     sys.stdout.flush()
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(2)
 
                     # Fechar abas (pode ter 2: popup original + nossa aba)
                     try:
@@ -2246,129 +1839,20 @@ class CanopusAutomation:
 
         return resultado
 
-    async def processar_multiplos_clientes(
-        self,
-        lista_clientes: List[Dict[str, Any]],
-        usuario: str,
-        senha: str,
-        destino: Path,
-        mes: str = None,
-        ano: int = None
-    ) -> List[Dict[str, Any]]:
-        """
-        OTIMIZAÇÃO: Processa múltiplos clientes REUTILIZANDO o browser
-
-        Este método mantém o browser aberto entre clientes, fazendo apenas
-        uma navegação de volta para a busca ao invés de fechar/abrir o navegador.
-
-        Args:
-            lista_clientes: Lista de dicts com {'cpf': '12345678901'}
-            usuario: Usuário para login
-            senha: Senha para login
-            destino: Diretório de destino dos PDFs
-            mes: Mês do boleto (opcional, extrai automaticamente se não fornecido)
-            ano: Ano do boleto (opcional)
-
-        Returns:
-            Lista de resultados (um dict por cliente)
-
-        Performance:
-            - SEM reutilização: ~30-60s por boleto
-            - COM reutilização: ~8-15s por boleto
-        """
-        resultados = []
-        inicio_total = datetime.now()
-
-        logger.info("=" * 80)
-        logger.info(f"🚀 PROCESSAMENTO EM LOTE - {len(lista_clientes)} clientes")
-        logger.info("=" * 80)
-
-        try:
-            # 1. Iniciar browser UMA VEZ
-            await self.iniciar_navegador()
-
-            # 2. Fazer login UMA VEZ
-            login_ok = await self.login(usuario, senha)
-            if not login_ok:
-                logger.error("❌ Falha no login - abortando processamento")
-                return []
-
-            # 3. Processar cada cliente SEM fechar o browser
-            for idx, cliente in enumerate(lista_clientes, 1):
-                cpf = cliente.get('cpf')
-                if not cpf:
-                    logger.warning(f"⚠️ Cliente {idx} sem CPF - pulando")
-                    continue
-
-                logger.info("")
-                logger.info("=" * 80)
-                logger.info(f"📋 Cliente {idx}/{len(lista_clientes)}: {cpf}")
-                logger.info("=" * 80)
-
-                # Processar cliente
-                resultado = await self.processar_cliente_completo(
-                    cpf=cpf,
-                    mes=mes or 'DEZEMBRO',
-                    ano=ano or datetime.now().year,
-                    destino=destino
-                )
-
-                resultados.append(resultado)
-                self.clientes_processados += 1
-
-                # Log de progresso
-                sucesso = self.stats['downloads_sucesso']
-                erro = self.stats['downloads_erro']
-                logger.info(f"📊 Progresso: {idx}/{len(lista_clientes)} | Sucesso: {sucesso} | Erro: {erro}")
-
-        except Exception as e:
-            logger.error(f"❌ Erro no processamento em lote: {e}")
-
-        finally:
-            # 4. Fechar browser APENAS NO FINAL
-            await self.fechar_navegador()
-
-        # Estatísticas finais
-        fim_total = datetime.now()
-        tempo_total = (fim_total - inicio_total).total_seconds()
-
-        logger.info("")
-        logger.info("=" * 80)
-        logger.info("📊 ESTATÍSTICAS FINAIS")
-        logger.info("=" * 80)
-        logger.info(f"✅ Clientes processados: {self.clientes_processados}")
-        logger.info(f"✅ Downloads sucesso: {self.stats['downloads_sucesso']}")
-        logger.info(f"❌ Downloads erro: {self.stats['downloads_erro']}")
-        logger.info(f"⏱️ Tempo total: {tempo_total:.1f}s ({tempo_total/60:.1f} min)")
-
-        if self.stats['downloads_sucesso'] > 0:
-            tempo_medio = tempo_total / self.stats['downloads_sucesso']
-            logger.info(f"📈 Tempo médio por boleto: {tempo_medio:.1f}s")
-            self.stats['tempo_medio_por_boleto'] = tempo_medio
-
-        logger.info("=" * 80)
-
-        return resultados
-
     # ========================================================================
     # MÉTODOS AUXILIARES
     # ========================================================================
 
     async def _delay_humanizado(self, minimo: float = None, maximo: float = None):
         """
-        DEPRECATED: Adiciona delay aleatório para parecer mais humano
-
-        OTIMIZAÇÃO: Este método foi mantido para compatibilidade mas NÃO
-        é mais usado na versão otimizada. Os delays humanizados foram
-        substituídos por waits inteligentes (wait_for_selector, wait_for_load_state)
+        Adiciona delay aleatório para parecer mais humano
 
         Args:
             minimo: Delay mínimo em segundos
             maximo: Delay máximo em segundos
         """
-        # OTIMIZAÇÃO: Reduzir delays para o mínimo
-        min_delay = minimo or 0.1
-        max_delay = maximo or 0.3
+        min_delay = minimo or self.config.DELAYS['minimo_humanizado']
+        max_delay = maximo or self.config.DELAYS['maximo_humanizado']
 
         delay = random.uniform(min_delay, max_delay)
         await asyncio.sleep(delay)
