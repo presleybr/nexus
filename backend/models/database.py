@@ -210,6 +210,41 @@ def get_db_connection():
             Database.return_connection(conn)  # SEMPRE devolver ao pool!
 
 
+@contextmanager
+def get_db_cursor():
+    """
+    Context manager que retorna cursor configurado para retornar DICTS (não tuplas).
+
+    USO CORRETO:
+        with get_db_cursor() as cur:
+            cur.execute("SELECT cpf, nome FROM clientes_finais")
+            clientes = cur.fetchall()
+            for cliente in clientes:
+                cpf = cliente['cpf']  # ✅ OK! cliente é dict
+
+    NUNCA use conn.cursor() diretamente sem row_factory=dict_row, pois retorna tuplas!
+
+    Returns:
+        Cursor PostgreSQL configurado com row_factory=dict_row
+    """
+    conn = None
+    cur = None
+    try:
+        conn = Database.get_connection()
+        cur = conn.cursor(row_factory=dict_row)
+        yield cur
+        conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise e
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            Database.return_connection(conn)
+
+
 def execute_query(query: str, params: Optional[Tuple] = None, fetch: bool = False) -> Any:
     """
     Executa uma query SQL

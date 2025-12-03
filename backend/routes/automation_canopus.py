@@ -37,6 +37,7 @@ if str(automation_path) not in sys.path:
 
 # Importar do backend
 from models.database import Database
+from psycopg.rows import dict_row
 
 # Importar do Canopus (com tratamento de erro)
 try:
@@ -186,7 +187,7 @@ def db_connection():
 
     Uso:
         with db_connection() as conn:
-            cur = conn.cursor()
+            cur = conn.cursor(row_factory=dict_row)
             cur.execute(...)
 
     SEMPRE use este context manager ao invés de get_db_connection() diretamente!
@@ -371,7 +372,7 @@ def upload_planilha():
         erros_detalhes = []
 
         with db_connection() as conn:
-            cur = conn.cursor()
+            cur = conn.cursor(row_factory=dict_row)
 
             for idx, cliente in enumerate(clientes, 1):
                 try:
@@ -515,7 +516,7 @@ def upload_planilha():
 def listar_consultores():
     """Lista todos os consultores"""
     with db_connection() as conn:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("""
                 SELECT
                     c.id,
@@ -562,7 +563,7 @@ def criar_consultor():
         return jsonify({'error': 'Empresa inválida (credms ou semicredito)'}), 400
 
     with db_connection() as conn:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("""
                 INSERT INTO consultores (
                     nome,
@@ -626,7 +627,7 @@ def atualizar_consultor(id):
     params.append(id)
 
     with db_connection() as conn:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(f"""
                 UPDATE consultores
                 SET {', '.join(updates)}, updated_at = CURRENT_TIMESTAMP
@@ -655,7 +656,7 @@ def atualizar_consultor(id):
 def desativar_consultor(id):
     """Desativa um consultor (soft delete)"""
     with db_connection() as conn:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("""
                 UPDATE consultores
                 SET ativo = FALSE, updated_at = CURRENT_TIMESTAMP
@@ -753,7 +754,7 @@ def listar_clientes_staging():
         params.append(limite)
 
     with db_connection() as conn:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(query, params)
             clientes = cur.fetchall()
 
@@ -889,7 +890,7 @@ def processar_downloads_ponto_venda():
 
     # Buscar todos os CPFs cadastrados para este ponto de venda
     with db_connection() as conn:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             query = """
                 SELECT DISTINCT cf.cpf, cf.nome, c.nome as consultor_nome
                 FROM clientes_finais cf
@@ -1021,7 +1022,7 @@ def listar_execucoes():
     params.append(limite)
 
     with db_connection() as conn:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(query, params)
             execucoes = cur.fetchall()
 
@@ -1043,7 +1044,7 @@ def listar_execucoes():
 def obter_execucao(automacao_id):
     """Obtém detalhes de uma execução específica"""
     with db_connection() as conn:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             # Buscar execução
             cur.execute("""
                 SELECT
@@ -1089,7 +1090,7 @@ def obter_execucao(automacao_id):
 def obter_estatisticas():
     """Retorna estatísticas gerais da automação"""
     with db_connection() as conn:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             # Estatísticas de consultores
             cur.execute("""
                 SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE ativo = TRUE) as ativos
@@ -1159,7 +1160,7 @@ def health_check():
     try:
         # Verificar conexão com banco
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("SELECT 1")
 
         # Verificar diretórios (se Canopus estiver disponível)
@@ -1309,7 +1310,7 @@ def verificar_pendentes():
         logger.info(f"🔍 Verificando clientes pendentes para PV {ponto_venda}")
 
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 # 1. Buscar TODOS os clientes do ponto de venda
                 cur.execute("""
                     SELECT DISTINCT c.cpf, c.nome_completo as nome
@@ -1434,7 +1435,7 @@ def downloads_status():
         limit = request.args.get('limit', 50, type=int)
 
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 # Buscar últimos downloads ordenados por data
                 cur.execute("""
                     SELECT
@@ -1497,7 +1498,7 @@ def status_completo():
         ponto_venda = request.args.get('ponto_venda', '24627')
 
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 # 1. Buscar total de clientes do ponto de venda
                 cur.execute("""
                     SELECT COUNT(DISTINCT cpf) as total
@@ -1682,7 +1683,7 @@ def verificar_boletos_banco():
     """
     try:
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 # Total de downloads
                 cur.execute("SELECT COUNT(*) as total FROM downloads_canopus")
                 total = cur.fetchone()['total']
@@ -1802,7 +1803,7 @@ def baixar_boletos_ponto_venda():
 
     try:
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("""
                     SELECT DISTINCT c.cpf, c.nome_completo as nome
                     FROM clientes_finais c
@@ -1849,7 +1850,7 @@ def baixar_boletos_ponto_venda():
 
             try:
                 with db_connection() as conn_filter:
-                    with conn_filter.cursor() as cur_filter:
+                    with conn_filter.cursor(row_factory=dict_row) as cur_filter:
                         # Buscar CPFs já baixados com SUCESSO
                         cur_filter.execute("""
                             SELECT DISTINCT cpf
@@ -1999,7 +2000,7 @@ def baixar_boletos_ponto_venda():
                     logger.info(f"🔑 Buscando credenciais do PV {ponto_venda}...")
 
                     with db_connection() as conn:
-                        with conn.cursor() as cur:
+                        with conn.cursor(row_factory=dict_row) as cur:
                             cur.execute("""
                                 SELECT usuario, senha, codigo_empresa, ponto_venda
                                 FROM credenciais_canopus
@@ -2246,7 +2247,7 @@ def baixar_boletos_ponto_venda():
                                         sys.stdout.flush()
 
                                         with db_connection() as conn_import:
-                                            with conn_import.cursor() as cur_import:
+                                            with conn_import.cursor(row_factory=dict_row) as cur_import:
                                                 logger.info(f"🔍 DEBUG: Buscando consultor_id para CPF {cpf}...")
                                                 sys.stdout.flush()
 
@@ -2464,7 +2465,7 @@ def baixar_boletos_ponto_venda():
                                 # REGISTRAR ERRO NO BANCO
                                 try:
                                     with db_connection() as conn_erro:
-                                        with conn_erro.cursor() as cur_erro:
+                                        with conn_erro.cursor(row_factory=dict_row) as cur_erro:
                                             # Buscar consultor_id
                                             cur_erro.execute("""
                                                 SELECT consultor_id FROM clientes_finais
@@ -2511,7 +2512,7 @@ def baixar_boletos_ponto_venda():
                                 # REGISTRAR NO BANCO
                                 try:
                                     with db_connection() as conn_erro:
-                                        with conn_erro.cursor() as cur_erro:
+                                        with conn_erro.cursor(row_factory=dict_row) as cur_erro:
                                             # Buscar consultor_id
                                             cur_erro.execute("""
                                                 SELECT consultor_id FROM clientes_finais
@@ -2559,7 +2560,7 @@ def baixar_boletos_ponto_venda():
                                 # REGISTRAR ERRO NO BANCO
                                 try:
                                     with db_connection() as conn_erro:
-                                        with conn_erro.cursor() as cur_erro:
+                                        with conn_erro.cursor(row_factory=dict_row) as cur_erro:
                                             # Buscar consultor_id
                                             cur_erro.execute("""
                                                 SELECT consultor_id FROM clientes_finais
@@ -2607,7 +2608,7 @@ def baixar_boletos_ponto_venda():
                             # REGISTRAR EXCEÇÃO NO BANCO
                             try:
                                 with db_connection() as conn_erro:
-                                    with conn_erro.cursor() as cur_erro:
+                                    with conn_erro.cursor(row_factory=dict_row) as cur_erro:
                                         # Buscar consultor_id
                                         cur_erro.execute("""
                                             SELECT consultor_id FROM clientes_finais
@@ -2818,7 +2819,7 @@ def importar_planilha_dener():
 
                 # ✅ CORREÇÃO: usar context manager para garantir devolução
                 with db_connection() as conn:
-                    with conn.cursor() as cur:
+                    with conn.cursor(row_factory=dict_row) as cur:
                         # Verificar se cliente já existe (buscar por CPF + PV)
                         cur.execute("""
                             SELECT id, nome_completo FROM clientes_finais
@@ -2980,7 +2981,6 @@ def importar_boletos():
     import tempfile
     import os
     from datetime import datetime
-    from psycopg.rows import dict_row
 
     logger.info("📥 Iniciando importação de boletos da tabela downloads_canopus...")
 
@@ -3149,7 +3149,7 @@ def importar_boletos():
             logger.info(f"   ✅ VALIDAÇÕES OK: Nome: {nome}, CPF: {cpf}, Valor: R$ {valor:.2f}, Venc: {vencimento.strftime('%d/%m/%Y') if vencimento else 'N/A'}")
 
             with db_connection() as conn:
-                cur = conn.cursor()
+                cur = conn.cursor(row_factory=dict_row)
                 # Verificar se cliente já existe (por CPF)
                 cur.execute("""
                     SELECT id, nome_completo, whatsapp
@@ -3300,7 +3300,6 @@ def listar_boletos_baixados():
     Lista todos os boletos baixados DO BANCO DE DADOS (PostgreSQL)
     Agora funciona no Render! Busca de downloads_canopus E boletos
     """
-    from psycopg.rows import dict_row
     import logging
 
     logger = logging.getLogger(__name__)
@@ -3485,7 +3484,7 @@ def limpar_downloads_antigos():
     """
     try:
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 # Contar quantos registros serão removidos
                 cur.execute("""
                     SELECT COUNT(*) as total FROM downloads_canopus
@@ -3548,7 +3547,7 @@ def resetar_dados():
 
         db = Database()
         conn = db.get_connection()
-        cur = conn.cursor()
+        cur = conn.cursor(row_factory=dict_row)
 
         # Deletar boletos primeiro (por causa da FK)
         logger.info("   Deletando boletos do banco...")
@@ -3618,7 +3617,7 @@ def backup_whatsapp():
 
         # Buscar todos os clientes com WhatsApp
         with db_connection() as conn:
-            cur = conn.cursor()
+            cur = conn.cursor(row_factory=dict_row)
 
             cur.execute("""
                 SELECT
@@ -3708,7 +3707,7 @@ def resetar_e_reimportar():
     try:
         db = Database()
         conn = db.get_connection()
-        cur = conn.cursor()
+        cur = conn.cursor(row_factory=dict_row)
 
         # ==================================================
         # 1. LIMPAR DADOS ANTIGOS
@@ -3979,7 +3978,7 @@ def listar_consultores_planilhas():
     """Lista todos os consultores com suas configurações de planilhas"""
     try:
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("""
                     SELECT
                         id,
@@ -4024,7 +4023,7 @@ def configurar_planilha_consultor(consultor_id):
 
         # Verificar se consultor existe
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("SELECT nome FROM consultores WHERE id = %s", (consultor_id,))
                 consultor = cur.fetchone()
 
@@ -4065,7 +4064,7 @@ def atualizar_planilha_consultor(consultor_id):
 
         # Buscar dados do consultor
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("""
                     SELECT id, nome, link_planilha_drive
                     FROM consultores
@@ -4103,7 +4102,7 @@ def atualizar_planilha_consultor(consultor_id):
 
         # Atualizar data da última atualização
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("""
                     UPDATE consultores
                     SET ultima_atualizacao_planilha = CURRENT_TIMESTAMP
@@ -4144,7 +4143,7 @@ def atualizar_todas_planilhas():
 
         # Buscar todos os consultores com link configurado
         with db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("""
                     SELECT id, nome, link_planilha_drive
                     FROM consultores
@@ -4182,7 +4181,7 @@ def atualizar_todas_planilhas():
                 if resultado['sucesso']:
                     # Atualizar data (usando conexão separada)
                     with db_connection() as conn:
-                        with conn.cursor() as cur:
+                        with conn.cursor(row_factory=dict_row) as cur:
                             cur.execute("""
                                 UPDATE consultores
                                 SET ultima_atualizacao_planilha = CURRENT_TIMESTAMP
