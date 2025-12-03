@@ -294,6 +294,16 @@
             color: #ef4444;
         }
 
+        .status-enviado {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .status-nao_enviado {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
         .action-btn {
             background: #333;
             color: #fff;
@@ -747,12 +757,13 @@
                                 <th>Arquivo</th>
                                 <th>Tamanho</th>
                                 <th>Status</th>
+                                <th>Disparo</th>
                                 <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody id="boletosTableBody">
                             <tr>
-                                <td colspan="8" class="empty-state">
+                                <td colspan="9" class="empty-state">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                                         <polyline points="14 2 14 8 20 8"></polyline>
@@ -1441,6 +1452,21 @@ Os boletos importados já estão prontos para envio via WhatsApp!`;
                         const statusTexto = boleto.dados_extraidos ? 'Processado' : 'Baixado';
                         const statusClass = boleto.dados_extraidos ? 'sucesso' : 'pendente';
 
+                        // Status de disparo (WhatsApp)
+                        let disparoClass = 'pendente';
+                        let disparoEmoji = '⏳';
+                        let disparoTexto = 'Pendente';
+
+                        if (boleto.status_envio === 'enviado') {
+                            disparoClass = 'enviado';
+                            disparoEmoji = '✅';
+                            disparoTexto = 'Enviado';
+                        } else if (boleto.status_envio === 'erro') {
+                            disparoClass = 'nao_enviado';
+                            disparoEmoji = '❌';
+                            disparoTexto = 'Erro';
+                        }
+
                         tr.innerHTML = `
                             <td>
                                 <strong>${boleto.cliente_nome}</strong>
@@ -1458,6 +1484,11 @@ Os boletos importados já estão prontos para envio via WhatsApp!`;
                             <td>
                                 <span class="status-badge status-${statusClass}">
                                     ${statusEmoji} ${statusTexto}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-badge status-${disparoClass}">
+                                    ${disparoEmoji} ${disparoTexto}
                                 </span>
                             </td>
                             <td>
