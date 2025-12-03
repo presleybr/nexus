@@ -39,14 +39,16 @@ class CanopusHTTPClient:
     def __init__(self, timeout: int = 30):
         self.session = requests.Session()
 
-        # Headers idênticos ao navegador
+        # Headers ULTRA-REALISTAS idênticos ao navegador Chrome real
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
             'Cache-Control': 'max-age=0',
-            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120"',
+            'Connection': 'keep-alive',
+            'DNT': '1',
+            'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
             'Sec-Ch-Ua-Mobile': '?0',
             'Sec-Ch-Ua-Platform': '"Windows"',
             'Sec-Fetch-Dest': 'document',
@@ -56,9 +58,65 @@ class CanopusHTTPClient:
             'Upgrade-Insecure-Requests': '1',
         })
 
-        self.session.verify = False  # SSL pode dar problema
+        # CRÍTICO: Manter verify=True para não ser detectado como bot
+        self.session.verify = True
         self.timeout = timeout
         self._logged_in = False
+        self.last_url = None  # Para Referer dinâmico
+
+        # Configurar retry strategy (comportamento humano: tentar novamente)
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,  # 1s, 2s, 4s
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "OPTIONS", "POST"]
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
+
+    def _safe_request(self, method: str, url: str, delay_before: float = 0.5, **kwargs):
+        """
+        Faz requisição HTTP SEGURA com:
+        - Delay antes (simula tempo humano)
+        - Referer automático (simula navegação real)
+        - Retry em caso de falha
+
+        Args:
+            method: 'GET' ou 'POST'
+            url: URL alvo
+            delay_before: Delay em segundos antes da requisição (padrão: 0.5s)
+            **kwargs: Argumentos para requests (data, json, etc)
+        """
+        import time
+        import random
+
+        # ANTI-DETECÇÃO: Delay aleatório antes da requisição
+        actual_delay = delay_before + random.uniform(0, 0.3)  # Variação humana
+        logger.debug(f"🕐 Delay antes de {method} {url}: {actual_delay:.2f}s")
+        time.sleep(actual_delay)
+
+        # ANTI-DETECÇÃO: Adicionar Referer se houver URL anterior
+        headers = kwargs.get('headers', {})
+        if self.last_url and self.last_url != url:
+            headers['Referer'] = self.last_url
+            logger.debug(f"📎 Referer: {self.last_url[:60]}...")
+
+        kwargs['headers'] = headers
+
+        # Fazer requisição
+        if method.upper() == 'GET':
+            response = self.session.get(url, **kwargs)
+        else:
+            response = self.session.post(url, **kwargs)
+
+        # Atualizar última URL (para próximo Referer)
+        self.last_url = url
+
+        return response
 
     def _extract_asp_fields(self, html: str) -> Dict[str, str]:
         """Extrai campos ASP.NET do HTML"""
@@ -102,11 +160,11 @@ class CanopusHTTPClient:
             usuario_formatado = usuario.zfill(10)
             logger.info(f"🔐 Login: {usuario} → {usuario_formatado}")
 
-            # 1. GET na página de login
+            # 1. GET na página de login (COM DELAY)
             url_login = f'{self.BASE_URL}/frmCorCCCnsLogin.aspx'
             logger.debug(f"GET {url_login}")
 
-            response = self.session.get(url_login, timeout=self.timeout)
+            response = self._safe_request('GET', url_login, delay_before=1.0, timeout=self.timeout)
             response.raise_for_status()
 
             # 2. Extrair campos ASP
@@ -125,10 +183,12 @@ class CanopusHTTPClient:
                 'as_fid': '',  # Gerado automaticamente
             }
 
-            # 4. POST login
+            # 4. POST login (COM DELAY e Referer)
             logger.debug("POST login...")
-            response = self.session.post(
+            response = self._safe_request(
+                'POST',
                 url_login,
+                delay_before=1.5,  # Delay maior (humano preenchendo formulário)
                 data=login_data,
                 timeout=self.timeout,
                 allow_redirects=True
@@ -177,7 +237,7 @@ class CanopusHTTPClient:
             # 1. Navegar para busca (clicar em Atendimento primeiro)
             # POST /WWW/frmMain.aspx com img_Atendimento
             url_main = f'{self.BASE_URL}/frmMain.aspx'
-            response = self.session.get(url_main, timeout=self.timeout)
+            response = self._safe_request('GET', url_main, delay_before=0.8, timeout=self.timeout)
 
             asp_fields = self._extract_asp_fields(response.text)
 
@@ -192,8 +252,10 @@ class CanopusHTTPClient:
                 'as_fid': '',
             }
 
-            response = self.session.post(
+            response = self._safe_request(
+                'POST',
                 url_main,
+                delay_before=0.7,
                 data=atendimento_data,
                 timeout=self.timeout,
                 allow_redirects=True
@@ -201,7 +263,7 @@ class CanopusHTTPClient:
 
             # 2. Acessar frmBuscaCota.aspx
             url_busca = f'{self.BASE_URL}/CONAT/frmBuscaCota.aspx'
-            response = self.session.get(url_busca, timeout=self.timeout)
+            response = self._safe_request('GET', url_busca, delay_before=0.6, timeout=self.timeout)
 
             asp_fields = self._extract_asp_fields(response.text)
 
@@ -217,8 +279,10 @@ class CanopusHTTPClient:
                 'as_fid': '',
             }
 
-            response = self.session.post(
+            response = self._safe_request(
+                'POST',
                 url_busca,
+                delay_before=0.5,
                 data=select_cpf_data,
                 timeout=self.timeout
             )
@@ -238,8 +302,10 @@ class CanopusHTTPClient:
             }
 
             logger.debug("POST busca...")
-            response = self.session.post(
+            response = self._safe_request(
+                'POST',
                 url_busca,
+                delay_before=1.0,  # Maior delay (humano digitando CPF)
                 data=buscar_data,
                 timeout=self.timeout
             )
@@ -285,8 +351,8 @@ class CanopusHTTPClient:
 
             url_busca = f'{self.BASE_URL}/CONAT/frmBuscaCota.aspx'
 
-            # Pegar página atual
-            response = self.session.get(url_busca, timeout=self.timeout)
+            # Pegar página atual (COM DELAY)
+            response = self._safe_request('GET', url_busca, delay_before=0.5, timeout=self.timeout)
             asp_fields = self._extract_asp_fields(response.text)
 
             # Extrair CPF da busca anterior (campo pode estar preenchido)
@@ -294,7 +360,7 @@ class CanopusHTTPClient:
             cpf_field = soup.find('input', {'id': 'ctl00_Conteudo_edtContextoBusca'})
             cpf_valor = cpf_field.get('value', '') if cpf_field else ''
 
-            # Clicar no link
+            # Clicar no link (COM DELAY - simula humano clicando)
             click_data = {
                 **asp_fields,
                 '__LASTFOCUS': '',
@@ -306,8 +372,10 @@ class CanopusHTTPClient:
                 'as_fid': '',
             }
 
-            response = self.session.post(
+            response = self._safe_request(
+                'POST',
                 url_busca,
+                delay_before=0.8,  # Simula clique humano
                 data=click_data,
                 timeout=self.timeout,
                 allow_redirects=True
@@ -336,13 +404,13 @@ class CanopusHTTPClient:
         try:
             logger.info("📄 Emitindo boleto...")
 
-            # 1. Acessar página de emissão
+            # 1. Acessar página de emissão (COM DELAY)
             url_emissao = f'{self.BASE_URL}/CONCO/frmConCoRelBoletoAvulso.aspx'
-            response = self.session.get(url_emissao, timeout=self.timeout)
+            response = self._safe_request('GET', url_emissao, delay_before=0.7, timeout=self.timeout)
 
             asp_fields = self._extract_asp_fields(response.text)
 
-            # 2. Clicar no checkbox do boleto (ctl03)
+            # 2. Clicar no checkbox do boleto (COM DELAY - simula leitura da lista)
             checkbox_data = {
                 **asp_fields,
                 '__EVENTTARGET': '',
@@ -364,13 +432,15 @@ class CanopusHTTPClient:
                 'as_fid': '',
             }
 
-            response = self.session.post(
+            response = self._safe_request(
+                'POST',
                 url_emissao,
+                delay_before=1.2,  # Delay maior (humano selecionando boleto)
                 data=checkbox_data,
                 timeout=self.timeout
             )
 
-            # 3. Clicar em "Emitir" (btnEmitir)
+            # 3. Clicar em "Emitir" (COM DELAY)
             asp_fields = self._extract_asp_fields(response.text)
 
             emitir_data = {
@@ -391,8 +461,10 @@ class CanopusHTTPClient:
                 'ctl00$Conteudo$hid_SN_Mesma_Conta_Debito': 'N',
             }
 
-            response = self.session.post(
+            response = self._safe_request(
+                'POST',
                 url_emissao,
+                delay_before=0.9,  # Simula clique no botão
                 data=emitir_data,
                 timeout=self.timeout
             )
@@ -418,8 +490,10 @@ class CanopusHTTPClient:
                 'ctl00$Conteudo$hid_SN_Mesma_Conta_Debito': 'N',
             }
 
-            response = self.session.post(
+            response = self._safe_request(
+                'POST',
                 url_emissao,
+                delay_before=0.5,
                 data=popup_data,
                 timeout=self.timeout
             )
@@ -443,12 +517,12 @@ class CanopusHTTPClient:
                 logger.error("❌ URL do PDF não encontrada")
                 return None
 
-            # 6. Baixar PDF
+            # 6. Baixar PDF (COM DELAY - simula aguardar geração)
             if not pdf_url.startswith('http'):
                 pdf_url = f'{self.BASE_URL}/{pdf_url}'
 
             logger.debug(f"Baixando PDF: {pdf_url}")
-            response = self.session.get(pdf_url, timeout=self.timeout)
+            response = self._safe_request('GET', pdf_url, delay_before=0.6, timeout=self.timeout)
 
             if response.status_code == 200 and len(response.content) > 1000:
                 logger.info(f"✅ PDF baixado: {len(response.content)} bytes")
