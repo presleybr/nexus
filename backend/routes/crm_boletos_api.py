@@ -3,11 +3,10 @@ API de Boletos - Endpoints para gestão de boletos
 """
 from flask import Blueprint, jsonify, request, session
 from routes.auth import login_required
-from models.database import DatabaseConnection
+from models.database import db
 import logging
 
 logger = logging.getLogger(__name__)
-db = DatabaseConnection()
 
 boletos_api_bp = Blueprint('boletos_api', __name__, url_prefix='/api/boletos')
 
