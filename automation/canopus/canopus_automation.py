@@ -478,6 +478,20 @@ class CanopusAutomation:
             url_atual = self.page.url
             logger.info(f"URL após login: {url_atual}")
 
+            # DEBUG: Capturar título e conteúdo da página
+            titulo = await self.page.title()
+            logger.info(f"Título da página: {titulo}")
+
+            # Capturar conteúdo da página para debug
+            page_text = await self.page.evaluate("() => document.body.innerText")
+            logger.info(f"📄 Conteúdo da página (primeiros 500 chars): {page_text[:500]}")
+
+            # Verificar se tem CAPTCHA
+            if 'captcha' in page_text.lower() or 'segur' in page_text.lower() or 'caracteres' in page_text.lower():
+                logger.error("🚨 CAPTCHA/Campo de segurança detectado!")
+                logger.error("   Sistema está pedindo verificação de segurança")
+                logger.error("   Isso indica que o Render está sendo detectado como bot")
+
             if 'login' not in url_atual.lower():
                 logger.info("✅ Login realizado com sucesso!")
                 self.logado = True
