@@ -198,6 +198,13 @@ def db_connection():
     try:
         conn = Database.get_connection()
         yield conn
+        # IMPORTANTE: Fazer commit se não houver erro
+        conn.commit()
+    except Exception as e:
+        # Fazer rollback em caso de erro
+        if conn:
+            conn.rollback()
+        raise e
     finally:
         if conn:
             try:
@@ -4557,13 +4564,14 @@ def baixar_boletos_http():
                     senha = credencial_row['senha']
                     codigo_empresa = credencial_row.get('codigo_empresa', '0101')
 
-                    # CORREÇÃO: Usar usuário do banco (NÃO formatar com zfill)
-                    # O banco já tem o usuário correto (ex: "24627" ou "0000024627")
-                    usuario_login = usuario
+                    # CORREÇÃO: Formatar usuário com zeros à esquerda (10 dígitos)
+                    # O Canopus exige formato: 0000024627 (10 dígitos com zeros)
+                    pv_str = str(credencial_row['ponto_venda']).strip()
+                    usuario_login = pv_str.zfill(10)
 
                     logger.info(f"✅ Credenciais obtidas")
                     logger.info(f"   Usuário (banco): {usuario}")
-                    logger.info(f"   Usuário (login): {usuario_login}")
+                    logger.info(f"   Usuário (login): {usuario_login} (PV com zeros)")
                     logger.info(f"🔐 Senha: {'*' * len(senha)}")
 
         except Exception as e:

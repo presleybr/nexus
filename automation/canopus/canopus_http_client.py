@@ -156,9 +156,10 @@ class CanopusHTTPClient:
           - __EVENTTARGET: btnLogin
         """
         try:
-            # CORREÇÃO: NÃO formatar usuário - usar como recebido
-            # O usuário já vem correto do banco (ex: "24627" ou "0000024627")
-            logger.info(f"🔐 Login: {usuario}")
+            # CORREÇÃO: Garantir formato com zeros à esquerda (10 dígitos)
+            # O Canopus exige formato: 0000024627 (10 dígitos com zeros)
+            usuario_formatado = str(usuario).strip().zfill(10)
+            logger.info(f"🔐 Login: {usuario_formatado}")
 
             # 1. GET na página de login (COM DELAY)
             url_login = f'{self.BASE_URL}/frmCorCCCnsLogin.aspx'
@@ -177,11 +178,19 @@ class CanopusHTTPClient:
                 '__LASTFOCUS': '',
                 '__EVENTTARGET': 'btnLogin',
                 '__EVENTARGUMENT': '',
-                'edtUsuario': usuario,  # Usar como recebido (sem formatação)
+                'edtUsuario': usuario_formatado,  # Com zeros à esquerda (10 dígitos)
                 'edtSenha': senha,
                 'hdnTokenRecaptcha': '',
                 'as_fid': '',  # Gerado automaticamente
             }
+
+            # Log detalhado dos campos do formulário
+            logger.info(f"📝 Campos do formulário de login:")
+            logger.info(f"   edtUsuario: {usuario_formatado}")
+            logger.info(f"   edtSenha: {'*' * len(senha)}")
+            logger.info(f"   __VIEWSTATE presente: {'Sim' if '__VIEWSTATE' in asp_fields else 'Não'}")
+            logger.info(f"   __EVENTVALIDATION presente: {'Sim' if '__EVENTVALIDATION' in asp_fields else 'Não'}")
+            logger.info(f"   Total de campos ASP: {len(asp_fields)}")
 
             # 4. POST login (COM DELAY e Referer)
             logger.debug("POST login...")
