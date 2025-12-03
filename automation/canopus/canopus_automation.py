@@ -62,25 +62,15 @@ if not logger.handlers:
 
 async def bloquear_recursos_desnecessarios(route: Route):
     """
-    Bloqueia recursos desnecessários para acelerar carregamento
+    Bloqueia APENAS analytics/tracking para acelerar
 
-    OTIMIZAÇÃO: Reduz tempo de carregamento de 30-60s para 8-15s
-    bloqueando imagens, CSS, fonts e analytics que não são necessários
-
-    IMPORTANTE: Não bloqueia imagens na página de login (pode ter CAPTCHA)
+    IMPORTANTE: NÃO bloqueia imagens, CSS, fonts (causava detecção de bot)
+    Bloqueia APENAS analytics/tracking que não são necessários
     """
     url = route.request.url.lower()
     resource_type = route.request.resource_type
 
-    # CRÍTICO: Não bloquear recursos na página de login (pode ter CAPTCHA)
-    if 'login' in url:
-        await route.continue_()
-        return
-
-    # Tipos de recursos a bloquear (EXCETO na página de login)
-    blocked_types = ['image', 'stylesheet', 'font', 'media']
-
-    # Domínios de analytics/tracking a bloquear
+    # Bloquear APENAS analytics/tracking (não imagens/CSS/fonts)
     blocked_domains = [
         'google-analytics.com',
         'googletagmanager.com',
@@ -89,21 +79,18 @@ async def bloquear_recursos_desnecessarios(route: Route):
         'analytics',
         'tracking',
         'hotjar',
-        'clarity'
+        'clarity',
+        'mouseflow',
+        'mixpanel'
     ]
 
-    # Bloquear por tipo
-    if resource_type in blocked_types:
-        await route.abort()
-        return
-
-    # Bloquear por domínio
+    # Bloquear por domínio (APENAS analytics)
     for domain in blocked_domains:
         if domain in url:
             await route.abort()
             return
 
-    # Permitir o resto (HTML, JS necessário, XHR)
+    # Permitir TUDO (imagens, CSS, JS, XHR, etc.)
     await route.continue_()
 
 
@@ -346,39 +333,28 @@ class CanopusAutomation:
             # Configurações do navegador
             pw_config = self.config.PLAYWRIGHT_CONFIG
 
-            # OTIMIZAÇÃO: Browser args agressivos para máxima velocidade
-            optimized_args = [
+            # IMPORTANTE: Browser args MÍNIMOS para evitar detecção de bot
+            # Removido: --single-process, --blink-settings=imagesEnabled=false
+            # Esses argumentos causavam detecção de bot e CAPTCHA
+            browser_args = [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-infobars',
-                '--disable-notifications',
-                '--disable-popup-blocking',
-                '--disable-translate',
-                '--disable-background-networking',
-                '--disable-sync',
-                '--disable-default-apps',
-                '--disable-component-update',
-                '--no-first-run',
-                '--no-default-browser-check',
-                '--single-process',  # Usa menos memória e CPU
-                '--disable-features=site-per-process',
-                '--blink-settings=imagesEnabled=false',  # Desabilita imagens
                 '--disable-blink-features=AutomationControlled',
+                '--disable-infobars',
+                '--window-size=1920,1080',
+                '--start-maximized',
             ]
 
-            # Argumentos para FORÇAR logs do Chromium (apenas se necessário)
-            chromium_log_args = [
-                '--enable-logging=stderr',
-                '--v=1',  # Verbose level 1 (reduzido de 2)
-                '--log-level=0',
-            ]
+            # Logs mínimos (apenas se necessário)
+            if os.getenv('DEBUG_BROWSER') == 'true':
+                browser_args.extend([
+                    '--enable-logging=stderr',
+                    '--v=1',
+                ])
 
             # Lançar navegador
-            logger.info(f"🚀 Lançando navegador OTIMIZADO (headless={self.headless})...")
+            logger.info(f"🚀 Lançando navegador (headless={self.headless})...")
             sys.stdout.flush()
 
             if pw_config['browser_type'] == 'firefox':
@@ -390,11 +366,10 @@ class CanopusAutomation:
                 self.browser = await self.playwright.webkit.launch(
                     headless=self.headless
                 )
-            else:  # chromium (padrão) - OTIMIZADO
+            else:  # chromium (padrão)
                 self.browser = await self.playwright.chromium.launch(
                     headless=self.headless,
-                    args=optimized_args + chromium_log_args,
-                    # OTIMIZAÇÃO: Remover slow_mo (era delay artificial)
+                    args=browser_args,
                     chromium_sandbox=False
                 )
 
@@ -415,27 +390,39 @@ class CanopusAutomation:
                 ignore_https_errors=True,
             )
 
-            # Script anti-detecção (executado em todas as páginas)
+            # Script anti-detecção MELHORADO (executado em todas as páginas)
             await self.context.add_init_script("""
-                // Remover webdriver flag
+                // Remover webdriver (indicador de automação)
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
                 });
 
-                // Sobrescrever plugins
+                // Simular plugins reais do Chrome
                 Object.defineProperty(navigator, 'plugins', {
-                    get: () => [1, 2, 3, 4, 5]
+                    get: () => [
+                        {name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer'},
+                        {name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai'},
+                        {name: 'Native Client', filename: 'internal-nacl-plugin'}
+                    ]
                 });
 
-                // Chrome runtime
-                window.chrome = { runtime: {} };
+                // Adicionar chrome object (browsers normais têm)
+                window.chrome = {
+                    runtime: {},
+                    loadTimes: function() {},
+                    csi: function() {}
+                };
+
+                // Adicionar navigator.languages
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['pt-BR', 'pt', 'en-US', 'en']
+                });
             """)
 
-            # OTIMIZAÇÃO: Registrar bloqueio de recursos NO CONTEXTO
-            # Isso bloqueia recursos em TODAS as páginas/abas do contexto
-            logger.info("🚫 Registrando bloqueio de recursos desnecessários...")
+            # Bloqueio seletivo de analytics (não bloqueia imagens/CSS para evitar detecção)
+            logger.info("🚫 Registrando bloqueio de analytics/tracking...")
             await self.context.route("**/*", bloquear_recursos_desnecessarios)
-            logger.info("✅ Bloqueio ativo: imagens, CSS, fonts, analytics")
+            logger.info("✅ Bloqueio ativo APENAS para analytics (imagens/CSS permitidos)")
             sys.stdout.flush()
 
             # Criar página
