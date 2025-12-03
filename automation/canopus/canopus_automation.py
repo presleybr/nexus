@@ -20,6 +20,13 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError
 )
 
+try:
+    from playwright_stealth import stealth_async
+    STEALTH_AVAILABLE = True
+except ImportError:
+    STEALTH_AVAILABLE = False
+    logger.warning("⚠️ playwright-stealth não disponível - detecção de bot pode ocorrer")
+
 from canopus_config import CanopusConfig
 import pandas as pd
 
@@ -237,8 +244,8 @@ class CanopusAutomation:
     # ========================================================================
 
     async def iniciar_navegador(self):
-        """Inicia o navegador Playwright"""
-        logger.info("🌐 Iniciando navegador...")
+        """Inicia o navegador Playwright com STEALTH MODE completo"""
+        logger.info("🌐 Iniciando navegador com stealth mode...")
 
         try:
             # Iniciar Playwright
@@ -248,74 +255,130 @@ class CanopusAutomation:
             logger.info("✅ Playwright iniciado")
             sys.stdout.flush()
 
-            # Configurações do navegador
-            pw_config = self.config.PLAYWRIGHT_CONFIG
-
-            # Argumentos anti-detecção extras
-            anti_detection_args = [
+            # STEALTH MODE: Args completos anti-detecção
+            stealth_args = [
                 '--disable-blink-features=AutomationControlled',
+                '--disable-features=IsolateOrigins,site-per-process',
+                '--disable-site-isolation-trials',
+                '--disable-web-security',
+                '--disable-features=BlockInsecurePrivateNetworkRequests',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-            ]
-
-            # Argumentos para FORÇAR logs do Chromium
-            chromium_log_args = [
-                '--enable-logging=stderr',  # Logs para stderr
-                '--v=2',  # Verbose level 2 (mais detalhado)
-                '--log-level=0',  # Log level 0 = INFO
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu',
+                '--hide-scrollbars',
+                '--mute-audio',
+                '--disable-background-networking',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-breakpad',
+                '--disable-component-extensions-with-background-pages',
+                '--disable-component-update',
+                '--disable-default-apps',
+                '--disable-extensions',
+                '--disable-features=TranslateUI',
+                '--disable-hang-monitor',
+                '--disable-ipc-flooding-protection',
+                '--disable-popup-blocking',
+                '--disable-prompt-on-repost',
+                '--disable-renderer-backgrounding',
+                '--disable-sync',
+                '--force-color-profile=srgb',
+                '--metrics-recording-only',
+                '--password-store=basic',
+                '--use-mock-keychain',
             ]
 
             # Lançar navegador
-            logger.info(f"🌐 Lançando navegador (headless={self.headless})...")
+            logger.info(f"🚀 Lançando Chromium STEALTH (headless={self.headless})...")
             sys.stdout.flush()
 
-            if pw_config['browser_type'] == 'firefox':
-                self.browser = await self.playwright.firefox.launch(
-                    headless=self.headless,
-                    slow_mo=pw_config['slow_mo']
-                )
-            elif pw_config['browser_type'] == 'webkit':
-                self.browser = await self.playwright.webkit.launch(
-                    headless=self.headless,
-                    slow_mo=pw_config['slow_mo']
-                )
-            else:  # chromium (padrão)
-                self.browser = await self.playwright.chromium.launch(
-                    headless=self.headless,
-                    args=pw_config['browser_args'] + anti_detection_args + chromium_log_args,
-                    slow_mo=pw_config['slow_mo'],
-                    # Forçar logs do Chromium para stderr (que será capturado)
-                    chromium_sandbox=False  # Desabilitar sandbox para melhor logging
-                )
+            self.browser = await self.playwright.chromium.launch(
+                headless=self.headless,
+                args=stealth_args,
+                chromium_sandbox=False
+            )
 
             logger.info("✅ Navegador lançado com sucesso")
             sys.stdout.flush()
 
-            # Criar contexto
-            logger.info("🔧 Criando contexto do navegador...")
+            # Criar contexto com configurações realistas
+            logger.info("🔧 Criando contexto STEALTH...")
             sys.stdout.flush()
 
             self.context = await self.browser.new_context(
-                viewport=pw_config['viewport'],
-                user_agent=pw_config['user_agent'],
-                accept_downloads=pw_config['accept_downloads'],
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 locale='pt-BR',
                 timezone_id='America/Sao_Paulo',
+                geolocation={'latitude': -23.5505, 'longitude': -46.6333},
+                permissions=['geolocation'],
+                java_script_enabled=True,
+                accept_downloads=True,
+                ignore_https_errors=True,
+                extra_http_headers={
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
+                    'Cache-Control': 'max-age=0',
+                }
             )
 
-            # Script anti-detecção (executado em todas as páginas)
+            # Script COMPLETO anti-detecção
             await self.context.add_init_script("""
-                // Remover webdriver flag
+                // Remover webdriver
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
                 });
 
-                // Sobrescrever plugins
+                // Falsificar plugins
                 Object.defineProperty(navigator, 'plugins', {
-                    get: () => [1, 2, 3, 4, 5]
+                    get: () => [
+                        {name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format'},
+                        {name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai'},
+                        {name: 'Native Client', filename: 'internal-nacl-plugin'}
+                    ]
                 });
 
-                // Chrome runtime
-                window.chrome = { runtime: {} };
+                // Falsificar languages
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['pt-BR', 'pt', 'en-US', 'en']
+                });
+
+                // Remover automação do Chrome
+                window.chrome = {
+                    runtime: {},
+                    loadTimes: function() {},
+                    csi: function() {},
+                    app: {}
+                };
+
+                // Falsificar permissions
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters)
+                );
+
+                // Falsificar battery
+                Object.defineProperty(navigator, 'getBattery', {
+                    get: () => () => Promise.resolve({
+                        charging: true,
+                        chargingTime: 0,
+                        dischargingTime: Infinity,
+                        level: 1.0
+                    })
+                });
             """)
 
             # Criar página
@@ -324,6 +387,14 @@ class CanopusAutomation:
             self.page = await self.context.new_page()
             logger.info("✅ Página criada")
             sys.stdout.flush()
+
+            # APLICAR STEALTH MODE (playwright-stealth)
+            if STEALTH_AVAILABLE:
+                logger.info("🥷 Aplicando playwright-stealth...")
+                sys.stdout.flush()
+                await stealth_async(self.page)
+                logger.info("✅ Stealth mode ativado!")
+                sys.stdout.flush()
 
             # Configurar listeners para capturar logs do navegador em TEMPO REAL
             logger.info("🔧 Configurando listeners de console e erros...")
@@ -436,40 +507,70 @@ class CanopusAutomation:
         Returns:
             True se login bem-sucedido, False caso contrário
         """
-        logger.info(f"🔐 Fazendo login - User: {usuario}")
+        logger.info(f"🔐 Fazendo login HUMANIZADO - User: {usuario}")
 
         try:
             # Navegar para página de login
             logger.info(f"Navegando para: {self.config.URLS['login']}")
-            await self.page.goto(self.config.URLS['login'])
-            await self._delay_humanizado()
+            await self.page.goto(self.config.URLS['login'], wait_until='networkidle')
+
+            # Delay inicial como humano faria (lendo a página)
+            await asyncio.sleep(random.uniform(1.0, 2.0))
 
             # Screenshot antes do login
             await self.screenshot("antes_login")
 
-            # Preencher usuário
-            logger.info("Preenchendo usuário...")
-            usuario_input = self.config.SELECTORS['login']['usuario_input']
-            await self.page.fill(usuario_input, usuario)
-            await self._delay_humanizado(0.3, 0.7)
+            # Mover mouse aleatoriamente (simula comportamento humano)
+            await self.page.mouse.move(
+                random.randint(100, 500),
+                random.randint(100, 300)
+            )
+            await asyncio.sleep(random.uniform(0.2, 0.5))
 
-            # Preencher senha
-            logger.info("Preenchendo senha...")
-            senha_input = self.config.SELECTORS['login']['senha_input']
-            await self.page.fill(senha_input, senha)
-            await self._delay_humanizado(0.5, 1.0)
+            # Preencher usuário CARACTERE POR CARACTERE
+            logger.info("Preenchendo usuário (humanizado)...")
+            usuario_input = self.config.SELECTORS['login']['usuario_input']
+            campo_usuario = await self.page.wait_for_selector(usuario_input, timeout=10000)
+            await campo_usuario.click()
+            await asyncio.sleep(random.uniform(0.3, 0.7))
+
+            # Digitar usuário caractere por caractere
+            for char in usuario:
+                await self.page.keyboard.type(char, delay=random.randint(50, 150))
+
+            logger.info(f"✅ Usuário digitado: {usuario}")
+            await asyncio.sleep(random.uniform(0.5, 1.0))
+
+            # Tab para próximo campo (mais humano que clicar)
+            await self.page.keyboard.press('Tab')
+            await asyncio.sleep(random.uniform(0.3, 0.5))
+
+            # Preencher senha CARACTERE POR CARACTERE
+            logger.info("Preenchendo senha (humanizado)...")
+            for char in senha:
+                await self.page.keyboard.type(char, delay=random.randint(50, 150))
+
+            logger.info("✅ Senha digitada")
+            await asyncio.sleep(random.uniform(0.5, 1.0))
 
             # Screenshot antes de clicar
             await self.screenshot("antes_clicar_login")
 
-            # Clicar em entrar
-            logger.info("Clicando no botão Login...")
+            # Mover mouse para o botão e clicar (mais humano)
+            logger.info("Clicando no botão Login (humanizado)...")
             botao_entrar = self.config.SELECTORS['login']['botao_entrar']
-            await self.page.click(botao_entrar)
+            botao = await self.page.wait_for_selector(botao_entrar, timeout=5000)
+            await botao.hover()  # Passar mouse por cima primeiro
+            await asyncio.sleep(random.uniform(0.2, 0.5))
+            await botao.click()
 
             # Aguardar navegação após login
             logger.info("Aguardando navegação...")
-            await asyncio.sleep(self.config.DELAYS['apos_login'])
+            try:
+                await self.page.wait_for_load_state('networkidle', timeout=15000)
+            except:
+                pass
+            await asyncio.sleep(random.uniform(1.0, 2.0))
 
             # Screenshot após login
             await self.screenshot("apos_login")
