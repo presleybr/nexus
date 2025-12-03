@@ -46,6 +46,7 @@ from routes.whatsapp_wppconnect import whatsapp_wppconnect_bp
 from routes.portal_consorcio import register_portal_routes
 from routes.boletos_modelo import register_boletos_modelo_routes
 from routes.automation_canopus import automation_canopus_bp
+from routes.crm_boletos_api import boletos_api_bp
 
 
 def create_app():
@@ -80,6 +81,7 @@ def create_app():
     app.register_blueprint(whatsapp_wppconnect_bp)
     app.register_blueprint(automation_bp)
     app.register_blueprint(automation_canopus_bp)  # Automação Canopus
+    app.register_blueprint(boletos_api_bp)  # API de Boletos
     app.register_blueprint(webhook_bp)
 
     # Registra rotas do Portal Consórcio
@@ -145,6 +147,13 @@ def create_app():
         if 'usuario_id' not in session:
             return render_template('login-cliente.html')
         return render_template('crm-cliente/disparos.html')
+
+    @app.route('/crm/boletos')
+    def crm_boletos():
+        """Gestão completa de boletos"""
+        if 'usuario_id' not in session:
+            return render_template('login-cliente.html')
+        return render_template('crm-cliente/boletos.html')
 
     @app.route('/crm/monitoramento')
     def crm_monitoramento():

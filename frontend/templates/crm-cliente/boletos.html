@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boletos - Nexus CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Nexus Design System -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/crm-cliente.css">
+
+    <style>
+        /* Estilos específicos da página de boletos */
+        .boletos-table {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .boletos-table h3 {
+            color: #fff;
+            margin-bottom: 1.5rem;
+            font-size: 1.2rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .table-header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-dropdown {
+            padding: 0.5rem 1rem;
+            background: #222;
+            border: 1px solid #333;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .filter-dropdown:focus {
+            outline: none;
+            border-color: #39FF14;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .boletos-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .boletos-table thead {
+            background: #222;
+        }
+
+        .boletos-table th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #39FF14;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+        }
+
+        .boletos-table tbody tr {
+            border-bottom: 1px solid #333;
+            transition: background 0.2s ease;
+        }
+
+        .boletos-table tbody tr:hover {
+            background: #222;
+        }
+
+        .boletos-table td {
+            padding: 1rem;
+            color: #ccc;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            display: inline-block;
+        }
+
+        .status-sucesso {
+            background: rgba(57, 255, 20, 0.2);
+            color: #39FF14;
+        }
+
+        .status-pendente {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+
+        .status-erro {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .status-enviado {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .status-nao_enviado {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .action-btn {
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: #39FF14;
+            color: #000;
+        }
+
+        .action-btn.secondary {
+            background: #444;
+        }
+
+        .action-btn.secondary:hover {
+            background: #555;
+            color: #fff;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #333;
+        }
+
+        .pagination button {
+            padding: 0.5rem 1rem;
+            background: #333;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: #39FF14;
+            color: #000;
+            border-color: #39FF14;
+        }
+
+        .pagination button.active {
+            background: #39FF14;
+            color: #000;
+            border-color: #39FF14;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="crm-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="/static/images/nexus_Logotipo.png" alt="Nexus" style="height: 80px; margin-bottom: 15px;">
+                <p id="empresaNome">Carregando...</p>
+            </div>
+
+            <nav>
+                <ul class="sidebar-menu">
+                    <li class="menu-item">
+                        <a href="/crm/dashboard" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/cadastro-clientes" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Clientes
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/whatsapp" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                            </svg>
+                            WhatsApp
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/disparos" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            Disparos
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/boletos" class="menu-link active">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <line x1="10" y1="9" x2="8" y2="9"></line>
+                            </svg>
+                            Boletos
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/automacao-canopus" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                            </svg>
+                            Automação Canopus
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/monitoramento" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            Monitoramento
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="/crm/graficos" class="menu-link">
+                            <svg class="menu-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                                <line x1="12" y1="20" x2="12" y2="10"></line>
+                                <line x1="18" y1="20" x2="18" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="16"></line>
+                            </svg>
+                            Gráficos
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <button class="logout-btn" onclick="logout()">
+                <svg style="width: 18px; height: 18px; vertical-align: middle; margin-right: 8px;" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Sair
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Boletos</h1>
+                <p class="breadcrumb">Gerenciamento de boletos e downloads</p>
+            </header>
+
+            <!-- Cards de Resumo Geral -->
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Total de Clientes</span>
+                        <span class="card-icon">👥</span>
+                    </div>
+                    <div class="card-value" id="totalClientes">-</div>
+                    <div class="card-footer">Clientes cadastrados</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Boletos Baixados</span>
+                        <span class="card-icon">✅</span>
+                    </div>
+                    <div class="card-value" id="totalBaixados">-</div>
+                    <div class="card-footer">PDFs baixados</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Boletos com Erro</span>
+                        <span class="card-icon">⚠️</span>
+                    </div>
+                    <div class="card-value" id="totalErros">-</div>
+                    <div class="card-footer">Com problemas</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Boletos Enviados</span>
+                        <span class="card-icon">📤</span>
+                    </div>
+                    <div class="card-value" id="totalEnviados">-</div>
+                    <div class="card-footer">Via WhatsApp</div>
+                </div>
+            </div>
+
+            <!-- Card: Boletos Baixados -->
+            <div class="boletos-table">
+                <div class="table-header-actions">
+                    <h3>✅ Boletos Baixados (<span id="countBaixados">0</span>)</h3>
+                    <select class="filter-dropdown" id="filterStatusEnvio">
+                        <option value="todos">Todos</option>
+                        <option value="enviados">Enviados</option>
+                        <option value="pendentes">Pendentes</option>
+                    </select>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Cliente / CPF</th>
+                                <th>Valor</th>
+                                <th>Vencimento</th>
+                                <th>Arquivo</th>
+                                <th>Tamanho</th>
+                                <th>Status</th>
+                                <th>Disparo</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaBaixados">
+                            <tr>
+                                <td colspan="8" class="empty-state">
+                                    <div class="loading">Carregando...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="paginacaoBaixados"></div>
+            </div>
+
+            <!-- Card: Erros - Sem Boleto -->
+            <div class="boletos-table">
+                <h3>⚠️ Clientes Sem Boleto (<span id="countSemBoleto">0</span>)</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Cliente / CPF</th>
+                                <th>Grupo / Cota</th>
+                                <th>Data Verificação</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaSemBoleto">
+                            <tr>
+                                <td colspan="4" class="empty-state">
+                                    <div class="loading">Carregando...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Card: Erros - CPF Não Encontrado -->
+            <div class="boletos-table">
+                <h3>❌ CPF Não Encontrado (<span id="countCpfNaoEncontrado">0</span>)</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>CPF</th>
+                                <th>Nome na Planilha</th>
+                                <th>Data Verificação</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaCpfNaoEncontrado">
+                            <tr>
+                                <td colspan="4" class="empty-state">
+                                    <div class="loading">Carregando...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Card: Histórico de Downloads -->
+            <div class="boletos-table">
+                <h3>📜 Histórico de Downloads</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data / Hora</th>
+                                <th>Tipo</th>
+                                <th>Total</th>
+                                <th>Sucesso</th>
+                                <th>Erros</th>
+                                <th>Duração</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaHistorico">
+                            <tr>
+                                <td colspan="6" class="empty-state">
+                                    <div class="loading">Carregando...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/crm-comum.js"></script>
+
+    <script>
+        // Carregar informações da empresa
+        carregarInformacoesEmpresa();
+
+        // Variável global para paginação
+        let paginaAtualBaixados = 1;
+
+        // Função para carregar resumo geral
+        async function carregarResumo() {
+            try {
+                const response = await fetch('/api/boletos/resumo');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('totalClientes').textContent = data.resumo.total_clientes || 0;
+                    document.getElementById('totalBaixados').textContent = data.resumo.total_baixados || 0;
+                    document.getElementById('totalErros').textContent = data.resumo.total_erros || 0;
+                    document.getElementById('totalEnviados').textContent = data.resumo.total_enviados || 0;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar resumo:', error);
+                document.getElementById('totalClientes').textContent = '0';
+                document.getElementById('totalBaixados').textContent = '0';
+                document.getElementById('totalErros').textContent = '0';
+                document.getElementById('totalEnviados').textContent = '0';
+            }
+        }
+
+        // Função para carregar boletos baixados
+        async function carregarBoletosBaixados(page = 1, status_envio = 'todos') {
+            try {
+                const response = await fetch(`/api/boletos/baixados?page=${page}&status_envio=${status_envio}`);
+                const data = await response.json();
+
+                const tbody = document.getElementById('tabelaBaixados');
+                tbody.innerHTML = '';
+
+                if (data.success && data.boletos && data.boletos.length > 0) {
+                    document.getElementById('countBaixados').textContent = data.total || 0;
+
+                    data.boletos.forEach(boleto => {
+                        const tr = document.createElement('tr');
+
+                        const statusClass = boleto.status_processamento === 'processado' ? 'sucesso' : 'pendente';
+                        const statusTexto = boleto.status_processamento === 'processado' ? 'Processado' : 'Baixado';
+
+                        let disparoClass = 'pendente';
+                        let disparoTexto = 'Pendente';
+                        if (boleto.status_envio === 'enviado') {
+                            disparoClass = 'enviado';
+                            disparoTexto = 'Enviado';
+                        } else if (boleto.status_envio === 'erro') {
+                            disparoClass = 'erro';
+                            disparoTexto = 'Erro';
+                        }
+
+                        tr.innerHTML = `
+                            <td>
+                                <strong>${boleto.cliente_nome || 'N/A'}</strong><br>
+                                <small style="color: #888;">CPF: ${boleto.cpf || 'N/A'}</small>
+                            </td>
+                            <td>${boleto.valor ? 'R$ ' + boleto.valor.toFixed(2) : 'N/A'}</td>
+                            <td>${boleto.vencimento || 'N/A'}</td>
+                            <td>${boleto.arquivo_nome || 'N/A'}</td>
+                            <td>${formatarTamanho(boleto.tamanho || 0)}</td>
+                            <td><span class="status-badge status-${statusClass}">${statusTexto}</span></td>
+                            <td><span class="status-badge status-${disparoClass}">${disparoTexto}</span></td>
+                            <td>
+                                <button class="action-btn" onclick="baixarBoleto('${boleto.arquivo_nome}')">📥 Baixar</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    // Criar paginação
+                    criarPaginacao('paginacaoBaixados', data.pagina_atual, data.total_paginas, (novaPagina) => {
+                        paginaAtualBaixados = novaPagina;
+                        carregarBoletosBaixados(novaPagina, status_envio);
+                    });
+                } else {
+                    document.getElementById('countBaixados').textContent = '0';
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="8" class="empty-state">
+                                <p>Nenhum boleto baixado encontrado.</p>
+                            </td>
+                        </tr>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar boletos baixados:', error);
+                document.getElementById('tabelaBaixados').innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty-state">
+                            <p>Erro ao carregar dados.</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Função para carregar erros - sem boleto
+        async function carregarErrosSemBoleto() {
+            try {
+                const response = await fetch('/api/boletos/erros/sem-boleto');
+                const data = await response.json();
+
+                const tbody = document.getElementById('tabelaSemBoleto');
+                tbody.innerHTML = '';
+
+                if (data.success && data.erros && data.erros.length > 0) {
+                    document.getElementById('countSemBoleto').textContent = data.erros.length;
+
+                    data.erros.forEach(erro => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>
+                                <strong>${erro.cliente_nome || 'N/A'}</strong><br>
+                                <small style="color: #888;">CPF: ${erro.cpf || 'N/A'}</small>
+                            </td>
+                            <td>${erro.grupo_cota || 'N/A'}</td>
+                            <td>${formatarData(erro.data_verificacao)}</td>
+                            <td>
+                                <button class="action-btn" onclick="tentarNovamente('${erro.cpf}')">🔄 Tentar Novamente</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    document.getElementById('countSemBoleto').textContent = '0';
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="empty-state">
+                                <p>Nenhum erro encontrado.</p>
+                            </td>
+                        </tr>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar erros sem boleto:', error);
+                document.getElementById('tabelaSemBoleto').innerHTML = `
+                    <tr>
+                        <td colspan="4" class="empty-state">
+                            <p>Erro ao carregar dados.</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Função para carregar erros - CPF não encontrado
+        async function carregarErrosCpfNaoEncontrado() {
+            try {
+                const response = await fetch('/api/boletos/erros/cpf-nao-encontrado');
+                const data = await response.json();
+
+                const tbody = document.getElementById('tabelaCpfNaoEncontrado');
+                tbody.innerHTML = '';
+
+                if (data.success && data.erros && data.erros.length > 0) {
+                    document.getElementById('countCpfNaoEncontrado').textContent = data.erros.length;
+
+                    data.erros.forEach(erro => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${erro.cpf || 'N/A'}</td>
+                            <td>${erro.nome_planilha || 'N/A'}</td>
+                            <td>${formatarData(erro.data_verificacao)}</td>
+                            <td>
+                                <button class="action-btn" onclick="editarCpf('${erro.cpf}', '${erro.nome_planilha}')">✏️ Editar CPF</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    document.getElementById('countCpfNaoEncontrado').textContent = '0';
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="empty-state">
+                                <p>Nenhum erro encontrado.</p>
+                            </td>
+                        </tr>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar erros CPF não encontrado:', error);
+                document.getElementById('tabelaCpfNaoEncontrado').innerHTML = `
+                    <tr>
+                        <td colspan="4" class="empty-state">
+                            <p>Erro ao carregar dados.</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Função para carregar histórico
+        async function carregarHistorico() {
+            try {
+                const response = await fetch('/api/boletos/historico');
+                const data = await response.json();
+
+                const tbody = document.getElementById('tabelaHistorico');
+                tbody.innerHTML = '';
+
+                if (data.success && data.historico && data.historico.length > 0) {
+                    data.historico.forEach(item => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${formatarData(item.data_hora)}</td>
+                            <td>${item.tipo || 'N/A'}</td>
+                            <td>${item.total || 0}</td>
+                            <td>${item.sucesso || 0}</td>
+                            <td>${item.erros || 0}</td>
+                            <td>${item.duracao || 'N/A'}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="empty-state">
+                                <p>Nenhum histórico disponível.</p>
+                            </td>
+                        </tr>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar histórico:', error);
+                document.getElementById('tabelaHistorico').innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <p>Erro ao carregar dados.</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Funções auxiliares
+        function formatarTamanho(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function formatarData(isoString) {
+            if (!isoString) return 'N/A';
+            const date = new Date(isoString);
+            return date.toLocaleString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function baixarBoleto(nomeArquivo) {
+            window.open(`/api/automation/download-boleto?nome=${encodeURIComponent(nomeArquivo)}`, '_blank');
+        }
+
+        function tentarNovamente(cpf) {
+            alert('Funcionalidade de tentar novamente em desenvolvimento para CPF: ' + cpf);
+            // TODO: Implementar lógica de retry
+        }
+
+        function editarCpf(cpfAntigo, nomePlanilha) {
+            const novoCpf = prompt(`Editar CPF para ${nomePlanilha}\n\nCPF antigo: ${cpfAntigo}\n\nDigite o CPF correto:`);
+            if (novoCpf) {
+                alert('Funcionalidade de edição em desenvolvimento. Novo CPF: ' + novoCpf);
+                // TODO: Implementar lógica de edição
+            }
+        }
+
+        function criarPaginacao(containerId, paginaAtual, totalPaginas, callback) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            if (totalPaginas <= 1) return;
+
+            // Botão anterior
+            const btnAnterior = document.createElement('button');
+            btnAnterior.textContent = '« Anterior';
+            btnAnterior.disabled = paginaAtual === 1;
+            btnAnterior.onclick = () => callback(paginaAtual - 1);
+            container.appendChild(btnAnterior);
+
+            // Números de página
+            for (let i = 1; i <= totalPaginas; i++) {
+                const btnPagina = document.createElement('button');
+                btnPagina.textContent = i;
+                btnPagina.className = i === paginaAtual ? 'active' : '';
+                btnPagina.onclick = () => callback(i);
+                container.appendChild(btnPagina);
+            }
+
+            // Botão próximo
+            const btnProximo = document.createElement('button');
+            btnProximo.textContent = 'Próximo »';
+            btnProximo.disabled = paginaAtual === totalPaginas;
+            btnProximo.onclick = () => callback(paginaAtual + 1);
+            container.appendChild(btnProximo);
+        }
+
+        // Event listener para filtro de status de envio
+        document.getElementById('filterStatusEnvio').addEventListener('change', (e) => {
+            paginaAtualBaixados = 1;
+            carregarBoletosBaixados(1, e.target.value);
+        });
+
+        // Inicialização ao carregar a página
+        document.addEventListener('DOMContentLoaded', function() {
+            carregarResumo();
+            carregarBoletosBaixados();
+            carregarErrosSemBoleto();
+            carregarErrosCpfNaoEncontrado();
+            carregarHistorico();
+
+            // Recarregar dados a cada 30 segundos
+            setInterval(() => {
+                carregarResumo();
+                carregarBoletosBaixados(paginaAtualBaixados, document.getElementById('filterStatusEnvio').value);
+            }, 30000);
+        });
+    </script>
+</body>
+</html>
