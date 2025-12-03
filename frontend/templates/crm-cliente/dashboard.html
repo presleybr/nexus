@@ -606,6 +606,7 @@
                                         <th>Arquivo</th>
                                         <th>Tamanho</th>
                                         <th>Status</th>
+                                        <th>Disparo</th>
                                         <th>Ações</th>
                                     </tr>
                                 </thead>
@@ -622,6 +623,21 @@
                         const statusEmoji = boleto.dados_extraidos ? '✅' : '⚠️';
                         const statusTexto = boleto.dados_extraidos ? 'Processado' : 'Baixado';
 
+                        // Status de disparo (WhatsApp)
+                        let disparoClass = 'pendente';
+                        let disparoEmoji = '⏳';
+                        let disparoTexto = 'Pendente';
+
+                        if (boleto.status_envio === 'enviado') {
+                            disparoClass = 'enviado';
+                            disparoEmoji = '✅';
+                            disparoTexto = 'Enviado';
+                        } else if (boleto.status_envio === 'erro') {
+                            disparoClass = 'nao_enviado';
+                            disparoEmoji = '❌';
+                            disparoTexto = 'Erro';
+                        }
+
                         html += `
                             <tr>
                                 <td>
@@ -635,6 +651,11 @@
                                 <td>
                                     <span class="status-badge status-${statusClass}">
                                         ${statusEmoji} ${statusTexto}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="status-badge status-${disparoClass}">
+                                        ${disparoEmoji} ${disparoTexto}
                                     </span>
                                 </td>
                                 <td>

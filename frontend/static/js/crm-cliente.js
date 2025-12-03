@@ -67,8 +67,8 @@ async function carregarDashboard() {
             }
         }
 
-        // Buscar últimos boletos do Portal
-        await carregarUltimosBoletos();
+        // REMOVIDO: carregarUltimosBoletos() - agora usa apenas o card de boletos-baixados do Canopus
+        // O card de boletos é carregado pelo dashboard.html inline via carregarDashboardStats()
 
     } catch (error) {
         console.error('Erro ao carregar dashboard:', error);

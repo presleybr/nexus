@@ -3221,11 +3221,12 @@ def listar_boletos_baixados():
                         b.valor_original,
                         b.data_vencimento,
                         b.numero_boleto as grupo_cota,
-                        b.status as status_boleto
+                        b.status as status_boleto,
+                        b.status_envio
                     FROM downloads_canopus dc
                     LEFT JOIN clientes_finais cf ON dc.cpf = cf.cpf
                     LEFT JOIN LATERAL (
-                        SELECT valor_original, data_vencimento, numero_boleto, status
+                        SELECT valor_original, data_vencimento, numero_boleto, status, status_envio
                         FROM boletos
                         WHERE boletos.cliente_final_id = cf.id
                         ORDER BY created_at DESC
@@ -3266,6 +3267,7 @@ def listar_boletos_baixados():
                             'tamanho': row.get('tamanho_bytes', 0),
                             'data_download': data_download_timestamp,
                             'status': row.get('status_boleto', 'processado'),
+                            'status_envio': row.get('status_envio', 'nao_enviado'),
                             'dados_extraidos': True,
                             'whatsapp': row.get('whatsapp', 'N/A')
                         }
