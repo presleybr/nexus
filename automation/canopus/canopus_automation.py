@@ -574,14 +574,20 @@ class CanopusAutomation:
             usuario_input = self.config.SELECTORS['login']['usuario_input']
             await self.page.wait_for_selector(usuario_input, state='visible', timeout=10000)
             await self.page.fill(usuario_input, usuario)
-            # OTIMIZAÇÃO: Remover delay humanizado desnecessário
+            logger.info(f"✅ Usuário preenchido: {usuario}")
+
+            # Pequeno delay para garantir que o campo foi preenchido
+            await asyncio.sleep(0.3)
 
             # Preencher senha
             logger.info("Preenchendo senha...")
             senha_input = self.config.SELECTORS['login']['senha_input']
             await self.page.wait_for_selector(senha_input, state='visible', timeout=10000)
             await self.page.fill(senha_input, senha)
-            # OTIMIZAÇÃO: Remover delay humanizado desnecessário
+            logger.info("✅ Senha preenchida")
+
+            # Pequeno delay para garantir que o campo foi preenchido
+            await asyncio.sleep(0.3)
 
             # Screenshot antes de clicar
             await self.screenshot("antes_clicar_login")
@@ -589,17 +595,49 @@ class CanopusAutomation:
             # Clicar em entrar
             logger.info("Clicando no botão Login...")
             botao_entrar = self.config.SELECTORS['login']['botao_entrar']
-            await self.page.click(botao_entrar)
 
-            # OTIMIZAÇÃO: Aguardar navegação INTELIGENTE (networkidle ou URL mudar)
-            logger.info("Aguardando navegação após login...")
+            # Aguardar botão estar realmente pronto
+            await self.page.wait_for_selector(botao_entrar, state='visible', timeout=10000)
+
+            # Verificar se botão está enabled
+            is_enabled = await self.page.evaluate(f"""
+                () => {{
+                    const btn = document.querySelector('{botao_entrar}');
+                    if (!btn) return false;
+                    return !btn.disabled;
+                }}
+            """)
+            logger.info(f"Botão Login enabled: {is_enabled}")
+
+            # Clicar no botão
+            await self.page.click(botao_entrar)
+            logger.info("✅ Clique executado no botão Login")
+
+            # IMPORTANTE: Aguardar navegação ou resposta do servidor
+            logger.info("Aguardando resposta do servidor após login...")
+
+            # Tentar múltiplas estratégias de detecção de sucesso
+            login_sucesso = False
+
             try:
-                # Aguardar URL mudar (sai de /login)
-                await self.page.wait_for_url(lambda url: 'login' not in url.lower(), timeout=10000)
+                # Estratégia 1: Aguardar URL mudar (mais confiável)
+                logger.info("Tentando detectar mudança de URL...")
+                await self.page.wait_for_url(
+                    lambda url: 'login' not in url.lower(),
+                    timeout=15000
+                )
+                login_sucesso = True
                 logger.info("✅ URL mudou - login detectado")
-            except:
-                # Fallback: aguardar networkidle
-                await self.page.wait_for_load_state('networkidle', timeout=10000)
+            except Exception as e_url:
+                logger.warning(f"⚠️ URL não mudou: {e_url}")
+
+                # Estratégia 2: Aguardar networkidle
+                try:
+                    logger.info("Aguardando network idle...")
+                    await self.page.wait_for_load_state('networkidle', timeout=15000)
+                    logger.info("✅ Network idle alcançado")
+                except Exception as e_network:
+                    logger.warning(f"⚠️ Network idle não alcançado: {e_network}")
 
             # Screenshot após login
             await self.screenshot("apos_login")
@@ -608,7 +646,12 @@ class CanopusAutomation:
             url_atual = self.page.url
             logger.info(f"URL após login: {url_atual}")
 
-            if 'login' not in url_atual.lower():
+            # DEBUG: Capturar título da página
+            titulo = await self.page.title()
+            logger.info(f"Título da página: {titulo}")
+
+            # Verificar múltiplos sinais de sucesso
+            if 'login' not in url_atual.lower() or login_sucesso:
                 logger.info("✅ Login realizado com sucesso!")
                 self.logado = True
                 self.empresa_atual = codigo_empresa
@@ -619,17 +662,55 @@ class CanopusAutomation:
                 self.codigo_empresa_atual = codigo_empresa
                 return True
 
-            # Verificar mensagem de erro
+            # Login falhou - tentar capturar mensagem de erro
+            logger.error("⚠️ Login parece ter falhado - investigando...")
+
+            # Verificar mensagem de erro na página
             try:
-                erro_selector = self.config.SELECTORS['login']['erro_login']
+                erro_selector = self.config.SELECTORS['login'].get('erro_login', '.erro, .alert, .error')
                 erro_element = await self.page.query_selector(erro_selector)
 
                 if erro_element:
                     mensagem_erro = await erro_element.text_content()
-                    logger.error(f"❌ Erro no login: {mensagem_erro}")
+                    logger.error(f"❌ Mensagem de erro encontrada: {mensagem_erro}")
+                else:
+                    logger.warning("⚠️ Nenhuma mensagem de erro encontrada na página")
 
-            except:
-                pass
+            except Exception as e_erro:
+                logger.warning(f"⚠️ Erro ao buscar mensagem de erro: {e_erro}")
+
+            # DEBUG: Capturar HTML da página para análise
+            try:
+                html_snippet = await self.page.evaluate("""
+                    () => {
+                        // Capturar primeiro 500 caracteres do body
+                        return document.body ? document.body.innerText.substring(0, 500) : 'N/A';
+                    }
+                """)
+                logger.info(f"📄 Conteúdo da página (primeiros 500 chars): {html_snippet}")
+            except Exception as e_html:
+                logger.warning(f"⚠️ Erro ao capturar HTML: {e_html}")
+
+            # DEBUG: Verificar se há elementos esperados da página interna
+            try:
+                # Tentar encontrar o ícone de atendimento (só aparece após login)
+                icone_atendimento = self.config.SELECTORS['busca']['icone_atendimento']
+                has_icon = await self.page.query_selector(icone_atendimento)
+
+                if has_icon:
+                    logger.info("✅ DESCOBERTA: Ícone de atendimento encontrado! Login pode ter funcionado!")
+                    self.logado = True
+                    self.empresa_atual = codigo_empresa
+                    self.ponto_venda_atual = ponto_venda
+                    self.usuario_atual = usuario
+                    self.senha_atual = senha
+                    self.codigo_empresa_atual = codigo_empresa
+                    return True
+                else:
+                    logger.warning("⚠️ Ícone de atendimento NÃO encontrado")
+
+            except Exception as e_icon:
+                logger.warning(f"⚠️ Erro ao verificar ícone: {e_icon}")
 
             logger.error("❌ Login falhou")
             await self.screenshot("login_falhou")
