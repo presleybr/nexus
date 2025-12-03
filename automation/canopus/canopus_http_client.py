@@ -16,7 +16,7 @@ import urllib3
 import requests
 from bs4 import BeautifulSoup
 
-from config import CanopusConfig
+from canopus_config import CanopusConfig
 
 # Suprimir warnings SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
