@@ -1176,6 +1176,132 @@ def status_execucao():
     })
 
 
+@automation_canopus_bp.route('/verificar-pendentes', methods=['GET'])
+def verificar_pendentes():
+    """
+    Verifica quais clientes já foram baixados e quais estão pendentes
+    Usado antes de iniciar download para evitar retrabalho
+    """
+    try:
+        ponto_venda = request.args.get('ponto_venda', '24627')
+
+        logger.info(f"🔍 Verificando clientes pendentes para PV {ponto_venda}")
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # 1. Buscar TODOS os clientes do ponto de venda
+                cur.execute("""
+                    SELECT DISTINCT c.cpf, c.nome_completo as nome
+                    FROM clientes_finais c
+                    WHERE c.ponto_venda = %s AND c.ativo = TRUE
+                    ORDER BY c.nome_completo
+                """, (ponto_venda,))
+
+                todos_clientes = cur.fetchall()
+                total_clientes = len(todos_clientes)
+
+                logger.info(f"📋 Total de clientes no PV: {total_clientes}")
+
+                # 2. Buscar CPFs já baixados com SUCESSO (ignorar)
+                cur.execute("""
+                    SELECT DISTINCT cpf, nome_arquivo, data_download
+                    FROM downloads_canopus
+                    WHERE status = 'sucesso'
+                    AND cpf IN (
+                        SELECT cpf FROM clientes_finais
+                        WHERE ponto_venda = %s AND ativo = TRUE
+                    )
+                    ORDER BY data_download DESC
+                """, (ponto_venda,))
+
+                ja_baixados = cur.fetchall()
+                cpfs_sucesso = set(d['cpf'] for d in ja_baixados)
+
+                logger.info(f"✅ Já baixados com sucesso: {len(cpfs_sucesso)}")
+
+                # 3. Buscar CPFs com ERRO anterior (reprocessar)
+                cur.execute("""
+                    SELECT DISTINCT ON (cpf)
+                        cpf,
+                        mensagem_erro,
+                        data_download,
+                        status
+                    FROM downloads_canopus
+                    WHERE status IN ('erro', 'sem_boleto')
+                    AND cpf IN (
+                        SELECT cpf FROM clientes_finais
+                        WHERE ponto_venda = %s AND ativo = TRUE
+                    )
+                    AND cpf NOT IN (
+                        SELECT DISTINCT cpf FROM downloads_canopus
+                        WHERE status = 'sucesso'
+                    )
+                    ORDER BY cpf, data_download DESC
+                """, (ponto_venda,))
+
+                com_erro = cur.fetchall()
+                cpfs_erro = set(d['cpf'] for d in com_erro)
+
+                logger.info(f"❌ Com erro anterior: {len(cpfs_erro)}")
+
+                # 4. Calcular pendentes (nunca tentou)
+                lista_pendentes = []
+                lista_com_erro = []
+
+                for cliente in todos_clientes:
+                    cpf = cliente['cpf']
+
+                    if cpf in cpfs_sucesso:
+                        continue  # Já baixado, ignorar
+
+                    if cpf in cpfs_erro:
+                        # Buscar mensagem de erro
+                        erro_info = next((e for e in com_erro if e['cpf'] == cpf), None)
+                        lista_com_erro.append({
+                            'cpf': cpf,
+                            'nome': cliente['nome'],
+                            'status': 'erro_anterior',
+                            'erro': erro_info['mensagem_erro'] if erro_info else 'Erro desconhecido',
+                            'data_erro': erro_info['data_download'].isoformat() if erro_info else None
+                        })
+                    else:
+                        # Nunca tentou
+                        lista_pendentes.append({
+                            'cpf': cpf,
+                            'nome': cliente['nome'],
+                            'status': 'pendente'
+                        })
+
+                pendentes = len(lista_pendentes)
+                logger.info(f"⏳ Pendentes (nunca tentou): {pendentes}")
+
+                return jsonify({
+                    'success': True,
+                    'total_clientes': total_clientes,
+                    'ja_baixados': len(cpfs_sucesso),
+                    'com_erro': len(cpfs_erro),
+                    'pendentes': pendentes,
+                    'lista_pendentes': lista_pendentes,
+                    'lista_com_erro': lista_com_erro,
+                    'lista_baixados': [
+                        {
+                            'cpf': d['cpf'],
+                            'nome_arquivo': d['nome_arquivo'],
+                            'data_download': d['data_download'].isoformat()
+                        }
+                        for d in ja_baixados[:10]  # Primeiros 10
+                    ]
+                })
+
+    except Exception as e:
+        logger.error(f"Erro ao verificar pendentes: {e}")
+        logger.exception("Traceback:")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @automation_canopus_bp.route('/downloads-status', methods=['GET'])
 def downloads_status():
     """
@@ -1454,8 +1580,11 @@ def baixar_boletos_ponto_venda():
     ponto_venda = data.get('ponto_venda', '24627')
     mes = data.get('mes')
     ano = data.get('ano')
+    forcar_todos = data.get('forcar_todos', False)  # Se True, ignora verificação e baixa todos
+    reprocessar_erros = data.get('reprocessar_erros', True)  # Se True, inclui os que deram erro
 
     logger.info(f"🚀 Iniciando download de boletos - PV: {ponto_venda}, Mês: {mes}, Ano: {ano}")
+    logger.info(f"📋 Forçar todos: {forcar_todos}, Reprocessar erros: {reprocessar_erros}")
     logger.info(f"📋 Dados recebidos: {data}")
 
     # Criar orquestrador
@@ -1501,106 +1630,108 @@ def baixar_boletos_ponto_venda():
         import asyncio
         import threading
 
-        # Criar lista de CPFs
-        cpfs_todos = [c['cpf'] for c in clientes]
-
-        logger.info(f"📋 Total de clientes no PV: {len(cpfs_todos)}")
-        sys.stdout.flush()
-
         # ========================================================================
-        # ENCONTRAR ÚLTIMO BOLETO BAIXADO E CONTINUAR SEQUENCIALMENTE
+        # FILTRAR CLIENTES BASEADO EM DOWNLOADS ANTERIORES
         # ========================================================================
-        indice_inicio = 0
-        ultimo_cpf_baixado = None
+        clientes_filtrados = clientes  # Lista padrão (todos)
         total_ja_baixados = 0
 
-        try:
-            with get_db_connection() as conn_check:
-                with conn_check.cursor() as cur_check:
-                    # Buscar o ÚLTIMO CPF baixado (mais recente) para este mês/ano
-                    # que também está na lista de CPFs do PV
-                    cur_check.execute("""
-                        SELECT cpf, data_download, nome_arquivo
-                        FROM downloads_canopus
-                        WHERE status = 'sucesso'
-                        AND EXTRACT(MONTH FROM data_download) = %s
-                        AND EXTRACT(YEAR FROM data_download) = %s
-                        AND cpf = ANY(%s)
-                        ORDER BY data_download DESC
-                        LIMIT 1
-                    """, (mes, ano if ano else 2025, cpfs_todos))
+        if not forcar_todos:
+            logger.info("=" * 80)
+            logger.info("🔍 FILTRANDO CLIENTES - Ignorando já baixados com sucesso")
+            logger.info("=" * 80)
 
-                    ultimo_download = cur_check.fetchone()
+            try:
+                with get_db_connection() as conn_filter:
+                    with conn_filter.cursor() as cur_filter:
+                        # Buscar CPFs já baixados com SUCESSO
+                        cur_filter.execute("""
+                            SELECT DISTINCT cpf
+                            FROM downloads_canopus
+                            WHERE status = 'sucesso'
+                            AND cpf IN (
+                                SELECT cpf FROM clientes_finais
+                                WHERE ponto_venda = %s AND ativo = TRUE
+                            )
+                        """, (ponto_venda,))
 
-                    if ultimo_download:
-                        ultimo_cpf_baixado = ultimo_download['cpf']
-                        data_ultimo = ultimo_download['data_download']
-                        nome_arquivo = ultimo_download['nome_arquivo']
+                        cpfs_sucesso = set(row['cpf'] for row in cur_filter.fetchall())
+                        logger.info(f"✅ Encontrados {len(cpfs_sucesso)} CPFs já baixados com sucesso")
 
-                        # Encontrar posição deste CPF na lista ordenada
-                        try:
-                            indice_ultimo = cpfs_todos.index(ultimo_cpf_baixado)
-                            indice_inicio = indice_ultimo + 1  # Começar do próximo
-                            total_ja_baixados = indice_inicio
+                        # Buscar CPFs com ERRO anterior
+                        cpfs_erro = set()
+                        if not reprocessar_erros:
+                            cur_filter.execute("""
+                                SELECT DISTINCT cpf
+                                FROM downloads_canopus
+                                WHERE status IN ('erro', 'sem_boleto')
+                                AND cpf IN (
+                                    SELECT cpf FROM clientes_finais
+                                    WHERE ponto_venda = %s AND ativo = TRUE
+                                )
+                                AND cpf NOT IN (
+                                    SELECT DISTINCT cpf FROM downloads_canopus WHERE status = 'sucesso'
+                                )
+                            """, (ponto_venda,))
 
-                            logger.info("=" * 80)
-                            logger.info(f"📊 RETOMANDO DOWNLOAD A PARTIR DO ÚLTIMO BOLETO")
-                            logger.info(f"   Total de clientes no PV: {len(cpfs_todos)}")
-                            logger.info(f"   Último baixado: {ultimo_cpf_baixado}")
-                            logger.info(f"   Arquivo: {nome_arquivo}")
-                            logger.info(f"   Data: {data_ultimo}")
-                            logger.info(f"   Posição: {indice_ultimo + 1}/{len(cpfs_todos)}")
-                            logger.info(f"   Já processados: {total_ja_baixados}")
-                            logger.info(f"   Faltam processar: {len(cpfs_todos) - indice_inicio}")
-                            logger.info("=" * 80)
-                            sys.stdout.flush()
+                            cpfs_erro = set(row['cpf'] for row in cur_filter.fetchall())
+                            logger.info(f"❌ Encontrados {len(cpfs_erro)} CPFs com erro (serão IGNORADOS)")
 
-                        except ValueError:
-                            # CPF não encontrado na lista (caso raro)
-                            logger.warning(f"⚠️ Último CPF baixado ({ultimo_cpf_baixado}) não está na lista atual")
-                            logger.info("   Iniciando do começo...")
-                            sys.stdout.flush()
-                            indice_inicio = 0
-                    else:
+                        # Filtrar lista de clientes
+                        clientes_filtrados = []
+                        for cliente in clientes:
+                            cpf = cliente['cpf']
+
+                            # Ignorar se já foi baixado com sucesso
+                            if cpf in cpfs_sucesso:
+                                total_ja_baixados += 1
+                                continue
+
+                            # Ignorar se teve erro e não quer reprocessar
+                            if cpf in cpfs_erro:
+                                continue
+
+                            clientes_filtrados.append(cliente)
+
                         logger.info("=" * 80)
-                        logger.info(f"📊 INICIANDO DOWNLOAD PELA PRIMEIRA VEZ")
-                        logger.info(f"   Total de clientes no PV: {len(cpfs_todos)}")
-                        logger.info(f"   Nenhum download anterior encontrado")
+                        logger.info(f"📊 RESULTADO DA FILTRAGEM:")
+                        logger.info(f"   Total de clientes no PV: {len(clientes)}")
+                        logger.info(f"   ✅ Já baixados (ignorados): {total_ja_baixados}")
+                        logger.info(f"   ❌ Com erro (ignorados): {len(cpfs_erro)}")
+                        logger.info(f"   ⏳ A processar: {len(clientes_filtrados)}")
                         logger.info("=" * 80)
                         sys.stdout.flush()
 
-        except Exception as e:
-            logger.warning(f"⚠️ Erro ao verificar último download: {e}")
-            logger.exception("Traceback:")
-            logger.info("   Continuando do início...")
+            except Exception as e:
+                logger.error(f"❌ Erro ao filtrar clientes: {e}")
+                logger.exception("Traceback:")
+                # Em caso de erro, processar todos
+                clientes_filtrados = clientes
+                total_ja_baixados = 0
+        else:
+            logger.info("=" * 80)
+            logger.info("🔄 FORÇAR TODOS - Processando TODOS os clientes sem filtro")
+            logger.info(f"   Total: {len(clientes)}")
+            logger.info("=" * 80)
             sys.stdout.flush()
-            indice_inicio = 0
 
-        # Pegar apenas os CPFs a partir do índice de início (continuar sequencialmente)
-        cpfs = cpfs_todos[indice_inicio:]
+        # Criar lista de CPFs a processar
+        cpfs = [c['cpf'] for c in clientes_filtrados]
 
-        logger.info("=" * 80)
-        logger.info(f"🎯 INICIANDO DOWNLOADS SEQUENCIAIS")
-        logger.info(f"   Índice de início: {indice_inicio + 1}/{len(cpfs_todos)}")
-        logger.info(f"   CPFs a processar: {len(cpfs)}")
-        if len(cpfs) > 0:
-            logger.info(f"   Primeiro CPF: {cpfs[0]} (posição {indice_inicio + 1})")
-            logger.info(f"   Último CPF: {cpfs[-1]} (posição {len(cpfs_todos)})")
-        logger.info("=" * 80)
-        sys.stdout.flush()
-
-        # Se não há CPFs para processar, retornar sucesso
         if len(cpfs) == 0:
             logger.info("✅ TODOS OS BOLETOS JÁ FORAM BAIXADOS!")
-            logger.info(f"   Total de {len(cpfs_todos)} boletos já registrados no banco.")
+            logger.info(f"   Total de {len(clientes)} clientes já processados.")
             sys.stdout.flush()
             return jsonify({
                 'success': True,
-                'message': 'Todos os boletos já foram baixados',
-                'total_clientes': len(cpfs_todos),
-                'ja_baixados': len(cpfs_todos),
-                'faltam': 0
+                'message': 'Todos os boletos já foram baixados com sucesso',
+                'total_clientes': len(clientes),
+                'ja_baixados': total_ja_baixados,
+                'a_processar': 0
             })
+
+        logger.info(f"📋 Clientes selecionados para download: {len(cpfs)}")
+        sys.stdout.flush()
 
         # Estatísticas compartilhadas
         stats = {
@@ -1610,8 +1741,7 @@ def baixar_boletos_ponto_venda():
             'sem_boleto': 0,
             'total': len(cpfs),
             'processados': 0,
-            'ja_baixados': total_ja_baixados,  # Quantos já foram processados anteriormente
-            'indice_inicio': indice_inicio  # Posição de onde começou
+            'ja_baixados': total_ja_baixados  # Quantos já foram processados anteriormente
         }
 
         # Função para processar em background
@@ -2353,19 +2483,22 @@ def baixar_boletos_ponto_venda():
         # Retornar imediatamente
         logger.info("📤 Retornando resposta ao cliente...")
         if total_ja_baixados > 0:
-            mensagem = f'Retomando download: {len(cpfs)} clientes restantes (de {len(cpfs_todos)} total). Já processados: {total_ja_baixados}.'
+            mensagem = f'Download iniciado: {len(cpfs)} clientes a processar (de {len(clientes)} total). Já baixados: {total_ja_baixados}.'
+        elif forcar_todos:
+            mensagem = f'Download iniciado: Forçando download de TODOS os {len(cpfs)} clientes.'
         else:
-            mensagem = f'Download iniciado para {len(cpfs)} clientes.'
+            mensagem = f'Download iniciado para {len(cpfs)} clientes pendentes.'
 
         return jsonify({
             'success': True,
             'message': mensagem,
             'data': {
                 'ponto_venda': ponto_venda,
-                'total_clientes': len(cpfs_todos),
+                'total_clientes': len(clientes),
                 'ja_baixados': total_ja_baixados,
                 'a_processar': len(cpfs),
-                'indice_inicio': indice_inicio + 1,
+                'forcar_todos': forcar_todos,
+                'reprocessar_erros': reprocessar_erros,
                 'status': 'iniciado',
                 'info': 'Acompanhe o progresso em tempo real no monitoramento'
             }

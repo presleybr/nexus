@@ -544,6 +544,67 @@
                         Retomar Download
                     </button>
 
+                    <!-- Modal de Resumo antes de Iniciar -->
+                    <div id="resumoModal" style="margin-top: 1.5rem; padding: 1.5rem; background: rgba(66,133,244,0.1); border-radius: 12px; border: 2px solid rgba(66,133,244,0.4); display: none;">
+                        <h4 style="margin: 0 0 1rem 0; color: #4285f4; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 16v-4M12 8h.01"></path>
+                            </svg>
+                            Resumo da Automação
+                        </h4>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                            <div style="text-align: center; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                                <div style="font-size: 1.8rem; font-weight: 700; color: #fff;" id="resumoTotal">0</div>
+                                <div style="color: rgba(255,255,255,0.7); font-size: 0.8rem; margin-top: 0.25rem;">Total</div>
+                            </div>
+                            <div style="text-align: center; padding: 1rem; background: rgba(52,168,83,0.2); border-radius: 8px;">
+                                <div style="font-size: 1.8rem; font-weight: 700; color: #34a853;" id="resumoBaixados">0</div>
+                                <div style="color: rgba(255,255,255,0.7); font-size: 0.8rem; margin-top: 0.25rem;">✅ Já baixados</div>
+                            </div>
+                            <div style="text-align: center; padding: 1rem; background: rgba(234,67,53,0.2); border-radius: 8px;">
+                                <div style="font-size: 1.8rem; font-weight: 700; color: #ea4335;" id="resumoErros">0</div>
+                                <div style="color: rgba(255,255,255,0.7); font-size: 0.8rem; margin-top: 0.25rem;">❌ Com erro</div>
+                            </div>
+                            <div style="text-align: center; padding: 1rem; background: rgba(66,133,244,0.2); border-radius: 8px;">
+                                <div style="font-size: 1.8rem; font-weight: 700; color: #4285f4;" id="resumoPendentes">0</div>
+                                <div style="color: rgba(255,255,255,0.7); font-size: 0.8rem; margin-top: 0.25rem;">⏳ Pendentes</div>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(0,0,0,0.3); border-radius: 6px;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; color: #fff; cursor: pointer;">
+                                <input type="checkbox" id="checkReprocessarErros" checked style="width: 18px; height: 18px;">
+                                <span>Reprocessar clientes com erro anterior</span>
+                            </label>
+                        </div>
+
+                        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                            <button class="btn-canopus" id="btnConfirmarPendentes" style="flex: 1; min-width: 200px; background: #34a853; color: #fff;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                <span id="textoBtnPendentes">Baixar 0 boletos</span>
+                            </button>
+                            <button class="btn-canopus" id="btnForcarTodos" style="flex: 1; min-width: 200px; background: #fbbc04; color: #000;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Forçar download de todos
+                            </button>
+                            <button class="btn-canopus" id="btnCancelarResumo" style="background: #666; color: #fff;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Card de Monitoramento em Tempo Real -->
                     <div id="monitorCard" style="margin-top: 1.5rem; padding: 1.5rem; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid rgba(66,133,244,0.3); display: none;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
@@ -801,7 +862,10 @@
         });
 
 
-        // Iniciar download
+        // Variáveis globais para controle
+        let resumoDados = null;
+
+        // Iniciar download - Primeiro verificar pendentes
         document.getElementById('btnIniciarDownload').addEventListener('click', async () => {
             const btn = document.getElementById('btnIniciarDownload');
 
@@ -818,24 +882,82 @@
             const pontoVenda = pv24627Checked ? '24627' : '17308';
 
             btn.disabled = true;
-            btn.innerHTML = '<span>Processando...</span>';
+            btn.innerHTML = '<span>🔍 Verificando...</span>';
 
-            // Mostrar indicador de progresso
-            const progressContainer = document.getElementById('progressSection');
-            if (progressContainer) {
-                progressContainer.style.display = 'block';
+            try {
+                // ETAPA 1: Verificar pendentes
+                adicionarLog('info', `🔍 Verificando clientes pendentes do PV ${pontoVenda}...`);
+
+                const response = await fetch(`/api/automation/verificar-pendentes?ponto_venda=${pontoVenda}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    resumoDados = result;
+
+                    // Atualizar modal de resumo
+                    document.getElementById('resumoTotal').textContent = result.total_clientes;
+                    document.getElementById('resumoBaixados').textContent = result.ja_baixados;
+                    document.getElementById('resumoErros').textContent = result.com_erro;
+                    document.getElementById('resumoPendentes').textContent = result.pendentes;
+
+                    // Calcular total a processar (pendentes + erros se reprocessar estiver marcado)
+                    const reprocessar = document.getElementById('checkReprocessarErros').checked;
+                    const totalProcessar = reprocessar ? (result.pendentes + result.com_erro) : result.pendentes;
+
+                    document.getElementById('textoBtnPendentes').textContent = `Baixar ${totalProcessar} boleto${totalProcessar !== 1 ? 's' : ''}`;
+
+                    // Ocultar botão Iniciar e mostrar modal de resumo
+                    btn.style.display = 'none';
+                    document.getElementById('resumoModal').style.display = 'block';
+
+                    adicionarLog('success', `✅ Análise concluída: ${totalProcessar} clientes a processar`);
+                } else {
+                    alert('Erro ao verificar pendentes: ' + result.error);
+                    btn.disabled = false;
+                    btn.innerHTML = 'Iniciar Download de Boletos';
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao conectar com o servidor');
+                btn.disabled = false;
+                btn.innerHTML = 'Iniciar Download de Boletos';
             }
+        });
 
-            mostrarProgresso();
-            adicionarLog('info', `Iniciando download de boletos do PV ${pontoVenda}...`);
+        // Atualizar contador quando mudar checkbox
+        document.getElementById('checkReprocessarErros').addEventListener('change', () => {
+            if (resumoDados) {
+                const reprocessar = document.getElementById('checkReprocessarErros').checked;
+                const totalProcessar = reprocessar ? (resumoDados.pendentes + resumoDados.com_erro) : resumoDados.pendentes;
+                document.getElementById('textoBtnPendentes').textContent = `Baixar ${totalProcessar} boleto${totalProcessar !== 1 ? 's' : ''}`;
+            }
+        });
 
-            // Calcular o PRÓXIMO mês (não o mês atual)
+        // Cancelar resumo
+        document.getElementById('btnCancelarResumo').addEventListener('click', () => {
+            document.getElementById('resumoModal').style.display = 'none';
+            const btnIniciar = document.getElementById('btnIniciarDownload');
+            btnIniciar.style.display = 'block';
+            btnIniciar.disabled = false;
+            btnIniciar.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Iniciar Download de Boletos';
+        });
+
+        // Função auxiliar para iniciar download (usada pelos 2 botões)
+        async function executarDownload(forcarTodos = false) {
+            const pontoVenda = document.getElementById('pvDownload24627').checked ? '24627' : '17308';
+            const reprocessarErros = document.getElementById('checkReprocessarErros').checked;
+
+            // Calcular mês
             const hoje = new Date();
             const proximoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
             const mesNome = proximoMes.toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase();
             const anoProximoMes = proximoMes.getFullYear();
 
-            adicionarLog('info', `Buscando boletos de ${mesNome}/${anoProximoMes}`);
+            adicionarLog('info', `🚀 Iniciando download de boletos do PV ${pontoVenda}...`);
+            adicionarLog('info', `📅 Buscando boletos de ${mesNome}/${anoProximoMes}`);
+
+            // Ocultar modal de resumo
+            document.getElementById('resumoModal').style.display = 'none';
 
             try {
                 const response = await fetch('/api/automation/baixar-boletos-ponto-venda', {
@@ -844,7 +966,9 @@
                     body: JSON.stringify({
                         ponto_venda: pontoVenda,
                         mes: mesNome,
-                        ano: anoProximoMes
+                        ano: anoProximoMes,
+                        forcar_todos: forcarTodos,
+                        reprocessar_erros: reprocessarErros
                     })
                 });
 
@@ -890,16 +1014,22 @@
                 } else {
                     adicionarLog('error', 'Erro ao iniciar download: ' + result.error);
                     alert('Erro ao iniciar download: ' + result.error);
-                    btn.disabled = false;
-                    btn.innerHTML = 'Iniciar Download';
                 }
             } catch (error) {
                 console.error('Erro:', error);
                 adicionarLog('error', 'Erro ao conectar com o servidor');
                 alert('Erro ao conectar com o servidor');
-                btn.disabled = false;
-                btn.innerHTML = 'Iniciar Download';
             }
+        }
+
+        // Handler: Confirmar Pendentes (baixar apenas pendentes)
+        document.getElementById('btnConfirmarPendentes').addEventListener('click', async () => {
+            await executarDownload(false);
+        });
+
+        // Handler: Forçar Todos (baixar todos, ignorar verificação)
+        document.getElementById('btnForcarTodos').addEventListener('click', async () => {
+            await executarDownload(true);
         });
 
         // Pausar download
