@@ -190,10 +190,21 @@ class CanopusHTTPClient:
             logger.info(f"   edtSenha: {'*' * len(senha)}")
             logger.info(f"   __VIEWSTATE presente: {'Sim' if '__VIEWSTATE' in asp_fields else 'Não'}")
             logger.info(f"   __EVENTVALIDATION presente: {'Sim' if '__EVENTVALIDATION' in asp_fields else 'Não'}")
+            logger.info(f"   __EVENTTARGET: {login_data.get('__EVENTTARGET', 'N/A')}")
             logger.info(f"   Total de campos ASP: {len(asp_fields)}")
 
+            # Log completo dos campos (exceto senha e ViewState gigante)
+            logger.info(f"🔍 DEBUG - Todos os campos do POST:")
+            for key, value in login_data.items():
+                if 'senha' in key.lower():
+                    logger.info(f"   {key}: ********")
+                elif 'viewstate' in key.lower():
+                    logger.info(f"   {key}: {value[:50] if value else 'vazio'}...")
+                else:
+                    logger.info(f"   {key}: {value}")
+
             # 4. POST login (COM DELAY e Referer)
-            logger.debug("POST login...")
+            logger.info("📤 Enviando POST de login...")
             response = self._safe_request(
                 'POST',
                 url_login,
@@ -210,14 +221,29 @@ class CanopusHTTPClient:
 
             # Procurar mensagens de erro no HTML
             soup = BeautifulSoup(response.text, 'html.parser')
-            erro_msg = soup.find('span', {'id': re.compile('.*erro.*', re.I)})
-            if erro_msg:
-                logger.error(f"❌ Mensagem de erro no HTML: {erro_msg.get_text(strip=True)}")
+
+            # Procurar por QUALQUER span com texto de erro
+            error_spans = soup.find_all('span', {'class': re.compile('.*erro.*', re.I)})
+            error_spans += soup.find_all('span', {'id': re.compile('.*erro.*', re.I)})
+            error_spans += soup.find_all('div', {'class': re.compile('.*erro.*|.*alert.*', re.I)})
+
+            if error_spans:
+                for span in error_spans:
+                    texto = span.get_text(strip=True)
+                    if texto:
+                        logger.error(f"❌ Mensagem de erro no HTML: {texto}")
 
             # Verificar título da página
             title = soup.find('title')
             if title:
                 logger.info(f"📄 Título da página: {title.get_text(strip=True)}")
+
+            # Procurar por scripts que possam ter mensagens de erro
+            scripts = soup.find_all('script')
+            for script in scripts:
+                script_text = script.string if script.string else ''
+                if 'alert' in script_text.lower() or 'erro' in script_text.lower():
+                    logger.warning(f"⚠️ Script com possível erro: {script_text[:200]}...")
 
             # Se redirecionou para frmMain.aspx = sucesso
             if 'frmMain.aspx' in response.url:
@@ -234,6 +260,15 @@ class CanopusHTTPClient:
             logger.error("❌ Login falhou - não detectou sucesso")
             logger.error(f"   URL: {response.url}")
             logger.error(f"   HTML preview: {response.text[:500]}")
+
+            # Salvar HTML completo para análise
+            try:
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
+                    f.write(response.text)
+                    logger.error(f"   💾 HTML completo salvo em: {f.name}")
+            except Exception as e:
+                logger.warning(f"⚠️ Não conseguiu salvar HTML: {e}")
 
             return False
 
