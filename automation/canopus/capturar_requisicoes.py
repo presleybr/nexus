@@ -1,204 +1,140 @@
 """
-Captura as requisições HTTP do sistema Canopus
-Abre navegador e loga todas as requisições para análise
+Script para capturar todas as requisições HTTP que o site Canopus faz.
+Executa o fluxo completo e salva as requisições em JSON.
 
-Uso: python capturar_requisicoes.py
+USO:
+    1. Configure variáveis de ambiente:
+       set CANOPUS_USUARIO=seu_usuario
+       set CANOPUS_SENHA=sua_senha
+       set CANOPUS_CPF_TESTE=12345678901
+
+    2. Execute:
+       python capturar_requisicoes.py
+
+    3. Complete o fluxo manualmente no browser
+
+    4. Analise: automation/canopus/requisicoes_capturadas.json
 """
 
 import asyncio
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 from playwright.async_api import async_playwright
 
-async def main():
-    print("=" * 80)
-    print("CAPTURA DE REQUISIÇÕES - CANOPUS")
-    print("=" * 80)
-    print("\nEste script vai capturar todas as requisições HTTP.")
-    print("Faça o fluxo completo manualmente:")
-    print("  1. Login")
-    print("  2. Buscar cliente (CPF)")
-    print("  3. Navegar para Emissão de Cobrança")
-    print("  4. Emitir boleto")
-    print("\nTodas as requisições serão salvas em um arquivo JSON.")
-    print("-" * 80)
+async def capturar_requisicoes():
+    """Captura todas as requisições durante o fluxo de download"""
 
     requisicoes = []
+    respostas_importantes = []
 
-    async def log_request(request):
-        req_data = {
-            'timestamp': datetime.now().isoformat(),
-            'method': request.method,
-            'url': request.url,
-            'headers': dict(request.headers),
-            'post_data': None,
-            'resource_type': request.resource_type
-        }
+    async def on_request(request):
+        """Callback para cada requisição"""
+        if 'canopus' in request.url.lower():
+            req_data = {
+                'timestamp': datetime.now().isoformat(),
+                'method': request.method,
+                'url': request.url,
+                'resource_type': request.resource_type,
+                'headers': dict(request.headers),
+                'post_data': None
+            }
 
-        if request.method == 'POST':
-            try:
-                req_data['post_data'] = request.post_data
-            except:
-                pass
-
-        requisicoes.append(req_data)
-
-        # Log resumido no console
-        resource_icon = {
-            'document': '📄',
-            'script': '📜',
-            'stylesheet': '🎨',
-            'image': '🖼️',
-            'xhr': '🔄',
-            'fetch': '🔄',
-        }.get(request.resource_type, '📦')
-
-        print(f"{resource_icon} [{request.method:4}] {request.url[:80]}")
-
-    async def log_response(response):
-        # Encontrar requisição correspondente
-        for req in reversed(requisicoes):
-            if req['url'] == response.url and 'status' not in req:
-                req['status'] = response.status
-                req['response_headers'] = dict(response.headers)
-
-                # Para respostas pequenas, capturar corpo
+            if request.method == 'POST':
                 try:
-                    content_type = response.headers.get('content-type', '')
-                    if 'text/html' in content_type or 'application/json' in content_type:
-                        body = await response.text()
-                        if len(body) < 100000:  # Só guardar se menor que 100KB
-                            req['response_body'] = body
+                    req_data['post_data'] = request.post_data
                 except:
                     pass
 
-                break
+            requisicoes.append(req_data)
+            print(f"📤 {request.method} {request.url[:80]}")
 
-    playwright = await async_playwright().start()
+    async def on_response(response):
+        """Callback para respostas importantes"""
+        content_type = response.headers.get('content-type', '')
 
-    browser = await playwright.chromium.launch(
-        headless=False,
-        args=[
-            '--disable-blink-features=AutomationControlled',
-            '--disable-dev-shm-usage',
-            '--disable-web-security',
-            '--no-sandbox',
-        ]
-    )
+        # Capturar PDFs e HTMLs importantes
+        if 'pdf' in content_type.lower() or 'html' in content_type.lower():
+            respostas_importantes.append({
+                'url': response.url,
+                'status': response.status,
+                'content_type': content_type,
+                'headers': dict(response.headers)
+            })
 
-    context = await browser.new_context(
-        viewport={'width': 1920, 'height': 1080},
-        user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        ignore_https_errors=True,
-        java_script_enabled=True,
-    )
+            if 'pdf' in content_type.lower():
+                print(f"📥 PDF DETECTADO: {response.url}")
 
-    page = await context.new_page()
+    # Buscar credenciais do banco ou variáveis de ambiente
+    usuario = os.environ.get('CANOPUS_USUARIO', '')
+    senha = os.environ.get('CANOPUS_SENHA', '')
+    cpf_teste = os.environ.get('CANOPUS_CPF_TESTE', '')
 
-    # Configurar timeout maior
-    page.set_default_timeout(60000)  # 60 segundos
-
-    # Registrar listeners
-    page.on('request', log_request)
-    page.on('response', log_response)
-
-    # Abrir Canopus - tentar várias URLs
-    print("\n🌐 Abrindo Canopus...")
-
-    urls_tentar = [
-        'https://cnp3.consorciocanopus.com.br/WWW/frmCorCCCnsLogin.aspx',
-        'https://cnp3.consorciocanopus.com.br/www/frmCorCCCnsLogin.aspx',
-        'https://cnp3.consorciocanopus.com.br/',
-    ]
-
-    sucesso = False
-    for url in urls_tentar:
-        try:
-            print(f"Tentando: {url}")
-            await page.goto(url, wait_until='domcontentloaded', timeout=30000)
-            print(f"✅ Conectado: {url}")
-            sucesso = True
-            break
-        except Exception as e:
-            print(f"❌ Falhou: {str(e)[:100]}")
-            continue
-
-    if not sucesso:
-        print("\n❌ Não foi possível conectar ao Canopus!")
-        print("\nPossíveis causas:")
-        print("  1. Servidor fora do ar")
-        print("  2. VPN/Firewall bloqueando")
-        print("  3. URL mudou")
-        print("\nTente abrir no navegador normal primeiro:")
-        print("  https://cnp3.consorciocanopus.com.br")
-        await browser.close()
-        await playwright.stop()
+    if not usuario or not senha:
+        print("❌ Configure as variáveis de ambiente:")
+        print("   set CANOPUS_USUARIO=seu_usuario")
+        print("   set CANOPUS_SENHA=sua_senha")
+        print("   set CANOPUS_CPF_TESTE=12345678901")
         return
 
-    print("\n" + "=" * 80)
-    print("NAVEGADOR ABERTO - FAÇA O FLUXO COMPLETO MANUALMENTE")
-    print("=" * 80)
-    print("\n📋 CHECKLIST:")
-    print("  [ ] 1. Fazer login")
-    print("  [ ] 2. Clicar em Atendimento")
-    print("  [ ] 3. Clicar em Busca Avançada")
-    print("  [ ] 4. Selecionar CPF")
-    print("  [ ] 5. Buscar cliente")
-    print("  [ ] 6. Clicar no cliente encontrado")
-    print("  [ ] 7. Clicar em Emissão de Cobrança")
-    print("  [ ] 8. Selecionar boleto")
-    print("  [ ] 9. Emitir Cobrança")
-    print("\n⏸️  Quando terminar, volte aqui e pressione ENTER.\n")
+    print("=" * 60)
+    print("🔍 CAPTURADOR DE REQUISIÇÕES HTTP - CANOPUS")
+    print("=" * 60)
+    print(f"Usuário: {usuario}")
+    print(f"CPF teste: {cpf_teste}")
+    print("=" * 60)
 
-    # Aguardar usuário
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, input, "Pressione ENTER para salvar e encerrar...")
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False, slow_mo=500)
+        context = await browser.new_context()
+        page = await context.new_page()
 
-    # Salvar requisições
-    pasta = r'D:\Nexus\automation\canopus\logs'
-    os.makedirs(pasta, exist_ok=True)
+        # Registrar listeners
+        page.on('request', on_request)
+        page.on('response', on_response)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    arquivo = os.path.join(pasta, f'requisicoes_{timestamp}.json')
+        try:
+            print("\n📍 ETAPA 1: Navegando para login...")
+            await page.goto('https://cnp3.consorciocanopus.com.br/')
+            await page.wait_for_load_state('networkidle')
 
-    with open(arquivo, 'w', encoding='utf-8') as f:
-        json.dump(requisicoes, f, indent=2, ensure_ascii=False)
+            print("\n⏳ Complete o LOGIN manualmente e pressione ENTER...")
+            input(">>> ")
 
-    print(f"\n✅ {len(requisicoes)} requisições salvas em:")
-    print(f"   {arquivo}")
+            print("\n⏳ Navegue até a BUSCA AVANÇADA, busque o CPF e BAIXE O BOLETO...")
+            print("   Pressione ENTER quando terminar...")
+            input(">>> ")
 
-    # Resumo
-    print("\n" + "=" * 80)
-    print("📊 RESUMO")
-    print("=" * 80)
+        except Exception as e:
+            print(f"❌ Erro: {e}")
 
-    posts = [r for r in requisicoes if r['method'] == 'POST']
-    gets = [r for r in requisicoes if r['method'] == 'GET']
-    aspx = [r for r in requisicoes if '.aspx' in r['url']]
+        finally:
+            cookies = await context.cookies()
+            await browser.close()
 
-    print(f"\n📈 Estatísticas:")
-    print(f"   Total de requisições: {len(requisicoes)}")
-    print(f"   GET:  {len(gets)}")
-    print(f"   POST: {len(posts)}")
-    print(f"   Páginas ASPX: {len(aspx)}")
+    # Salvar resultados
+    print("\n" + "=" * 60)
+    print("📊 RESULTADOS")
+    print("=" * 60)
 
-    print(f"\n🔍 URLs POST importantes:")
-    for r in posts:
-        if '.aspx' in r['url']:
-            from urllib.parse import urlparse
-            parsed = urlparse(r['url'])
-            print(f"   → {parsed.path}")
+    requisicoes_post = [r for r in requisicoes if r['method'] == 'POST']
 
-    print(f"\n💾 Execute agora:")
-    print(f"   python mapear_fluxo.py")
-    print(f"\n   OU:")
-    print(f"   python mapear_fluxo.py {arquivo}")
+    print(f"\nTotal de requisições: {len(requisicoes)}")
+    print(f"Requisições POST: {len(requisicoes_post)}")
 
-    await browser.close()
-    await playwright.stop()
+    resultado = {
+        'data_captura': datetime.now().isoformat(),
+        'requisicoes': requisicoes,
+        'respostas_importantes': respostas_importantes,
+        'cookies': [{'name': c['name'], 'domain': c['domain']} for c in cookies]
+    }
 
-    print("\n✅ Encerrado!")
+    output_path = Path('requisicoes_capturadas.json')
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(resultado, f, indent=2, ensure_ascii=False)
+
+    print(f"\n✅ Resultados salvos em: {output_path}")
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    asyncio.run(capturar_requisicoes())
