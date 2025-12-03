@@ -195,17 +195,36 @@ class CanopusHTTPClient:
             )
 
             # 5. Verificar sucesso
-            # Se redirecionou para frmMain.aspx = sucesso
-            if 'frmMain.aspx' in response.url or response.status_code == 200:
-                # Verificar se tem ValidaSessaoLogin
-                if 'ValidaSessaoLogin' in response.text or 'frmMain' in response.text:
-                    self._logged_in = True
-                    logger.info("✅ Login OK!")
-                    return True
+            logger.info(f"🔍 DEBUG Login - URL final: {response.url}")
+            logger.info(f"🔍 DEBUG Login - Status: {response.status_code}")
+            logger.info(f"🔍 DEBUG Login - Tamanho HTML: {len(response.text)} bytes")
 
-            logger.error("❌ Login falhou")
-            logger.debug(f"URL final: {response.url}")
-            logger.debug(f"Status: {response.status_code}")
+            # Procurar mensagens de erro no HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+            erro_msg = soup.find('span', {'id': re.compile('.*erro.*', re.I)})
+            if erro_msg:
+                logger.error(f"❌ Mensagem de erro no HTML: {erro_msg.get_text(strip=True)}")
+
+            # Verificar título da página
+            title = soup.find('title')
+            if title:
+                logger.info(f"📄 Título da página: {title.get_text(strip=True)}")
+
+            # Se redirecionou para frmMain.aspx = sucesso
+            if 'frmMain.aspx' in response.url:
+                self._logged_in = True
+                logger.info("✅ Login OK! (detectado por URL)")
+                return True
+
+            # Verificar se tem ValidaSessaoLogin ou frmMain no HTML
+            if 'ValidaSessaoLogin' in response.text or 'frmMain' in response.text or 'bem-vindo' in response.text.lower():
+                self._logged_in = True
+                logger.info("✅ Login OK! (detectado por conteúdo)")
+                return True
+
+            logger.error("❌ Login falhou - não detectou sucesso")
+            logger.error(f"   URL: {response.url}")
+            logger.error(f"   HTML preview: {response.text[:500]}")
 
             return False
 
