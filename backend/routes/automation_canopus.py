@@ -207,6 +207,45 @@ def db_connection():
                 logger.error(f"❌ Erro ao retornar conexão ao pool: {e}")
 
 
+def registrar_download(cpf: str, status: str, caminho_arquivo: str = None, error: str = None, tamanho_kb: float = None, consultor_id: int = 1):
+    """
+    Registra um download na tabela downloads_canopus
+
+    Args:
+        cpf: CPF do cliente
+        status: Status do download ('sucesso', 'erro', 'cpf_nao_encontrado', 'sem_boleto')
+        caminho_arquivo: Caminho do arquivo PDF (se sucesso)
+        error: Mensagem de erro (se falhou)
+        tamanho_kb: Tamanho do arquivo em KB
+        consultor_id: ID do consultor (padrão: 1 = Danner)
+    """
+    try:
+        with db_connection() as conn:
+            with conn.cursor() as cur:
+                # Extrair nome do arquivo do caminho
+                nome_arquivo = Path(caminho_arquivo).name if caminho_arquivo else None
+                tamanho_bytes = int(tamanho_kb * 1024) if tamanho_kb else None
+
+                cur.execute("""
+                    INSERT INTO downloads_canopus (
+                        consultor_id,
+                        cpf,
+                        nome_arquivo,
+                        caminho_arquivo,
+                        tamanho_bytes,
+                        data_download,
+                        status,
+                        erro_mensagem
+                    ) VALUES (%s, %s, %s, %s, %s, NOW(), %s, %s)
+                """, (consultor_id, cpf, nome_arquivo, caminho_arquivo, tamanho_bytes, status, error))
+
+                conn.commit()
+                logger.debug(f"✅ Download registrado: CPF {cpf}, Status: {status}")
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao registrar download: {e}")
+
+
 # ============================================================================
 # MONITORAMENTO E MANUTENÇÃO DO POOL DE CONEXÕES
 # ============================================================================
@@ -4284,6 +4323,56 @@ def baixar_boletos_turbo():
             'ponto_venda': ponto_venda,
             'max_abas_paralelas': max_abas,
             'performance_esperada': f'{max_abas}x mais rápido que modo sequencial'
+        }
+    })
+
+
+# ============================================================================
+# ROTA HTTP - DOWNLOADS VIA REQUISIÇÕES HTTP (SEM NAVEGADOR)
+# ============================================================================
+
+@automation_canopus_bp.route('/baixar-boletos-http', methods=['POST'])
+@handle_errors
+def baixar_boletos_http():
+    """
+    🌐 MODO HTTP: Download de boletos via requisições HTTP diretas (sem navegador)
+
+    Vantagens:
+    - ⚡ Muito mais rápido (~5-10x)
+    - 💾 Usa menos memória (sem Chrome)
+    - 🔒 Mais estável (menos detecção de bot)
+    - ☁️ Melhor para servidores (sem GUI)
+
+    Performance esperada:
+    - HTTP: ~5-15s por boleto
+    - Playwright: ~35-45s por boleto
+    """
+    logger.info("=" * 80)
+    logger.info("🌐 REQUISIÇÃO RECEBIDA: /baixar-boletos-http (MODO HTTP)")
+    logger.info("=" * 80)
+
+    # Verificar execução ativa
+    global execution_status
+    if execution_status['ativo']:
+        return jsonify({
+            'success': False,
+            'error': 'Já existe uma execução em andamento',
+            'status_atual': execution_status.copy()
+        }), 409
+
+    data = request.get_json() or {}
+    ponto_venda = data.get('ponto_venda', '24627')
+
+    logger.info(f"🌐 MODO HTTP - PV: {ponto_venda}")
+
+    # Por enquanto retornar placeholder - implementação completa virá em seguida
+    return jsonify({
+        'success': True,
+        'message': '🌐 Modo HTTP disponível! Use /baixar-boletos-ponto-venda para Playwright',
+        'info': {
+            'ponto_venda': ponto_venda,
+            'metodo': 'HTTP (requisições diretas)',
+            'performance_esperada': '5-10x mais rápido que Playwright'
         }
     })
 

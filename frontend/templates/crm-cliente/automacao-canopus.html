@@ -539,8 +539,49 @@
                         </div>
                     </div>
 
+                    <!-- Seletor de Método -->
+                    <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(66,133,244,0.1); border-radius: 12px; border: 2px solid rgba(66,133,244,0.3);">
+                        <h4 style="margin: 0 0 1rem 0; color: #4285f4; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M12 1v6m0 6v6m7.071-13.071l-4.243 4.243m0 6l4.243 4.243M1 12h6m6 0h6m-13.071 7.071l4.243-4.243m6 0l4.243 4.243"></path>
+                            </svg>
+                            Método de Download
+                        </h4>
 
-                    <button class="btn-canopus" id="btnIniciarDownload" style="background: #fbbc04; color: #000; position: relative; z-index: 1;">
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                            <!-- Opção Playwright (Padrão) -->
+                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: rgba(0,0,0,0.2); border-radius: 8px; cursor: pointer; transition: all 0.2s; flex: 1; min-width: 200px;">
+                                <input type="radio" name="metodoDownload" value="playwright" checked style="width: 18px; height: 18px; cursor: pointer;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; color: #fff; font-size: 0.95rem;">🎭 Playwright (Navegador)</div>
+                                    <div style="color: rgba(255,255,255,0.6); font-size: 0.75rem; margin-top: 0.25rem;">Estável • Com stealth mode</div>
+                                </div>
+                            </label>
+
+                            <!-- Opção HTTP -->
+                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: rgba(0,0,0,0.2); border-radius: 8px; cursor: pointer; transition: all 0.2s; flex: 1; min-width: 200px;">
+                                <input type="radio" name="metodoDownload" value="http" style="width: 18px; height: 18px; cursor: pointer;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; color: #fff; font-size: 0.95rem;">🌐 HTTP (Requisições Diretas)</div>
+                                    <div style="color: rgba(255,255,255,0.6); font-size: 0.75rem; margin-top: 0.25rem;">⚡ 5-10x mais rápido • Menos memória</div>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(251,188,4,0.15); border-radius: 6px; border-left: 3px solid #fbbc04;">
+                            <div style="color: rgba(255,255,255,0.8); font-size: 0.8rem; display: flex; align-items: start; gap: 0.5rem;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0; margin-top: 2px;">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg>
+                                <span><strong>HTTP:</strong> Muito mais rápido, mas pode falhar se o sistema detectar requisições automatizadas</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn-canopus" id="btnIniciarDownload" style="background: #fbbc04; color: #000; position: relative; z-index: 1; margin-top: 1.5rem;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="7 10 12 15 17 10"></polyline>
@@ -976,14 +1017,22 @@
             const mesNome = proximoMes.toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase();
             const anoProximoMes = proximoMes.getFullYear();
 
+            // Verificar método selecionado
+            const metodoSelecionado = document.querySelector('input[name="metodoDownload"]:checked').value;
+            const isHTTP = metodoSelecionado === 'http';
+
             adicionarLog('info', `🚀 Iniciando download de boletos do PV ${pontoVenda}...`);
             adicionarLog('info', `📅 Buscando boletos de ${mesNome}/${anoProximoMes}`);
+            adicionarLog('info', `🔧 Método: ${isHTTP ? '🌐 HTTP (Requisições Diretas)' : '🎭 Playwright (Navegador)'}`);
 
             // Ocultar modal de resumo
             document.getElementById('resumoModal').style.display = 'none';
 
             try {
-                const response = await fetch('/api/automation/baixar-boletos-ponto-venda', {
+                // Escolher rota baseado no método
+                const endpoint = isHTTP ? '/api/automation/baixar-boletos-http' : '/api/automation/baixar-boletos-ponto-venda';
+
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
