@@ -18,6 +18,7 @@ PERFORMANCE ESPERADA:
 import asyncio
 import logging
 import sys
+import os
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime
