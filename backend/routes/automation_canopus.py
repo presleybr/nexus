@@ -1366,6 +1366,91 @@ def downloads_status():
         }), 500
 
 
+@automation_canopus_bp.route('/status-completo', methods=['GET'])
+def status_completo():
+    """
+    Retorna status completo do banco com estatísticas e lista de processados
+    Usado para carregar estado ao abrir/recarregar página
+    """
+    try:
+        ponto_venda = request.args.get('ponto_venda', '24627')
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # 1. Buscar total de clientes do ponto de venda
+                cur.execute("""
+                    SELECT COUNT(DISTINCT cpf) as total
+                    FROM clientes_finais
+                    WHERE ponto_venda = %s AND ativo = TRUE
+                """, (ponto_venda,))
+
+                total_row = cur.fetchone()
+                total_clientes = total_row['total'] if total_row else 0
+
+                # 2. Buscar estatísticas de downloads (CPFs únicos)
+                cur.execute("""
+                    SELECT
+                        COUNT(DISTINCT CASE WHEN status = 'sucesso' THEN cpf END) as sucesso,
+                        COUNT(DISTINCT CASE WHEN status = 'erro' THEN cpf END) as erro,
+                        COUNT(DISTINCT CASE WHEN status = 'sem_boleto' THEN cpf END) as sem_boleto
+                    FROM downloads_canopus
+                    WHERE cpf IN (
+                        SELECT cpf FROM clientes_finais
+                        WHERE ponto_venda = %s AND ativo = TRUE
+                    )
+                """, (ponto_venda,))
+
+                stats = cur.fetchone()
+                ja_baixados = stats['sucesso'] if stats else 0
+                com_erro = stats['erro'] if stats else 0
+                sem_boleto = stats['sem_boleto'] if stats else 0
+
+                # Pendentes = Total - Sucesso (erros e sem_boleto podem ser reprocessados)
+                pendentes = total_clientes - ja_baixados
+
+                # Calcular progresso percentual
+                progresso_percentual = round((ja_baixados / total_clientes * 100), 1) if total_clientes > 0 else 0
+
+                # 3. Buscar lista dos últimos processados (50 últimos)
+                cur.execute("""
+                    SELECT
+                        d.cpf,
+                        d.status,
+                        d.mensagem_erro,
+                        d.nome_arquivo,
+                        d.data_download,
+                        cf.nome_completo as cliente_nome
+                    FROM downloads_canopus d
+                    LEFT JOIN clientes_finais cf ON cf.cpf = d.cpf
+                    WHERE d.cpf IN (
+                        SELECT cpf FROM clientes_finais
+                        WHERE ponto_venda = %s AND ativo = TRUE
+                    )
+                    ORDER BY d.data_download DESC
+                    LIMIT 50
+                """, (ponto_venda,))
+
+                ultimos_processados = cur.fetchall()
+
+                return jsonify({
+                    'success': True,
+                    'total': total_clientes,
+                    'ja_baixados': ja_baixados,
+                    'com_erro': com_erro,
+                    'sem_boleto': sem_boleto,
+                    'pendentes': pendentes,
+                    'progresso_percentual': progresso_percentual,
+                    'ultimos_processados': ultimos_processados
+                })
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar status completo: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @automation_canopus_bp.route('/pausar-download', methods=['POST'])
 def pausar_download():
     """

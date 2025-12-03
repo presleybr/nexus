@@ -1482,8 +1482,114 @@ Os boletos importados já estão prontos para envio via WhatsApp!`;
             window.open(`/api/automation/download-boleto?nome=${encodeURIComponent(nomeArquivo)}`, '_blank');
         }
 
+        // Função para carregar status do banco ao abrir página
+        async function carregarStatusDoBanco() {
+            try {
+                const pontoVenda = '24627';  // Ou pegar do checkbox selecionado
+                const response = await fetch(`/api/automation/status-completo?ponto_venda=${pontoVenda}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    // Atualizar contadores do resumo modal (se existir)
+                    const resumoTotal = document.getElementById('resumoTotal');
+                    const resumoBaixados = document.getElementById('resumoBaixados');
+                    const resumoErros = document.getElementById('resumoErros');
+                    const resumoPendentes = document.getElementById('resumoPendentes');
+
+                    if (resumoTotal) resumoTotal.textContent = data.total;
+                    if (resumoBaixados) resumoBaixados.textContent = data.ja_baixados;
+                    if (resumoErros) resumoErros.textContent = data.com_erro;
+                    if (resumoPendentes) resumoPendentes.textContent = data.pendentes;
+
+                    // Atualizar contador principal de progresso
+                    const progressCount = document.getElementById('progressCount');
+                    const progressTotal = document.getElementById('progressTotal');
+                    const progressPercentage = document.getElementById('progressPercentage');
+                    const realProgressBar = document.getElementById('realProgressBar');
+
+                    if (progressCount) progressCount.textContent = data.ja_baixados;
+                    if (progressTotal) progressTotal.textContent = data.total;
+                    if (progressPercentage) progressPercentage.textContent = data.progresso_percentual + '%';
+                    if (realProgressBar) realProgressBar.style.width = data.progresso_percentual + '%';
+
+                    // Atualizar contadores da lista de downloads
+                    const countSucesso = document.getElementById('countSucesso');
+                    const countErro = document.getElementById('countErro');
+                    const countSemBoleto = document.getElementById('countSemBoleto');
+
+                    if (countSucesso) countSucesso.textContent = data.ja_baixados;
+                    if (countErro) countErro.textContent = data.com_erro;
+                    if (countSemBoleto) countSemBoleto.textContent = data.sem_boleto;
+
+                    // Atualizar lista de processados
+                    const downloadsList = document.getElementById('downloadsList');
+                    if (downloadsList && data.ultimos_processados && data.ultimos_processados.length > 0) {
+                        downloadsList.innerHTML = '';
+
+                        // Mostrar card
+                        const downloadsListCard = document.getElementById('downloadsListCard');
+                        if (downloadsListCard) downloadsListCard.style.display = 'block';
+
+                        data.ultimos_processados.forEach(d => {
+                            const item = document.createElement('div');
+                            item.style.cssText = 'padding: 0.5rem; margin-bottom: 0.25rem; background: rgba(0,0,0,0.2); border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;';
+
+                            let icon = '';
+                            let color = '';
+                            let statusText = '';
+
+                            if (d.status === 'sucesso') {
+                                icon = '✅';
+                                color = '#34a853';
+                                statusText = d.nome_arquivo || 'Sucesso';
+                            } else if (d.status === 'erro') {
+                                icon = '❌';
+                                color = '#ea4335';
+                                statusText = d.mensagem_erro || 'Erro';
+                            } else if (d.status === 'sem_boleto') {
+                                icon = '⚠️';
+                                color = '#fbbc04';
+                                statusText = 'Sem boleto';
+                            } else {
+                                icon = '⏳';
+                                color = '#888';
+                                statusText = 'Pendente';
+                            }
+
+                            item.innerHTML = `
+                                <span style="font-size: 1rem;">${icon}</span>
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="color: #fff; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                        ${d.cliente_nome || d.cpf}
+                                    </div>
+                                    <div style="color: ${color}; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${statusText}">
+                                        ${statusText}
+                                    </div>
+                                </div>
+                            `;
+
+                            downloadsList.appendChild(item);
+                        });
+                    }
+
+                    // Se há downloads em andamento, mostrar card de monitoramento
+                    if (data.ja_baixados > 0 && data.ja_baixados < data.total) {
+                        const monitorCard = document.getElementById('monitorCard');
+                        if (monitorCard) monitorCard.style.display = 'block';
+                    }
+
+                    console.log(`✅ Status do banco carregado: ${data.ja_baixados}/${data.total} processados`);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar status do banco:', error);
+            }
+        }
+
         // Carregar boletos ao carregar a página
         carregarBoletosBaixados();
+
+        // Carregar status do banco ao carregar a página
+        carregarStatusDoBanco();
     </script>
 </body>
 </html>

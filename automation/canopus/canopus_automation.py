@@ -656,26 +656,19 @@ class CanopusAutomation:
                 logger.info(f"Encontrados {len(links)} resultado(s)")
                 sys.stdout.flush()
 
-                # Clicar no SEGUNDO link (índice 1) - o primeiro sempre está vazio
-                if len(links) >= 2:
-                    logger.info("Clicando no segundo resultado (com grupo/cota)...")
-                    await links[1].click()  # Índice 1 = segundo item
+                # Clicar no ÚLTIMO link (mais recente/correto)
+                if len(links) >= 1:
+                    # Usar índice negativo -1 para pegar o último item
+                    ultimo_indice = len(links) - 1
+                    logger.info(f"Clicando no ÚLTIMO resultado (índice {ultimo_indice + 1}/{len(links)})...")
+                    sys.stdout.flush()
+
+                    await links[-1].click()  # Índice -1 = último item
                     await self._delay_humanizado(2.0, 3.0)
                     await self.screenshot("apos_clicar_cliente")
 
-                    logger.info(f"✅ Cliente acessado: {cpf_formatado}")
-
-                    return {
-                        'cpf': cpf_limpo,
-                        'cpf_formatado': cpf_formatado,
-                        'encontrado': True,
-                    }
-                elif len(links) == 1:
-                    # Se só tiver 1 link, clicar nele
-                    logger.info("Apenas 1 resultado encontrado, clicando...")
-                    await links[0].click()
-                    await self._delay_humanizado(2.0, 3.0)
-                    await self.screenshot("apos_clicar_cliente")
+                    logger.info(f"✅ Cliente acessado (último registro): {cpf_formatado}")
+                    sys.stdout.flush()
 
                     return {
                         'cpf': cpf_limpo,
@@ -684,6 +677,7 @@ class CanopusAutomation:
                     }
                 else:
                     logger.warning("⚠️ Nenhum resultado encontrado")
+                    sys.stdout.flush()
                     await self.screenshot("sem_resultados")
                     return None
 
