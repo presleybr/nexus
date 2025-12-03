@@ -68,10 +68,26 @@ class Database:
 
                 # Usa DATABASE_URL diretamente (compatível com Render.com)
                 conninfo = Config.DATABASE_URL
-                cls._connection_pool = ConnectionPool(conninfo, min_size=minconn, max_size=maxconn)
+
+                # OTIMIZAÇÃO: Configurações avançadas do pool para evitar vazamentos
+                cls._connection_pool = ConnectionPool(
+                    conninfo=conninfo,
+                    min_size=minconn,
+                    max_size=maxconn,
+                    timeout=30.0,  # Timeout para obter conexão (30s)
+                    max_waiting=100,  # Máximo de requisições esperando
+                    max_lifetime=3600.0,  # Reciclar conexões após 1 hora
+                    max_idle=600.0,  # Fechar conexões ociosas após 10 min
+                    reconnect_timeout=300.0,  # Timeout para reconectar
+                )
+
+                # IMPORTANTE: Abrir o pool explicitamente
+                cls._connection_pool.open()
+
                 logger.info(f"✅ Pool de conexões PostgreSQL inicializado com sucesso")
                 logger.info(f"   Ambiente: {'Render (produção)' if is_render else 'Local (desenvolvimento)'}")
                 logger.info(f"   Pool: min={minconn}, max={maxconn} conexões")
+                logger.info(f"   Timeout: 30s, Max waiting: 100, Max lifetime: 1h")
                 logger.info(f"   Conectado a: {Config.DB_HOST}:{Config.DB_PORT}/{Config.DB_NAME}")
         except Exception as e:
             logger.error(f"❌ Erro ao inicializar pool de conexões: {e}")
@@ -100,17 +116,98 @@ class Database:
         """Fecha todas as conexões do pool"""
         if cls._connection_pool:
             cls._connection_pool.close()
+            cls._connection_pool = None
             logger.info("🔒 Pool de conexões fechado")
 
+    @classmethod
+    def get_pool_stats(cls) -> Dict[str, Any]:
+        """
+        Retorna estatísticas do pool de conexões
 
+        Returns:
+            Dict com estatísticas do pool
+        """
+        if not cls._connection_pool:
+            return {
+                'status': 'pool_not_initialized',
+                'error': 'Pool de conexões não foi inicializado'
+            }
+
+        try:
+            stats = cls._connection_pool.get_stats()
+            return {
+                'status': 'ok',
+                'pool_min': cls._connection_pool.min_size,
+                'pool_max': cls._connection_pool.max_size,
+                'pool_size': stats.get('pool_size', 0),
+                'pool_available': stats.get('pool_available', 0),
+                'requests_waiting': stats.get('requests_waiting', 0),
+                'requests_num': stats.get('requests_num', 0),
+                'usage_percent': round((stats.get('pool_size', 0) / cls._connection_pool.max_size) * 100, 1)
+            }
+        except Exception as e:
+            logger.error(f"Erro ao obter stats do pool: {e}")
+            return {
+                'status': 'error',
+                'error': str(e)
+            }
+
+    @classmethod
+    def reset_pool(cls, minconn: int = None, maxconn: int = None):
+        """
+        Reseta o pool de conexões (solução de emergência para PoolTimeout)
+
+        Args:
+            minconn: Novo mínimo de conexões
+            maxconn: Novo máximo de conexões
+        """
+        logger.warning("⚠️  RESETANDO POOL DE CONEXÕES...")
+
+        try:
+            # Fechar pool atual
+            cls.close_all_connections()
+
+            # Reinicializar com novos parâmetros
+            cls.initialize_pool(minconn=minconn, maxconn=maxconn)
+
+            logger.info("✅ Pool de conexões resetado com sucesso")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao resetar pool: {e}")
+            raise
+
+
+from contextlib import contextmanager
+
+@contextmanager
 def get_db_connection():
     """
-    Função auxiliar para obter uma conexão do banco
+    Context manager que GARANTE que a conexão seja devolvida ao pool.
+
+    SEMPRE use assim:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(...)
+
+    NUNCA use assim (causa vazamento):
+        conn = get_db_connection()  # ❌ ERRADO
 
     Returns:
         Conexão PostgreSQL
     """
-    return Database.get_connection()
+    conn = None
+    try:
+        conn = Database.get_connection()
+        yield conn
+        conn.commit()  # Commit automático se não houver erro
+    except Exception as e:
+        if conn:
+            conn.rollback()  # Rollback automático em caso de erro
+        raise e
+    finally:
+        if conn:
+            Database.return_connection(conn)  # SEMPRE devolver ao pool!
 
 
 def execute_query(query: str, params: Optional[Tuple] = None, fetch: bool = False) -> Any:

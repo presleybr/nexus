@@ -179,22 +179,6 @@ def handle_errors(f):
 
 from contextlib import contextmanager
 
-def get_db_connection():
-    """
-    Retorna conexão do POOL de banco de dados (CRÍTICO para estabilidade!)
-
-    ANTES: Criava nova conexão a cada chamada (vazamento de recursos)
-    AGORA: Usa pool gerenciado que reutiliza conexões
-
-    IMPORTANTE: Use com context manager ou chame Database.return_connection(conn) no finally!
-    """
-    from models.database import Database
-
-    # CRÍTICO: Usar pool ao invés de criar conexão nova
-    # Isso evita esgotar o limite de conexões do PostgreSQL (25 no Render)
-    return Database.get_connection()
-
-
 @contextmanager
 def db_connection():
     """
@@ -220,6 +204,68 @@ def db_connection():
                 logger.debug("🔒 Conexão retornada ao pool")
             except Exception as e:
                 logger.error(f"❌ Erro ao retornar conexão ao pool: {e}")
+
+
+# ============================================================================
+# MONITORAMENTO E MANUTENÇÃO DO POOL DE CONEXÕES
+# ============================================================================
+
+@automation_canopus_bp.route('/pool-status', methods=['GET'])
+@handle_errors
+def pool_status():
+    """
+    Retorna o status atual do pool de conexões PostgreSQL
+
+    Útil para monitorar a saúde do sistema e detectar vazamentos
+    """
+    try:
+        stats = Database.get_pool_stats()
+
+        return jsonify({
+            'success': True,
+            'pool': stats
+        })
+
+    except Exception as e:
+        logger.error(f"Erro ao obter status do pool: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@automation_canopus_bp.route('/reset-pool', methods=['POST'])
+@handle_errors
+def reset_pool():
+    """
+    Reseta o pool de conexões quando estiver esgotado
+
+    ⚠️ Use apenas como solução de emergência para resolver PoolTimeout
+    O ideal é corrigir os vazamentos de conexão que causaram o problema
+    """
+    try:
+        logger.warning("⚠️ Resetando pool de conexões...")
+
+        # Resetar pool
+        Database.reset_pool(minconn=2, maxconn=20)
+
+        # Verificar status após reset
+        stats = Database.get_pool_stats()
+
+        logger.info("✅ Pool de conexões resetado com sucesso")
+
+        return jsonify({
+            'success': True,
+            'message': 'Pool de conexões resetado com sucesso',
+            'pool': stats
+        })
+
+    except Exception as e:
+        logger.error(f"Erro ao resetar pool: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 # ============================================================================
@@ -324,7 +370,7 @@ def upload_planilha():
         erros = 0
         erros_detalhes = []
 
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             cur = conn.cursor()
 
             for idx, cliente in enumerate(clientes, 1):
@@ -468,7 +514,7 @@ def upload_planilha():
 @handle_errors
 def listar_consultores():
     """Lista todos os consultores"""
-    with get_db_connection() as conn:
+    with db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT
@@ -515,7 +561,7 @@ def criar_consultor():
     if not data.get('empresa') or data['empresa'] not in ['credms', 'semicredito']:
         return jsonify({'error': 'Empresa inválida (credms ou semicredito)'}), 400
 
-    with get_db_connection() as conn:
+    with db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO consultores (
@@ -579,7 +625,7 @@ def atualizar_consultor(id):
 
     params.append(id)
 
-    with get_db_connection() as conn:
+    with db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(f"""
                 UPDATE consultores
@@ -608,7 +654,7 @@ def atualizar_consultor(id):
 @handle_errors
 def desativar_consultor(id):
     """Desativa um consultor (soft delete)"""
-    with get_db_connection() as conn:
+    with db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE consultores
@@ -706,7 +752,7 @@ def listar_clientes_staging():
         query += " LIMIT %s"
         params.append(limite)
 
-    with get_db_connection() as conn:
+    with db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(query, params)
             clientes = cur.fetchall()
@@ -842,7 +888,7 @@ def processar_downloads_ponto_venda():
     logger.info(f"📥 Iniciando downloads em massa - PV: {ponto_venda}, Ano: {ano}")
 
     # Buscar todos os CPFs cadastrados para este ponto de venda
-    with get_db_connection() as conn:
+    with db_connection() as conn:
         with conn.cursor() as cur:
             query = """
                 SELECT DISTINCT cf.cpf, cf.nome, c.nome as consultor_nome
@@ -974,7 +1020,7 @@ def listar_execucoes():
     query += " ORDER BY e.iniciado_em DESC LIMIT %s"
     params.append(limite)
 
-    with get_db_connection() as conn:
+    with db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(query, params)
             execucoes = cur.fetchall()
@@ -996,7 +1042,7 @@ def listar_execucoes():
 @handle_errors
 def obter_execucao(automacao_id):
     """Obtém detalhes de uma execução específica"""
-    with get_db_connection() as conn:
+    with db_connection() as conn:
         with conn.cursor() as cur:
             # Buscar execução
             cur.execute("""
@@ -1042,7 +1088,7 @@ def obter_execucao(automacao_id):
 @handle_errors
 def obter_estatisticas():
     """Retorna estatísticas gerais da automação"""
-    with get_db_connection() as conn:
+    with db_connection() as conn:
         with conn.cursor() as cur:
             # Estatísticas de consultores
             cur.execute("""
@@ -1112,7 +1158,7 @@ def health_check():
     """Verifica saúde do serviço de automação"""
     try:
         # Verificar conexão com banco
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1")
 
@@ -1163,37 +1209,73 @@ def health_check():
         }), 500
 
 
-@automation_canopus_bp.route('/reset-pool', methods=['POST'])
+@automation_canopus_bp.route('/pool-status', methods=['GET'])
 @handle_errors
-def reset_connection_pool():
+def get_pool_status():
     """
-    Reseta o pool de conexões do PostgreSQL
-    Use quando o pool estiver esgotado ou com conexões presas
+    Retorna status atual do pool de conexões PostgreSQL
+    Útil para monitorar conexões disponíveis e diagnosticar PoolTimeout
     """
     try:
         from models.database import Database
 
-        logger.warning("⚠️ Resetando pool de conexões do PostgreSQL...")
+        stats = Database.get_pool_stats()
 
-        # Fechar todas as conexões atuais
-        if Database._connection_pool:
-            Database.close_all_connections()
-            Database._connection_pool = None
-            logger.info("🔒 Pool de conexões fechado")
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
 
-        # Reinicializar pool com novos parâmetros
-        Database.initialize_pool(minconn=5, maxconn=50)
-        logger.info("✅ Pool de conexões reinicializado (min=5, max=50)")
+    except Exception as e:
+        logger.error(f"❌ Erro ao obter status do pool: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@automation_canopus_bp.route('/reset-pool', methods=['POST'])
+@handle_errors
+def reset_connection_pool():
+    """
+    🔄 Reseta o pool de conexões do PostgreSQL
+    Use quando o pool estiver esgotado ou com conexões presas
+
+    SOLUÇÃO DE EMERGÊNCIA para erro: psycopg_pool.PoolTimeout
+
+    Body (opcional):
+    {
+        "minconn": 5,
+        "maxconn": 30
+    }
+    """
+    try:
+        from models.database import Database
+
+        data = request.get_json() or {}
+        minconn = data.get('minconn', 5)
+        maxconn = data.get('maxconn', 30)
+
+        logger.warning("⚠️  RESETANDO pool de conexões do PostgreSQL...")
+        logger.info(f"   Novos parâmetros: min={minconn}, max={maxconn}")
+
+        # Usar método novo que reseta corretamente
+        Database.reset_pool(minconn=minconn, maxconn=maxconn)
+
+        # Obter stats após reset
+        stats = Database.get_pool_stats()
 
         return jsonify({
             'success': True,
             'message': 'Pool de conexões resetado com sucesso',
             'pool_config': {
-                'min_connections': 5,
-                'max_connections': 50,
-                'timeout': 10.0
-            }
+                'min_connections': minconn,
+                'max_connections': maxconn,
+                'timeout': 30.0
+            },
+            'stats': stats
         })
+
     except Exception as e:
         logger.error(f"❌ Erro ao resetar pool: {e}")
         return jsonify({
@@ -1226,7 +1308,7 @@ def verificar_pendentes():
 
         logger.info(f"🔍 Verificando clientes pendentes para PV {ponto_venda}")
 
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             with conn.cursor() as cur:
                 # 1. Buscar TODOS os clientes do ponto de venda
                 cur.execute("""
@@ -1351,7 +1433,7 @@ def downloads_status():
         # Pegar limite da query string (padrão: 50 últimos)
         limit = request.args.get('limit', 50, type=int)
 
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             with conn.cursor() as cur:
                 # Buscar últimos downloads ordenados por data
                 cur.execute("""
@@ -1414,7 +1496,7 @@ def status_completo():
     try:
         ponto_venda = request.args.get('ponto_venda', '24627')
 
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             with conn.cursor() as cur:
                 # 1. Buscar total de clientes do ponto de venda
                 cur.execute("""
@@ -1599,7 +1681,7 @@ def verificar_boletos_banco():
     Verifica downloads registrados na tabela downloads_canopus
     """
     try:
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             with conn.cursor() as cur:
                 # Total de downloads
                 cur.execute("SELECT COUNT(*) as total FROM downloads_canopus")
@@ -1719,7 +1801,7 @@ def baixar_boletos_ponto_venda():
     logger.info(f"🔍 Buscando clientes do PV {ponto_venda}...")
 
     try:
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT DISTINCT c.cpf, c.nome_completo as nome
@@ -1766,7 +1848,7 @@ def baixar_boletos_ponto_venda():
             logger.info("=" * 80)
 
             try:
-                with get_db_connection() as conn_filter:
+                with db_connection() as conn_filter:
                     with conn_filter.cursor() as cur_filter:
                         # Buscar CPFs já baixados com SUCESSO
                         cur_filter.execute("""
@@ -1916,7 +1998,7 @@ def baixar_boletos_ponto_venda():
                     atualizar_status(etapa='Buscando credenciais no banco...')
                     logger.info(f"🔑 Buscando credenciais do PV {ponto_venda}...")
 
-                    with get_db_connection() as conn:
+                    with db_connection() as conn:
                         with conn.cursor() as cur:
                             cur.execute("""
                                 SELECT usuario, senha, codigo_empresa, ponto_venda
@@ -2163,7 +2245,7 @@ def baixar_boletos_ponto_venda():
                                         logger.info("🔍 DEBUG: Conectando ao banco...")
                                         sys.stdout.flush()
 
-                                        with get_db_connection() as conn_import:
+                                        with db_connection() as conn_import:
                                             with conn_import.cursor() as cur_import:
                                                 logger.info(f"🔍 DEBUG: Buscando consultor_id para CPF {cpf}...")
                                                 sys.stdout.flush()
@@ -2381,7 +2463,7 @@ def baixar_boletos_ponto_venda():
 
                                 # REGISTRAR ERRO NO BANCO
                                 try:
-                                    with get_db_connection() as conn_erro:
+                                    with db_connection() as conn_erro:
                                         with conn_erro.cursor() as cur_erro:
                                             # Buscar consultor_id
                                             cur_erro.execute("""
@@ -2428,7 +2510,7 @@ def baixar_boletos_ponto_venda():
 
                                 # REGISTRAR NO BANCO
                                 try:
-                                    with get_db_connection() as conn_erro:
+                                    with db_connection() as conn_erro:
                                         with conn_erro.cursor() as cur_erro:
                                             # Buscar consultor_id
                                             cur_erro.execute("""
@@ -2476,7 +2558,7 @@ def baixar_boletos_ponto_venda():
 
                                 # REGISTRAR ERRO NO BANCO
                                 try:
-                                    with get_db_connection() as conn_erro:
+                                    with db_connection() as conn_erro:
                                         with conn_erro.cursor() as cur_erro:
                                             # Buscar consultor_id
                                             cur_erro.execute("""
@@ -2524,7 +2606,7 @@ def baixar_boletos_ponto_venda():
 
                             # REGISTRAR EXCEÇÃO NO BANCO
                             try:
-                                with get_db_connection() as conn_erro:
+                                with db_connection() as conn_erro:
                                     with conn_erro.cursor() as cur_erro:
                                         # Buscar consultor_id
                                         cur_erro.execute("""
@@ -2734,34 +2816,35 @@ def importar_planilha_dener():
 
                 logger.debug(f"[{idx}/{len(clientes)}] Processando: {nome} (CPF: {cpf_formatado}, PV: {ponto_venda})")
 
-                conn = get_db_connection()
-                with conn.cursor() as cur:
-                    # Verificar se cliente já existe (buscar por CPF + PV)
-                    cur.execute("""
-                        SELECT id, nome_completo FROM clientes_finais
-                        WHERE cpf = %s AND ponto_venda = %s
-                    """, (cpf, ponto_venda))
+                # ✅ CORREÇÃO: usar context manager para garantir devolução
+                with db_connection() as conn:
+                    with conn.cursor() as cur:
+                        # Verificar se cliente já existe (buscar por CPF + PV)
+                        cur.execute("""
+                            SELECT id, nome_completo FROM clientes_finais
+                            WHERE cpf = %s AND ponto_venda = %s
+                        """, (cpf, ponto_venda))
 
-                    existing = cur.fetchone()
+                        existing = cur.fetchone()
 
-                    # Gerar número de contrato único
-                    numero_contrato = f"CANOPUS-{ponto_venda}-{cpf}"
+                        # Gerar número de contrato único
+                        numero_contrato = f"CANOPUS-{ponto_venda}-{cpf}"
 
-                    # Buscar ID do consultor (Dener/Danner)
-                    cur.execute("""
-                        SELECT id FROM consultores
-                        WHERE nome ILIKE '%dener%' OR nome ILIKE '%danner%' OR nome ILIKE '%den%'
-                        LIMIT 1
-                    """)
-                    consultor_row = cur.fetchone()
-                    consultor_id = consultor_row['id'] if consultor_row else None
+                        # Buscar ID do consultor (Dener/Danner)
+                        cur.execute("""
+                            SELECT id FROM consultores
+                            WHERE nome ILIKE '%dener%' OR nome ILIKE '%danner%' OR nome ILIKE '%den%'
+                            LIMIT 1
+                        """)
+                        consultor_row = cur.fetchone()
+                        consultor_id = consultor_row['id'] if consultor_row else None
 
-                    # Buscar primeiro cliente_nexus disponível
-                    cur.execute("SELECT id FROM clientes_nexus ORDER BY id LIMIT 1")
-                    cliente_nexus_row = cur.fetchone()
-                    cliente_nexus_id = cliente_nexus_row['id'] if cliente_nexus_row else None
+                        # Buscar primeiro cliente_nexus disponível
+                        cur.execute("SELECT id FROM clientes_nexus ORDER BY id LIMIT 1")
+                        cliente_nexus_row = cur.fetchone()
+                        cliente_nexus_id = cliente_nexus_row['id'] if cliente_nexus_row else None
 
-                    if existing:
+                        if existing:
                         # ========== ATUALIZAR CLIENTE EXISTENTE ==========
                         cliente_id = existing['id']
                         logger.info(f"   🔄 Atualizando cliente existente (ID: {cliente_id}): {nome}")
@@ -2907,7 +2990,7 @@ def importar_boletos():
 
     # Buscar cliente_nexus_id do usuário logado (não mais hardcoded)
     try:
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 # Buscar o primeiro (e único) cliente_nexus ativo
                 cur.execute("""
@@ -2936,7 +3019,7 @@ def importar_boletos():
 
     # Buscar PDFs da tabela downloads_canopus que ainda não foram importados
     try:
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("""
                     SELECT
@@ -3065,8 +3148,8 @@ def importar_boletos():
 
             logger.info(f"   ✅ VALIDAÇÕES OK: Nome: {nome}, CPF: {cpf}, Valor: R$ {valor:.2f}, Venc: {vencimento.strftime('%d/%m/%Y') if vencimento else 'N/A'}")
 
-            conn = get_db_connection()
-            with conn.cursor() as cur:
+            with db_connection() as conn:
+                cur = conn.cursor()
                 # Verificar se cliente já existe (por CPF)
                 cur.execute("""
                     SELECT id, nome_completo, whatsapp
@@ -3172,19 +3255,11 @@ def importar_boletos():
                 logger.info(f"   ✅ Boleto criado (ID: {boleto_id})")
                 stats['boletos_criados'] += 1
 
-                # Commit apenas se tudo deu certo
-                conn.commit()
+                # Commit é feito automaticamente pelo context manager db_connection()
                 logger.info(f"   💾 Transação confirmada com sucesso!")
 
         except Exception as e:
-            # Rollback em caso de erro
-            if conn:
-                try:
-                    conn.rollback()
-                    logger.error(f"   ↩️  Rollback realizado devido ao erro")
-                except:
-                    pass
-
+            # Rollback é feito automaticamente pelo context manager db_connection()
             logger.error(f"   ❌ ERRO ao processar PDF: {str(e)}")
             import traceback
             logger.error(f"   📋 Stack trace: {traceback.format_exc()}")
@@ -3198,13 +3273,7 @@ def importar_boletos():
                     logger.debug(f"   🗑️  Arquivo temporário removido")
                 except:
                     pass
-
-            # Garantir fechamento da conexão
-            if conn:
-                try:
-                    conn.close()
-                except:
-                    pass
+            # Conexão é devolvida automaticamente ao pool pelo context manager db_connection()
 
     logger.info(f"✅ Importação concluída: {stats['boletos_criados']} boletos criados")
 
@@ -3231,7 +3300,6 @@ def listar_boletos_baixados():
     Lista todos os boletos baixados DO BANCO DE DADOS (PostgreSQL)
     Agora funciona no Render! Busca de downloads_canopus E boletos
     """
-    from models.database import get_db_connection
     from psycopg.rows import dict_row
     import logging
 
@@ -3239,7 +3307,7 @@ def listar_boletos_baixados():
     boletos = []
 
     try:
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 # BUSCAR DA TABELA downloads_canopus (que registra os downloads)
                 # JOIN com clientes_finais para pegar dados completos
@@ -3362,7 +3430,7 @@ def download_boleto():
 
     try:
         # Buscar PDF da tabela downloads_canopus
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("""
                     SELECT
@@ -3416,7 +3484,7 @@ def limpar_downloads_antigos():
     Mantém apenas downloads com base64 (formato novo)
     """
     try:
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             with conn.cursor() as cur:
                 # Contar quantos registros serão removidos
                 cur.execute("""
@@ -3549,7 +3617,7 @@ def backup_whatsapp():
         logger.info("📦 Iniciando backup de WhatsApps...")
 
         # Buscar todos os clientes com WhatsApp
-        with get_db_connection() as conn:
+        with db_connection() as conn:
             cur = conn.cursor()
 
             cur.execute("""
@@ -3910,32 +3978,30 @@ def resetar_e_reimportar():
 def listar_consultores_planilhas():
     """Lista todos os consultores com suas configurações de planilhas"""
     try:
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT
-                    id,
-                    nome,
-                    email,
-                    empresa,
-                    ponto_venda,
-                    link_planilha_drive,
-                    ultima_atualizacao_planilha,
-                    ativo
-                FROM consultores
-                ORDER BY nome
-            """)
+        with db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT
+                        id,
+                        nome,
+                        email,
+                        empresa,
+                        ponto_venda,
+                        link_planilha_drive,
+                        ultima_atualizacao_planilha,
+                        ativo
+                    FROM consultores
+                    ORDER BY nome
+                """)
 
-            consultores = cur.fetchall()
+                consultores = cur.fetchall()
 
-        conn.close()
-
-        return jsonify({
-            'success': True,
-            'data': {
-                'consultores': consultores
-            }
-        })
+            return jsonify({
+                'success': True,
+                'data': {
+                    'consultores': consultores
+                }
+            })
 
     except Exception as e:
         logger.error(f"Erro ao listar consultores: {e}")
@@ -3957,36 +4023,31 @@ def configurar_planilha_consultor(consultor_id):
             }), 400
 
         # Verificar se consultor existe
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute("SELECT nome FROM consultores WHERE id = %s", (consultor_id,))
-            consultor = cur.fetchone()
+        with db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT nome FROM consultores WHERE id = %s", (consultor_id,))
+                consultor = cur.fetchone()
 
-            if not consultor:
-                conn.close()
-                return jsonify({
-                    'success': False,
-                    'error': 'Consultor não encontrado'
-                }), 404
+                if not consultor:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Consultor não encontrado'
+                    }), 404
 
-            # Atualizar link da planilha
-            cur.execute("""
-                UPDATE consultores
-                SET link_planilha_drive = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (link_drive, consultor_id))
+                # Atualizar link da planilha
+                cur.execute("""
+                    UPDATE consultores
+                    SET link_planilha_drive = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (link_drive, consultor_id))
 
-            conn.commit()
+            logger.info(f"✅ Link da planilha configurado para consultor {consultor['nome']}")
 
-        conn.close()
-
-        logger.info(f"✅ Link da planilha configurado para consultor {consultor['nome']}")
-
-        return jsonify({
-            'success': True,
-            'message': f'Link configurado com sucesso para {consultor["nome"]}'
-        })
+            return jsonify({
+                'success': True,
+                'message': f'Link configurado com sucesso para {consultor["nome"]}'
+            })
 
     except Exception as e:
         logger.error(f"Erro ao configurar planilha: {e}")
@@ -4003,25 +4064,23 @@ def atualizar_planilha_consultor(consultor_id):
         from services.drive_downloader import baixar_planilha_consultor
 
         # Buscar dados do consultor
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, nome, link_planilha_drive
-                FROM consultores
-                WHERE id = %s
-            """, (consultor_id,))
+        with db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, nome, link_planilha_drive
+                    FROM consultores
+                    WHERE id = %s
+                """, (consultor_id,))
 
-            consultor = cur.fetchone()
+                consultor = cur.fetchone()
 
         if not consultor:
-            conn.close()
             return jsonify({
                 'success': False,
                 'error': 'Consultor não encontrado'
             }), 404
 
         if not consultor['link_planilha_drive']:
-            conn.close()
             return jsonify({
                 'success': False,
                 'error': f'Consultor {consultor["nome"]} não tem link do Google Drive configurado'
@@ -4043,15 +4102,13 @@ def atualizar_planilha_consultor(consultor_id):
             }), 500
 
         # Atualizar data da última atualização
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE consultores
-                SET ultima_atualizacao_planilha = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (consultor_id,))
-            conn.commit()
-
-        conn.close()
+        with db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE consultores
+                    SET ultima_atualizacao_planilha = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (consultor_id,))
 
         logger.info(f"✅ Planilha atualizada com sucesso: {consultor['nome']}")
 
@@ -4086,21 +4143,20 @@ def atualizar_todas_planilhas():
         from services.drive_downloader import baixar_planilha_consultor
 
         # Buscar todos os consultores com link configurado
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, nome, link_planilha_drive
-                FROM consultores
-                WHERE link_planilha_drive IS NOT NULL
-                  AND link_planilha_drive != ''
-                  AND ativo = TRUE
-                ORDER BY nome
-            """)
+        with db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, nome, link_planilha_drive
+                    FROM consultores
+                    WHERE link_planilha_drive IS NOT NULL
+                      AND link_planilha_drive != ''
+                      AND ativo = TRUE
+                    ORDER BY nome
+                """)
 
-            consultores = cur.fetchall()
+                consultores = cur.fetchall()
 
         if not consultores:
-            conn.close()
             return jsonify({
                 'success': False,
                 'error': 'Nenhum consultor com planilha configurada'
@@ -4124,14 +4180,14 @@ def atualizar_todas_planilhas():
                 )
 
                 if resultado['sucesso']:
-                    # Atualizar data
-                    with conn.cursor() as cur:
-                        cur.execute("""
-                            UPDATE consultores
-                            SET ultima_atualizacao_planilha = CURRENT_TIMESTAMP
-                            WHERE id = %s
-                        """, (consultor['id'],))
-                        conn.commit()
+                    # Atualizar data (usando conexão separada)
+                    with db_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                UPDATE consultores
+                                SET ultima_atualizacao_planilha = CURRENT_TIMESTAMP
+                                WHERE id = %s
+                            """, (consultor['id'],))
 
                     sucessos += 1
                     resultados.append({
@@ -4157,8 +4213,6 @@ def atualizar_todas_planilhas():
                     'erro': str(e)
                 })
                 logger.error(f"   ❌ {consultor['nome']}: EXCEÇÃO - {e}")
-
-        conn.close()
 
         logger.info(f"✅ Atualização concluída: {sucessos} sucessos, {falhas} falhas")
 
@@ -4260,6 +4314,9 @@ if __name__ == "__main__":
     print("  GET    /api/automation/estatisticas")
     print("\nHealth:")
     print("  GET    /api/automation/health")
+    print("\nPool de Conexões:")
+    print("  GET    /api/automation/pool-status           📊 Status do pool")
+    print("  POST   /api/automation/reset-pool            🔄 Resetar pool")
     print("\nReset:")
     print("  POST   /api/automation/resetar-e-reimportar")
     print("\n" + "=" * 80)
