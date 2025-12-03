@@ -66,11 +66,18 @@ async def bloquear_recursos_desnecessarios(route: Route):
 
     OTIMIZAÇÃO: Reduz tempo de carregamento de 30-60s para 8-15s
     bloqueando imagens, CSS, fonts e analytics que não são necessários
+
+    IMPORTANTE: Não bloqueia imagens na página de login (pode ter CAPTCHA)
     """
     url = route.request.url.lower()
     resource_type = route.request.resource_type
 
-    # Tipos de recursos a bloquear
+    # CRÍTICO: Não bloquear recursos na página de login (pode ter CAPTCHA)
+    if 'login' in url:
+        await route.continue_()
+        return
+
+    # Tipos de recursos a bloquear (EXCETO na página de login)
     blocked_types = ['image', 'stylesheet', 'font', 'media']
 
     # Domínios de analytics/tracking a bloquear
@@ -588,6 +595,54 @@ class CanopusAutomation:
 
             # Pequeno delay para garantir que o campo foi preenchido
             await asyncio.sleep(0.3)
+
+            # NOVO: Verificar se existe campo de segurança/CAPTCHA
+            logger.info("🔍 Verificando se existe campo de segurança...")
+            try:
+                # Buscar por possíveis campos de segurança
+                security_selectors = [
+                    'input[name*="captcha" i]',
+                    'input[name*="token" i]',
+                    'input[name*="segur" i]',
+                    'input[name*="caracteres" i]',
+                    'input[id*="captcha" i]',
+                    'input[id*="token" i]',
+                    'input[id*="segur" i]',
+                ]
+
+                security_field = None
+                for selector in security_selectors:
+                    field = await self.page.query_selector(selector)
+                    if field:
+                        field_id = await field.get_attribute('id')
+                        field_name = await field.get_attribute('name')
+                        field_type = await field.get_attribute('type')
+                        logger.info(f"⚠️ CAMPO DE SEGURANÇA ENCONTRADO:")
+                        logger.info(f"   Selector: {selector}")
+                        logger.info(f"   ID: {field_id}")
+                        logger.info(f"   Name: {field_name}")
+                        logger.info(f"   Type: {field_type}")
+                        security_field = field
+                        break
+
+                # Verificar se há texto mencionando segurança na página
+                page_text = await self.page.evaluate("() => document.body.innerText")
+                if 'segur' in page_text.lower() or 'caracteres' in page_text.lower():
+                    logger.warning("⚠️ TEXTO DE SEGURANÇA DETECTADO NA PÁGINA")
+                    # Extrair e mostrar o trecho relevante
+                    lines = page_text.split('\n')
+                    for i, line in enumerate(lines):
+                        if 'segur' in line.lower() or 'caracteres' in line.lower():
+                            logger.warning(f"   Linha {i}: {line.strip()}")
+
+                if not security_field:
+                    logger.info("✅ Nenhum campo de segurança detectado - procedendo com login normal")
+                else:
+                    logger.error("❌ CAMPO DE SEGURANÇA PRESENTE - LOGIN PODE FALHAR")
+                    logger.error("   Este campo precisa ser preenchido mas não temos a lógica para isso ainda")
+
+            except Exception as e_sec:
+                logger.warning(f"⚠️ Erro ao verificar campo de segurança: {e_sec}")
 
             # Screenshot antes de clicar
             await self.screenshot("antes_clicar_login")
