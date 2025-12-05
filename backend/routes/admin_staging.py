@@ -7,7 +7,7 @@ from flask import Blueprint, jsonify, request
 import os
 import logging
 
-from models.database import db_connection, dict_row
+from models.database import get_db_connection as db_connection, dict_row
 
 logger = logging.getLogger(__name__)
 
