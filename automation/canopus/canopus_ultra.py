@@ -325,12 +325,28 @@ class CanopusUltra:
             # Emitir - usar expect_popup para capturar o popup corretamente
             logger.info(f"  [{idx}/{total}] Clicando em Emitir Cobrança...")
 
+            popup = None
             try:
                 # Método 1: Usar expect_popup (mais confiável)
                 async with self.page.expect_popup(timeout=15000) as popup_info:
                     await self.page.click('input[value="Emitir Cobrança"]')
                 popup = await popup_info.value
-                logger.info(f"  [{idx}/{total}] Popup capturado via expect_popup: {popup.url[:50]}...")
+                logger.info(f"  [{idx}/{total}] Popup capturado: {popup.url[:50]}...")
+
+                # IMPORTANTE: Aguardar o popup sair de about:blank e carregar conteúdo real
+                if popup.url == 'about:blank':
+                    logger.info(f"  [{idx}/{total}] Aguardando popup carregar...")
+                    # Aguardar navegação para URL real
+                    try:
+                        await popup.wait_for_url(lambda url: url != 'about:blank', timeout=10000)
+                        logger.info(f"  [{idx}/{total}] Popup navegou para: {popup.url[:50]}...")
+                    except:
+                        # Se não navegou, aguardar um pouco e verificar se tem conteúdo
+                        await asyncio.sleep(2)
+
+                # Aguardar carregamento completo
+                await popup.wait_for_load_state('networkidle', timeout=self.TIMEOUT_LONGO)
+
             except Exception as e_popup:
                 logger.warning(f"  [{idx}/{total}] expect_popup falhou: {e_popup}")
                 # Método 2: Fallback - aguardar popup manualmente
@@ -338,16 +354,14 @@ class CanopusUltra:
                 for attempt in range(30):  # 15 segundos máximo
                     await asyncio.sleep(0.5)
                     for p in self.context.pages:
-                        if p != self.page and ('frmConCmImpressao' in p.url or 'Impressao' in p.url or len(self.context.pages) > 1):
+                        if p != self.page and p.url != 'about:blank':
                             popup = p
                             logger.info(f"  [{idx}/{total}] Popup encontrado (tentativa {attempt+1}): {p.url[:50]}...")
                             break
                     if popup:
                         break
 
-            if popup:
-                await popup.wait_for_load_state('networkidle', timeout=self.TIMEOUT_LONGO)
-
+            if popup and popup.url != 'about:blank':
                 # Salvar PDF
                 nome_arquivo = self._formatar_nome(nome, mes)
                 caminho = os.path.join(self.pasta_downloads, nome_arquivo)
@@ -369,13 +383,14 @@ class CanopusUltra:
                 logger.info(f"✅ [{idx}/{total}] SUCESSO - CPF: {cpf_fmt} | {nome[:25]} | ⏱️ {duracao:.1f}s")
             else:
                 duracao = (datetime.now() - inicio).total_seconds()
-                resultado['erro'] = 'Popup do PDF não abriu'
+                erro_msg = 'Popup ficou em about:blank' if popup else 'Popup do PDF não abriu'
+                resultado['erro'] = erro_msg
                 resultado['status'] = 'erro'
                 resultado['duracao'] = duracao
                 self.stats['erros'] += 1
 
                 # Log de erro com tempo total
-                logger.error(f"❌ [{idx}/{total}] ERRO - CPF: {cpf_fmt} | Popup não abriu | ⏱️ {duracao:.1f}s")
+                logger.error(f"❌ [{idx}/{total}] ERRO - CPF: {cpf_fmt} | {erro_msg} | ⏱️ {duracao:.1f}s")
 
         except Exception as e:
             duracao = (datetime.now() - inicio).total_seconds()
