@@ -171,7 +171,7 @@ class CapturadorAPICanopus:
             return False
 
     async def navegar_para_atendimento(self):
-        """Navega para o menu de Atendimento"""
+        """Navega para o menu de Atendimento e clica em Busca Avançada"""
         logger.info("Navegando para Atendimento...")
 
         # Clicar no menu Atendimento
@@ -180,16 +180,28 @@ class CapturadorAPICanopus:
             await img_atendimento.click()
             logger.info("   Clicou em Atendimento")
             await asyncio.sleep(2)
-            return True
         else:
             # Tentar clicar por coordenadas ou outro seletor
             try:
                 await self.page.click('img[id*="Atendimento"]')
                 await asyncio.sleep(2)
-                return True
             except:
                 logger.error("Menu Atendimento nao encontrado!")
                 return False
+
+        # Clicar em Busca Avançada
+        btn_busca_avancada = '#ctl00_Conteudo_btnBuscaAvancada'
+        try:
+            await self.page.wait_for_selector(btn_busca_avancada, timeout=10000)
+            await self.page.click(btn_busca_avancada)
+            logger.info("   Clicou em Busca Avancada")
+            await asyncio.sleep(2)
+            return True
+        except Exception as e:
+            logger.warning(f"   Busca Avancada nao encontrada: {e}")
+            # Tirar screenshot para debug
+            await self.page.screenshot(path='debug_atendimento.png')
+            return True  # Continuar mesmo assim
 
     async def buscar_cliente(self, cpf: str):
         """Busca um cliente por CPF na tela de busca"""
@@ -199,17 +211,18 @@ class CapturadorAPICanopus:
         cpf_limpo = ''.join(filter(str.isdigit, cpf))
         cpf_formatado = f"{cpf_limpo[:3]}.{cpf_limpo[3:6]}.{cpf_limpo[6:9]}-{cpf_limpo[9:]}"
 
-        # Navegar para busca
-        await self.page.goto(f'{self.BASE_URL}/CONAT/frmBuscaCota.aspx')
-        await asyncio.sleep(2)
+        # Aguardar o dropdown de tipo de busca aparecer (já estamos na busca avançada)
+        select_tipo = '#ctl00_Conteudo_cbxCriterioBusca'
 
         # Selecionar tipo de busca = CPF (F)
         try:
-            await self.page.select_option('#ctl00_Conteudo_cbxCriterioBusca', 'F')
+            await self.page.wait_for_selector(select_tipo, timeout=30000)
+            await self.page.select_option(select_tipo, 'F')
             logger.info("   Selecionou CPF como criterio")
             await asyncio.sleep(1)
         except Exception as e:
             logger.warning(f"   Erro ao selecionar criterio: {e}")
+            await self.page.screenshot(path='debug_select_cpf.png')
 
         # Preencher CPF
         campo_busca = await self.page.query_selector('#ctl00_Conteudo_edtContextoBusca')
@@ -233,21 +246,24 @@ class CapturadorAPICanopus:
 
         await asyncio.sleep(3)
 
-        # Verificar se encontrou resultados
-        resultado = await self.page.query_selector('a[id*="grdBuscaAvancada"][id*="lnkGrupoCota"]')
+        # Verificar se encontrou resultados (seletor correto do Playwright)
+        resultado = await self.page.query_selector('a[id*="grdBuscaAvancada"][id*="lnkID_Documento"]')
         if resultado:
             logger.info("Cliente encontrado!")
             return True
         else:
             logger.warning("Cliente nao encontrado na busca")
+            # Tirar screenshot para debug
+            await self.page.screenshot(path='debug_busca.png')
+            logger.info("Screenshot salvo em debug_busca.png")
             return False
 
     async def acessar_cliente(self):
         """Clica no cliente encontrado"""
         logger.info("Acessando cliente...")
 
-        # Clicar no primeiro resultado da grid
-        links = await self.page.query_selector_all('a[id*="grdBuscaAvancada"][id*="lnkGrupoCota"]')
+        # Clicar no primeiro resultado da grid (seletor correto do Playwright)
+        links = await self.page.query_selector_all('a[id*="grdBuscaAvancada"][id*="lnkID_Documento"]')
 
         if links and len(links) > 0:
             # Pegar o segundo link (ctl03) que geralmente e o correto
@@ -261,20 +277,24 @@ class CapturadorAPICanopus:
             return False
 
     async def navegar_para_boletos(self):
-        """Navega ate a pagina de emissao de boletos"""
-        logger.info("Navegando para boletos...")
+        """Navega ate a pagina de emissao de boletos via menu"""
+        logger.info("Navegando para emissao de cobranca...")
 
-        # A URL de boleto avulso
-        await self.page.goto(f'{self.BASE_URL}/CONCO/frmConCoRelBoletoAvulso.aspx')
-        await asyncio.sleep(3)
+        # Clicar no link "Emissão de Cobrança" no menu do cliente
+        menu_emissao = '#ctl00_Conteudo_Menu_CONAT_grdMenu_CONAT_ctl05_hlkFormulario'
 
-        # Verificar se chegou na pagina
-        if 'BoletoAvulso' in self.page.url or 'CONCO' in self.page.url:
-            logger.info("Na pagina de boletos!")
+        try:
+            await self.page.wait_for_selector(menu_emissao, timeout=10000)
+            await self.page.click(menu_emissao)
+            logger.info("   Clicou em Emissao de Cobranca")
+            await asyncio.sleep(3)
             return True
-        else:
-            logger.warning(f"URL inesperada: {self.page.url}")
-            return True  # Continuar mesmo assim
+        except Exception as e:
+            logger.warning(f"   Menu Emissao nao encontrado: {e}")
+            # Tentar URL direta como fallback
+            await self.page.goto(f'{self.BASE_URL}/CONCO/frmConCoRelBoletoAvulso.aspx')
+            await asyncio.sleep(3)
+            return True
 
     async def baixar_boleto(self):
         """Tenta baixar o boleto - AQUI VAMOS CAPTURAR A REQUISICAO"""
@@ -393,6 +413,7 @@ async def executar_captura(usuario: str, senha: str, cpf_teste: str, headless: b
         login_ok = await capturador.login(usuario, senha)
         if not login_ok:
             logger.error("Falha no login, abortando")
+            capturador.salvar_capturas('capturas_canopus_login_falhou.json')
             return
 
         # Navegar para atendimento
@@ -401,7 +422,9 @@ async def executar_captura(usuario: str, senha: str, cpf_teste: str, headless: b
         # Buscar cliente
         encontrou = await capturador.buscar_cliente(cpf_teste)
         if not encontrou:
-            logger.error("Cliente nao encontrado, abortando")
+            logger.error("Cliente nao encontrado")
+            # Salvar capturas parciais antes de abortar
+            capturador.salvar_capturas('capturas_canopus_parcial.json')
             return
 
         # Acessar cliente
