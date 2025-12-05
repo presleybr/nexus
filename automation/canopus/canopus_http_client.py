@@ -600,14 +600,44 @@ class CanopusHTTPClient:
             traceback.print_exc()
             return None
 
-    def salvar_pdf(self, pdf_bytes: bytes, cpf: str, consultor: str = "Danner") -> str:
-        """Salva PDF em arquivo"""
+    def salvar_pdf(self, pdf_bytes: bytes, cpf: str, consultor: str = "Danner", nome_cliente: str = None, mes: str = None) -> str:
+        """
+        Salva PDF em arquivo com formato igual ao Playwright.
+
+        Formato do nome: NOME_CLIENTE_MES.pdf
+        Exemplo: ADAO_JUNIOR_PEREIRA_DE_BRITO_DEZEMBRO.pdf
+
+        Args:
+            pdf_bytes: Conteúdo do PDF em bytes
+            cpf: CPF do cliente
+            consultor: Nome da pasta do consultor (default: Danner)
+            nome_cliente: Nome do cliente para o arquivo
+            mes: Mês do boleto (ex: DEZEMBRO)
+
+        Returns:
+            Caminho completo do arquivo salvo
+        """
         pasta = CanopusConfig.DOWNLOADS_DIR / consultor
         pasta.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        cpf_limpo = re.sub(r'[^\d]', '', cpf)
-        arquivo = pasta / f"boleto_{cpf_limpo}_{timestamp}.pdf"
+        # Formatar nome do arquivo igual ao Playwright
+        if nome_cliente and mes:
+            # Limpar nome do cliente (remover caracteres especiais)
+            import unicodedata
+            nome_limpo = unicodedata.normalize('NFKD', nome_cliente)
+            nome_limpo = nome_limpo.encode('ASCII', 'ignore').decode('ASCII')
+            nome_limpo = ''.join(c if c.isalnum() or c in ' -_' else '' for c in nome_limpo)
+            nome_limpo = nome_limpo.strip().upper().replace(' ', '_')
+
+            # Formato: NOME_CLIENTE_MES.pdf
+            nome_arquivo = f"{nome_limpo}_{mes.upper()}.pdf"
+        else:
+            # Fallback: usa CPF + timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            cpf_limpo = re.sub(r'[^\d]', '', cpf)
+            nome_arquivo = f"boleto_{cpf_limpo}_{timestamp}.pdf"
+
+        arquivo = pasta / nome_arquivo
 
         with open(arquivo, 'wb') as f:
             f.write(pdf_bytes)

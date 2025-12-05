@@ -242,12 +242,13 @@ def registrar_download(cpf: str, status: str, caminho_arquivo: str = None, error
                         tamanho_bytes,
                         data_download,
                         status,
-                        erro_mensagem
-                    ) VALUES (%s, %s, %s, %s, %s, NOW(), %s, %s)
+                        mensagem_erro,
+                        created_at
+                    ) VALUES (%s, %s, %s, %s, %s, NOW(), %s, %s, NOW())
                 """, (consultor_id, cpf, nome_arquivo, caminho_arquivo, tamanho_bytes, status, error))
 
                 conn.commit()
-                logger.debug(f"✅ Download registrado: CPF {cpf}, Status: {status}")
+                logger.info(f"✅ Download registrado: CPF {cpf}, Status: {status}, Arquivo: {nome_arquivo}")
 
     except Exception as e:
         logger.error(f"❌ Erro ao registrar download: {e}")
@@ -4719,16 +4720,34 @@ def baixar_boletos_http():
 
         client = CanopusHTTPClient(timeout=30)
 
+        # ========================================================================
+        # MODO ULTRA: Delays mínimos para máxima velocidade
+        # ========================================================================
+        MODO_ULTRA = True  # Ativar modo ultra-rápido
+
+        if MODO_ULTRA:
+            DELAY_INICIAL = 0.5           # Era 2-4s
+            DELAY_POS_LOGIN = 0.3         # Era 1.5-3s
+            DELAY_ENTRE_CLIENTES = 0.3    # Era 3-8s
+            DELAY_POS_BUSCA = 0.2         # Era 0.8-1.5s
+            DELAY_POS_ACESSO = 0.2        # Era 1.2-2.5s
+            logger.info("🚀 MODO ULTRA ATIVADO - Delays mínimos!")
+        else:
+            DELAY_INICIAL = random.uniform(2.0, 4.0)
+            DELAY_POS_LOGIN = random.uniform(1.5, 3.0)
+            DELAY_ENTRE_CLIENTES = random.uniform(3.0, 8.0)
+            DELAY_POS_BUSCA = random.uniform(0.8, 1.5)
+            DELAY_POS_ACESSO = random.uniform(1.2, 2.5)
+
         try:
-            # ANTI-DETECÇÃO: Delay inicial aleatório (simula humano lendo a página)
-            delay_inicial = random.uniform(2.0, 4.0)
-            logger.info(f"🕐 Delay inicial (simula leitura): {delay_inicial:.1f}s")
-            time.sleep(delay_inicial)
+            # Delay inicial
+            logger.info(f"🕐 Delay inicial: {DELAY_INICIAL:.1f}s")
+            time.sleep(DELAY_INICIAL)
 
             # Fazer login
-            atualizar_status(etapa=f'Fazendo login HTTP stealth (PV: {usuario_login})...')
+            atualizar_status(etapa=f'Fazendo login HTTP ULTRA (PV: {usuario_login})...')
             logger.info("=" * 80)
-            logger.info("🔐 FAZENDO LOGIN HTTP STEALTH")
+            logger.info("🔐 FAZENDO LOGIN HTTP ULTRA")
             logger.info(f"👤 Usuário: {usuario_login}")
             logger.info("=" * 80)
 
@@ -4740,14 +4759,31 @@ def baixar_boletos_http():
 
             logger.info("✅ LOGIN HTTP REALIZADO COM SUCESSO!")
 
-            # ANTI-DETECÇÃO: Delay após login (simula navegação)
-            delay_pos_login = random.uniform(1.5, 3.0)
-            logger.info(f"🕐 Delay pós-login: {delay_pos_login:.1f}s")
-            time.sleep(delay_pos_login)
+            # Delay pós-login
+            logger.info(f"🕐 Delay pós-login: {DELAY_POS_LOGIN:.1f}s")
+            time.sleep(DELAY_POS_LOGIN)
 
-            atualizar_status(etapa='Login HTTP stealth OK! Processando clientes...')
+            atualizar_status(etapa='Login HTTP ULTRA OK! Processando clientes...')
 
-            # Processar cada CPF com ANTI-DETECÇÃO
+            # Criar mapa de CPF -> nome do cliente para uso posterior
+            clientes_map = {c['cpf']: c.get('nome', 'CLIENTE') for c in clientes_filtrados}
+
+            # Calcular mês para nome do arquivo
+            hoje = datetime.now()
+            proximo_mes = datetime(hoje.year, hoje.month + 1 if hoje.month < 12 else 1, 1)
+            if hoje.month == 12:
+                proximo_mes = datetime(hoje.year + 1, 1, 1)
+
+            meses_nomes = {
+                1: 'JANEIRO', 2: 'FEVEREIRO', 3: 'MARÇO', 4: 'ABRIL',
+                5: 'MAIO', 6: 'JUNHO', 7: 'JULHO', 8: 'AGOSTO',
+                9: 'SETEMBRO', 10: 'OUTUBRO', 11: 'NOVEMBRO', 12: 'DEZEMBRO'
+            }
+            mes_nome = mes if mes else meses_nomes.get(proximo_mes.month, 'MES')
+
+            logger.info(f"📅 Mês para arquivo: {mes_nome}")
+
+            # Processar cada CPF - MODO ULTRA
             for idx, cpf in enumerate(cpfs, 1):
                 # Verificar pausa
                 global execution_status
@@ -4766,29 +4802,27 @@ def baixar_boletos_http():
                     logger.info(f"▶️ RETOMANDO do cliente {idx}/{len(cpfs)}")
                     execution_status['ativo'] = True
 
+                # Buscar nome do cliente
+                nome_cliente = clientes_map.get(cpf, 'CLIENTE')
+
                 logger.info("")
                 logger.info("=" * 80)
-                logger.info(f"📄 PROCESSANDO CLIENTE {idx}/{len(cpfs)} (HTTP STEALTH)")
+                logger.info(f"📄 PROCESSANDO CLIENTE {idx}/{len(cpfs)} (HTTP ULTRA)")
+                logger.info(f"   Nome: {nome_cliente}")
                 logger.info(f"   CPF: {cpf}")
                 logger.info("=" * 80)
 
                 atualizar_status(
-                    etapa=f'Processando via HTTP stealth: {idx}/{len(cpfs)} - CPF: {cpf}',
+                    etapa=f'HTTP ULTRA: {idx}/{len(cpfs)} - {nome_cliente}',
                     progresso=idx,
                     total=len(cpfs)
                 )
 
                 try:
-                    # ANTI-DETECÇÃO: Delay entre clientes (simula humano)
-                    # Primeiro cliente: menor delay
-                    # Demais: delay maior e variável
-                    if idx == 1:
-                        delay_entre = random.uniform(1.0, 2.0)
-                    else:
-                        delay_entre = random.uniform(3.0, 8.0)  # 3-8 segundos (muito humano)
-
-                    logger.info(f"🕐 Delay anti-detecção: {delay_entre:.1f}s (simula humano)")
-                    time.sleep(delay_entre)
+                    # Delay entre clientes (ULTRA: mínimo)
+                    if idx > 1:
+                        logger.info(f"🕐 Delay entre clientes: {DELAY_ENTRE_CLIENTES:.1f}s")
+                        time.sleep(DELAY_ENTRE_CLIENTES)
 
                     # Buscar cliente
                     logger.info(f"🔍 Buscando CPF: {cpf}")
@@ -4799,10 +4833,9 @@ def baixar_boletos_http():
                         registrar_download(cpf, 'cpf_nao_encontrado', None, error='Cliente não encontrado')
                         continue
 
-                    # ANTI-DETECÇÃO: Delay após busca
-                    delay_busca = random.uniform(0.8, 1.5)
-                    logger.info(f"🕐 Delay pós-busca: {delay_busca:.1f}s")
-                    time.sleep(delay_busca)
+                    # Delay pós-busca (ULTRA: mínimo)
+                    logger.info(f"🕐 Delay pós-busca: {DELAY_POS_BUSCA:.1f}s")
+                    time.sleep(DELAY_POS_BUSCA)
 
                     # Acessar cliente
                     logger.info(f"📂 Acessando cliente...")
@@ -4811,10 +4844,9 @@ def baixar_boletos_http():
                         registrar_download(cpf, 'erro', None, error='Falha ao acessar cliente')
                         continue
 
-                    # ANTI-DETECÇÃO: Delay após acessar (simula leitura da página)
-                    delay_acesso = random.uniform(1.2, 2.5)
-                    logger.info(f"🕐 Delay pós-acesso: {delay_acesso:.1f}s")
-                    time.sleep(delay_acesso)
+                    # Delay pós-acesso (ULTRA: mínimo)
+                    logger.info(f"🕐 Delay pós-acesso: {DELAY_POS_ACESSO:.1f}s")
+                    time.sleep(DELAY_POS_ACESSO)
 
                     # Emitir boleto
                     logger.info(f"📄 Emitindo boleto...")
@@ -4825,12 +4857,24 @@ def baixar_boletos_http():
                         registrar_download(cpf, 'sem_boleto', None, error='Boleto não disponível')
                         continue
 
-                    # Salvar PDF
-                    arquivo_path = client.salvar_pdf(pdf_bytes, cpf, consultor='Danner')
+                    # Salvar PDF com nome formatado igual ao Playwright
+                    # Determinar pasta baseado no PV do cliente
+                    cliente_info = next((c for c in clientes_filtrados if c['cpf'] == cpf), None)
+                    pv_cliente = cliente_info.get('ponto_venda', ponto_venda) if cliente_info else ponto_venda
+                    pasta_cliente = obter_pasta_destino_http(pv_cliente)
+
+                    arquivo_path = client.salvar_pdf(
+                        pdf_bytes,
+                        cpf,
+                        consultor=pasta_cliente.name,  # Nome da pasta
+                        nome_cliente=nome_cliente,
+                        mes=mes_nome
+                    )
                     tamanho_kb = len(pdf_bytes) / 1024
 
                     logger.info(f"✅ BOLETO BAIXADO COM SUCESSO!")
-                    logger.info(f"   Arquivo: {arquivo_path}")
+                    logger.info(f"   Arquivo: {Path(arquivo_path).name}")
+                    logger.info(f"   Caminho: {arquivo_path}")
                     logger.info(f"   Tamanho: {tamanho_kb:.1f} KB")
 
                     # Registrar sucesso
