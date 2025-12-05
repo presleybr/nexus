@@ -2359,7 +2359,7 @@ def baixar_boletos_ponto_venda():
                                                 cur_import.execute("""
                                                     INSERT INTO downloads_canopus (
                                                         consultor_id, cpf, nome_arquivo,
-                                                        arquivo_base64, tamanho_bytes, status,
+                                                        caminho_arquivo, tamanho_bytes, status,
                                                         data_download, created_at
                                                     ) VALUES (%s, %s, %s, %s, %s, 'sucesso', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                                                 """, (consultor_id, cpf, arquivo_nome, pdf_base64, arquivo_tamanho))
