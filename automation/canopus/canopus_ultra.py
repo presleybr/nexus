@@ -336,6 +336,7 @@ class CanopusUltra:
                 # Verificar se é potencial PDF
                 is_potential_pdf = (
                     'frmConCmImpressao' in url or
+                    'Impressao' in url or
                     url.endswith('.pdf') or
                     '.pdf?' in url or
                     request.resource_type == 'document'
@@ -345,26 +346,33 @@ class CanopusUltra:
                     await route.continue_()
                     return
 
+                logger.info(f"  [{idx}/{total}] 🔍 Interceptando: {url[:60]}...")
+
                 try:
                     # Buscar resposta
                     response = await route.fetch()
                     content_type = response.headers.get('content-type', '').lower()
+                    body = response.body  # bytes
+
+                    logger.info(f"  [{idx}/{total}] 📦 Content-Type: {content_type}, Size: {len(body)} bytes")
 
                     # Capturar se for PDF
-                    if 'pdf' in content_type or 'octet-stream' in content_type:
-                        body = response.body
+                    if 'pdf' in content_type or 'octet-stream' in content_type or body.startswith(b'%PDF'):
                         tamanho = len(body)
 
                         # Verificar se é PDF real
                         if body.startswith(b'%PDF') and tamanho > 10000:
                             pdf_bytes_capturado = body
                             pdf_url_capturado = url
-                            logger.info(f"  [{idx}/{total}] 🎯 PDF capturado via route: {tamanho/1024:.0f}KB")
+                            logger.info(f"  [{idx}/{total}] 🎯 PDF CAPTURADO: {tamanho/1024:.0f}KB")
+                        else:
+                            logger.warning(f"  [{idx}/{total}] ⚠️ Não é PDF real ou muito pequeno: {tamanho} bytes")
 
                     # Passar resposta pro navegador
                     await route.fulfill(response=response)
 
                 except Exception as e:
+                    logger.warning(f"  [{idx}/{total}] ⚠️ Erro no route: {e}")
                     await route.continue_()
 
             # Registrar route handler
