@@ -320,19 +320,28 @@ class CanopusUltra:
             await img_cbs[-1].click()
             await asyncio.sleep(0.5)
 
-            # Emitir
-            await self.page.click('input[value="Emitir Cobrança"]')
+            # Emitir - usar expect_popup para capturar o popup corretamente
+            logger.info(f"  [{idx}/{total}] Clicando em Emitir Cobrança...")
 
-            # PASSO 5: Aguardar popup (timeout moderado)
-            popup = None
-            for _ in range(20):  # 10 segundos máximo
-                await asyncio.sleep(0.5)
-                for p in self.context.pages:
-                    if 'frmConCmImpressao' in p.url:
-                        popup = p
+            try:
+                # Método 1: Usar expect_popup (mais confiável)
+                async with self.page.expect_popup(timeout=15000) as popup_info:
+                    await self.page.click('input[value="Emitir Cobrança"]')
+                popup = await popup_info.value
+                logger.info(f"  [{idx}/{total}] Popup capturado via expect_popup: {popup.url[:50]}...")
+            except Exception as e_popup:
+                logger.warning(f"  [{idx}/{total}] expect_popup falhou: {e_popup}")
+                # Método 2: Fallback - aguardar popup manualmente
+                popup = None
+                for attempt in range(30):  # 15 segundos máximo
+                    await asyncio.sleep(0.5)
+                    for p in self.context.pages:
+                        if p != self.page and ('frmConCmImpressao' in p.url or 'Impressao' in p.url or len(self.context.pages) > 1):
+                            popup = p
+                            logger.info(f"  [{idx}/{total}] Popup encontrado (tentativa {attempt+1}): {p.url[:50]}...")
+                            break
+                    if popup:
                         break
-                if popup:
-                    break
 
             if popup:
                 await popup.wait_for_load_state('networkidle', timeout=self.TIMEOUT_LONGO)
