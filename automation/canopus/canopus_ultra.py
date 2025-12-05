@@ -322,51 +322,69 @@ class CanopusUltra:
             await img_cbs[-1].click()
             await asyncio.sleep(0.5)
 
-            # ESTRATÉGIA: Interceptar bytes do PDF via response handler
+            # ESTRATÉGIA: Usar route handler para interceptar PDF (como código antigo)
             logger.info(f"  [{idx}/{total}] Configurando interceptação de PDF...")
 
             pdf_bytes_capturado = None
             pdf_url_capturado = None
 
-            async def interceptar_pdf(response):
+            async def route_pdf_handler(route):
                 nonlocal pdf_bytes_capturado, pdf_url_capturado
+                request = route.request
+                url = request.url
+
+                # Verificar se é potencial PDF
+                is_potential_pdf = (
+                    'frmConCmImpressao' in url or
+                    url.endswith('.pdf') or
+                    '.pdf?' in url or
+                    request.resource_type == 'document'
+                )
+
+                if not is_potential_pdf:
+                    await route.continue_()
+                    return
+
                 try:
+                    # Buscar resposta
+                    response = await route.fetch()
                     content_type = response.headers.get('content-type', '').lower()
-                    url = response.url
 
-                    # Verificar se é PDF
-                    if ('pdf' in content_type or
-                        'octet-stream' in content_type or
-                        'frmConCmImpressao' in url or
-                        url.endswith('.pdf')):
-
-                        body = await response.body()
+                    # Capturar se for PDF
+                    if 'pdf' in content_type or 'octet-stream' in content_type:
+                        body = response.body
                         tamanho = len(body)
 
-                        # Verificar se é PDF real (começa com %PDF)
+                        # Verificar se é PDF real
                         if body.startswith(b'%PDF') and tamanho > 10000:
                             pdf_bytes_capturado = body
                             pdf_url_capturado = url
-                            logger.info(f"  [{idx}/{total}] 🎯 PDF capturado: {tamanho/1024:.0f}KB")
-                except:
-                    pass
+                            logger.info(f"  [{idx}/{total}] 🎯 PDF capturado via route: {tamanho/1024:.0f}KB")
 
-            # Registrar handler no contexto
-            self.context.on('response', interceptar_pdf)
+                    # Passar resposta pro navegador
+                    await route.fulfill(response=response)
+
+                except Exception as e:
+                    await route.continue_()
+
+            # Registrar route handler
+            await self.context.route('**/*', route_pdf_handler)
 
             try:
                 # Clicar em Emitir Cobrança
                 logger.info(f"  [{idx}/{total}] Clicando em Emitir Cobrança...")
                 await self.page.click('input[value="Emitir Cobrança"]')
 
-                # Aguardar PDF ser interceptado (até 15 segundos)
-                for _ in range(30):
+                # Aguardar PDF ser interceptado (até 20 segundos)
+                for i in range(40):
                     await asyncio.sleep(0.5)
                     if pdf_bytes_capturado:
                         break
+                    if i % 10 == 0 and i > 0:
+                        logger.info(f"  [{idx}/{total}] Aguardando PDF... ({i/2:.0f}s)")
 
-                # Remover handler
-                self.context.remove_listener('response', interceptar_pdf)
+                # Remover route handler
+                await self.context.unroute('**/*', route_pdf_handler)
 
                 if pdf_bytes_capturado:
                     # Salvar PDF
@@ -398,7 +416,10 @@ class CanopusUltra:
                     logger.error(f"❌ [{idx}/{total}] ERRO - CPF: {cpf_fmt} | PDF não interceptado | ⏱️ {duracao:.1f}s")
 
             except Exception as e_emitir:
-                self.context.remove_listener('response', interceptar_pdf)
+                try:
+                    await self.context.unroute('**/*', route_pdf_handler)
+                except:
+                    pass
                 raise e_emitir
 
         except Exception as e:
