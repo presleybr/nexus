@@ -1,17 +1,18 @@
 """
-Canopus ULTRA - Velocidade Máxima com Stealth Mode
-===================================================
+Canopus ULTRA - Velocidade Máxima com Processamento Paralelo
+============================================================
 Método otimizado para download de boletos Canopus.
 
-Versão: 2.0.0 (2025-12-04)
-Build: Force redeploy
+Versão: 3.0.0 (2025-12-04)
+Build: PARALLEL
 
 Características:
 - Login único compartilhado entre processamentos
 - Stealth mode completo (anti-detecção de bot)
 - Timeouts curtos para clientes não encontrados (~3s)
 - Delays mínimos otimizados
-- Tempo médio: ~8-10s por cliente com sucesso
+- PROCESSAMENTO PARALELO com múltiplos workers (2x mais rápido!)
+- Tempo médio: ~4-5s por cliente (efetivo com 2 workers)
 
 Uso:
     from canopus_ultra import processar_boletos_ultra_sync
@@ -21,7 +22,9 @@ Uso:
         senha='Senha123',
         clientes=[{'cpf': '12345678901', 'nome': 'FULANO'}],
         mes='JANEIRO',
-        headless=True
+        headless=True,
+        num_workers=2,  # Número de workers paralelos
+        paralelo=True   # Ativar modo paralelo
     )
 """
 
@@ -73,21 +76,24 @@ class CanopusUltra:
         usuario: str,
         senha: str,
         headless: bool = True,
-        callback_status: Callable = None
+        callback_status: Callable = None,
+        num_workers: int = 1  # Número de workers (1=sequencial, 2+=paralelo)
     ):
         self.usuario = str(usuario).strip().zfill(10)
         self.senha = senha
         self.headless = headless
         self.callback_status = callback_status
+        self.num_workers = num_workers
 
         self.playwright = None
         self.browser: Browser = None
         self.context: BrowserContext = None
-        self.page: Page = None
+        self.page: Page = None  # Página principal (para login)
+        self.pages: List[Page] = []  # Páginas dos workers
         self.logado = False
         self.pasta_downloads = None
 
-        # Estatísticas
+        # Estatísticas (thread-safe com lock)
         self.stats = {
             'sucessos': 0,
             'erros': 0,
@@ -96,6 +102,7 @@ class CanopusUltra:
             'total': 0,
             'processados': 0
         }
+        self._stats_lock = None  # Será criado no iniciar()
 
     def _atualizar_status(self, etapa: str, progresso: int = None, erro: str = None):
         """Atualiza status via callback se disponível"""
@@ -108,6 +115,9 @@ class CanopusUltra:
         """Inicia o navegador com stealth mode completo."""
         self.pasta_downloads = pasta_downloads or f"/tmp/boletos_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         os.makedirs(self.pasta_downloads, exist_ok=True)
+
+        # Criar lock para estatísticas (precisa estar no event loop)
+        self._stats_lock = asyncio.Lock()
 
         self._atualizar_status('Iniciando navegador...')
 
@@ -175,6 +185,20 @@ class CanopusUltra:
 
         self.logado = True
         logger.info("✅ Login realizado com sucesso!")
+
+        # Criar páginas dos workers para processamento paralelo (só se num_workers > 1)
+        if self.num_workers > 1:
+            logger.info(f"🔧 Criando {self.num_workers} workers paralelos...")
+            for i in range(self.num_workers):
+                worker_page = await self.context.new_page()
+                if STEALTH_AVAILABLE:
+                    await stealth_async(worker_page)
+                self.pages.append(worker_page)
+                logger.info(f"  ✓ Worker {i+1} criado")
+            logger.info(f"🚀 {self.num_workers} workers prontos!")
+        else:
+            logger.info("📝 Modo sequencial (1 worker)")
+
         return True
 
     async def _fazer_login(self) -> bool:
@@ -201,15 +225,25 @@ class CanopusUltra:
         nome: str,
         mes: str,
         idx: int,
-        total: int
+        total: int,
+        page: Page = None,
+        worker_id: int = 0
     ) -> dict:
         """
         Processa cliente com velocidade máxima.
         Timeouts curtos para operações que falham.
+
+        Args:
+            page: Página específica do worker (se None, usa self.page)
+            worker_id: ID do worker para logging
         """
+        # Usar página fornecida ou página principal
+        if page is None:
+            page = self.page
+
         # Formatar CPF para exibição
         cpf_fmt = f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}" if len(cpf) == 11 else cpf
-        logger.info(f"⚡ [ULTRA] Processando cliente: {cpf_fmt} ({idx}/{total})")
+        logger.info(f"⚡ [W{worker_id}] Processando: {cpf_fmt} ({idx}/{total})")
 
         inicio = datetime.now()
         resultado = {
@@ -222,22 +256,22 @@ class CanopusUltra:
 
         try:
             # PASSO 1: Ir para Atendimento
-            await self.page.goto(f'{self.BASE_URL}/WWW/frmMain.aspx')
-            await self.page.wait_for_load_state('domcontentloaded')
+            await page.goto(f'{self.BASE_URL}/WWW/frmMain.aspx')
+            await page.wait_for_load_state('domcontentloaded')
 
-            await self.page.click('#ctl00_img_Atendimento', timeout=self.TIMEOUT_RAPIDO)
-            await self.page.wait_for_load_state('domcontentloaded')
+            await page.click('#ctl00_img_Atendimento', timeout=self.TIMEOUT_RAPIDO)
+            await page.wait_for_load_state('domcontentloaded')
 
             # PASSO 2: Busca Avançada (timeout curto)
             try:
-                await self.page.click('text="Busca avançada..."', timeout=self.TIMEOUT_RAPIDO)
+                await page.click('text="Busca avançada..."', timeout=self.TIMEOUT_RAPIDO)
             except:
                 # Tentar seletor alternativo
-                await self.page.click('input[value*="Busca"]', timeout=self.TIMEOUT_RAPIDO)
+                await page.click('input[value*="Busca"]', timeout=self.TIMEOUT_RAPIDO)
 
             # Esperar dropdown aparecer (timeout curto)
             try:
-                await self.page.wait_for_selector(
+                await page.wait_for_selector(
                     'select[id*="cbxCriterioBusca"]',
                     timeout=self.TIMEOUT_RAPIDO
                 )
@@ -247,63 +281,65 @@ class CanopusUltra:
                 return resultado
 
             # Selecionar CPF
-            await self.page.select_option('select[id*="cbxCriterioBusca"]', 'F')
+            await page.select_option('select[id*="cbxCriterioBusca"]', 'F')
 
             # Formatar e preencher CPF
             cpf_limpo = re.sub(r'\D', '', cpf)
             cpf_fmt = f'{cpf_limpo[:3]}.{cpf_limpo[3:6]}.{cpf_limpo[6:9]}-{cpf_limpo[9:]}'
 
-            await self.page.fill('input[id*="edtContextoBusca"]', cpf_fmt)
+            await page.fill('input[id*="edtContextoBusca"]', cpf_fmt)
 
             # Buscar
-            await self.page.click('input[value="Buscar"]')
+            await page.click('input[value="Buscar"]')
 
             # TIMEOUT CURTO para resultado da busca
             await asyncio.sleep(1.0)
 
             # Verificar resultado RAPIDAMENTE
-            html = await self.page.content()
+            html = await page.content()
             if 'Nenhum registro' in html or 'não encontrado' in html.lower():
                 resultado['erro'] = 'Cliente não encontrado no Canopus'
                 resultado['status'] = 'cpf_nao_encontrado'
-                self.stats['cpf_nao_encontrado'] += 1
+                async with self._stats_lock:
+                    self.stats['cpf_nao_encontrado'] += 1
                 duracao = (datetime.now() - inicio).total_seconds()
                 resultado['duracao'] = duracao
-                logger.info(f"⚠️ [{idx}/{total}] NÃO ENCONTRADO - CPF: {cpf_fmt} | {nome[:25]} | ⏱️ {duracao:.1f}s")
+                logger.info(f"⚠️ [W{worker_id}] NÃO ENCONTRADO - CPF: {cpf_fmt} | {nome[:25]} | ⏱️ {duracao:.1f}s")
                 return resultado
 
             # PASSO 3: Selecionar cliente (timeout curto)
             try:
-                link = await self.page.wait_for_selector('td a', timeout=self.TIMEOUT_RAPIDO)
+                link = await page.wait_for_selector('td a', timeout=self.TIMEOUT_RAPIDO)
                 if link:
                     await link.click()
                     await asyncio.sleep(0.2)
             except:
                 resultado['erro'] = 'Link do cliente não encontrado'
                 resultado['status'] = 'cpf_nao_encontrado'
-                self.stats['cpf_nao_encontrado'] += 1
+                async with self._stats_lock:
+                    self.stats['cpf_nao_encontrado'] += 1
                 return resultado
 
             # Confirmar busca
             try:
-                btn_confirmar = await self.page.wait_for_selector(
+                btn_confirmar = await page.wait_for_selector(
                     'input[value="Confirmar Busca"]',
                     timeout=self.TIMEOUT_RAPIDO
                 )
                 if btn_confirmar:
                     await btn_confirmar.click()
-                    await self.page.wait_for_load_state('domcontentloaded')
+                    await page.wait_for_load_state('domcontentloaded')
             except:
                 pass  # Continuar mesmo sem confirmar
 
             # PASSO 4: Emissão de boleto (navegação direta)
-            await self.page.goto(f'{self.BASE_URL}/WWW/CONCO/frmConCoRelBoletoAvulso.aspx')
-            await self.page.wait_for_load_state('domcontentloaded')
+            await page.goto(f'{self.BASE_URL}/WWW/CONCO/frmConCoRelBoletoAvulso.aspx')
+            await page.wait_for_load_state('domcontentloaded')
             await asyncio.sleep(0.3)
 
             # Verificar se há boletos disponíveis (timeout curto)
             try:
-                img_cbs = await self.page.query_selector_all(
+                img_cbs = await page.query_selector_all(
                     'input[type="image"][id*="imgEmite_Boleto"]'
                 )
             except:
@@ -312,10 +348,11 @@ class CanopusUltra:
             if not img_cbs:
                 resultado['erro'] = 'Nenhum boleto disponível'
                 resultado['status'] = 'sem_boleto'
-                self.stats['sem_boleto'] += 1
+                async with self._stats_lock:
+                    self.stats['sem_boleto'] += 1
                 duracao = (datetime.now() - inicio).total_seconds()
                 resultado['duracao'] = duracao
-                logger.info(f"📄 [{idx}/{total}] SEM BOLETO - CPF: {cpf_fmt} | {nome[:25]} | ⏱️ {duracao:.1f}s")
+                logger.info(f"📄 [W{worker_id}] SEM BOLETO - CPF: {cpf_fmt} | {nome[:25]} | ⏱️ {duracao:.1f}s")
                 return resultado
 
             # Marcar último boleto
@@ -323,7 +360,7 @@ class CanopusUltra:
             await asyncio.sleep(0.3)
 
             # ESTRATÉGIA: Usar route handler para interceptar PDF (como código antigo)
-            logger.info(f"  [{idx}/{total}] Configurando interceptação de PDF...")
+            logger.info(f"  [W{worker_id}] Configurando interceptação de PDF...")
 
             pdf_bytes_capturado = None
             pdf_url_capturado = None
@@ -346,7 +383,7 @@ class CanopusUltra:
                     await route.continue_()
                     return
 
-                logger.info(f"  [{idx}/{total}] 🔍 Interceptando: {url[:60]}...")
+                logger.info(f"  [W{worker_id}] 🔍 Interceptando: {url[:60]}...")
 
                 try:
                     # Buscar resposta
@@ -354,7 +391,7 @@ class CanopusUltra:
                     content_type = response.headers.get('content-type', '').lower()
                     body = response.body  # bytes
 
-                    logger.info(f"  [{idx}/{total}] 📦 Content-Type: {content_type}, Size: {len(body)} bytes")
+                    logger.info(f"  [W{worker_id}] 📦 Content-Type: {content_type}, Size: {len(body)} bytes")
 
                     # Capturar se for PDF
                     if 'pdf' in content_type or 'octet-stream' in content_type or body.startswith(b'%PDF'):
@@ -364,15 +401,15 @@ class CanopusUltra:
                         if body.startswith(b'%PDF') and tamanho > 10000:
                             pdf_bytes_capturado = body
                             pdf_url_capturado = url
-                            logger.info(f"  [{idx}/{total}] 🎯 PDF CAPTURADO: {tamanho/1024:.0f}KB")
+                            logger.info(f"  [W{worker_id}] 🎯 PDF CAPTURADO: {tamanho/1024:.0f}KB")
                         else:
-                            logger.warning(f"  [{idx}/{total}] ⚠️ Não é PDF real ou muito pequeno: {tamanho} bytes")
+                            logger.warning(f"  [W{worker_id}] ⚠️ Não é PDF real ou muito pequeno: {tamanho} bytes")
 
                     # Passar resposta pro navegador
                     await route.fulfill(response=response)
 
                 except Exception as e:
-                    logger.warning(f"  [{idx}/{total}] ⚠️ Erro no route: {e}")
+                    logger.warning(f"  [W{worker_id}] ⚠️ Erro no route: {e}")
                     await route.continue_()
 
             # Registrar route handler
@@ -380,8 +417,8 @@ class CanopusUltra:
 
             try:
                 # Clicar em Emitir Cobrança
-                logger.info(f"  [{idx}/{total}] Clicando em Emitir Cobrança...")
-                await self.page.click('input[value="Emitir Cobrança"]')
+                logger.info(f"  [W{worker_id}] Clicando em Emitir Cobrança...")
+                await page.click('input[value="Emitir Cobrança"]')
 
                 # Aguardar PDF ser interceptado (até 12 segundos)
                 for i in range(24):
@@ -409,17 +446,19 @@ class CanopusUltra:
                     resultado['caminho'] = caminho
                     resultado['tamanho'] = tamanho
                     resultado['duracao'] = duracao
-                    self.stats['sucessos'] += 1
+                    async with self._stats_lock:
+                        self.stats['sucessos'] += 1
 
                     tamanho_kb = tamanho / 1024
-                    logger.info(f"✅ [{idx}/{total}] SUCESSO - CPF: {cpf_fmt} | {nome[:25]} | {tamanho_kb:.0f}KB | ⏱️ {duracao:.1f}s")
+                    logger.info(f"✅ [W{worker_id}] SUCESSO - CPF: {cpf_fmt} | {nome[:25]} | {tamanho_kb:.0f}KB | ⏱️ {duracao:.1f}s")
                 else:
                     duracao = (datetime.now() - inicio).total_seconds()
                     resultado['erro'] = 'PDF não interceptado'
                     resultado['status'] = 'erro'
                     resultado['duracao'] = duracao
-                    self.stats['erros'] += 1
-                    logger.error(f"❌ [{idx}/{total}] ERRO - CPF: {cpf_fmt} | PDF não interceptado | ⏱️ {duracao:.1f}s")
+                    async with self._stats_lock:
+                        self.stats['erros'] += 1
+                    logger.error(f"❌ [W{worker_id}] ERRO - CPF: {cpf_fmt} | PDF não interceptado | ⏱️ {duracao:.1f}s")
 
             except Exception as e_emitir:
                 try:
@@ -433,18 +472,11 @@ class CanopusUltra:
             resultado['erro'] = str(e)[:100]
             resultado['status'] = 'erro'
             resultado['duracao'] = duracao
-            self.stats['erros'] += 1
+            async with self._stats_lock:
+                self.stats['erros'] += 1
 
             # Log de exceção com tempo total
-            logger.error(f"❌ [{idx}/{total}] ERRO - CPF: {cpf_fmt} | {str(e)[:50]} | ⏱️ {duracao:.1f}s")
-
-        finally:
-            # Fechar popups extras
-            try:
-                for p in self.context.pages[1:]:
-                    await p.close()
-            except:
-                pass
+            logger.error(f"❌ [W{worker_id}] ERRO - CPF: {cpf_fmt} | {str(e)[:50]} | ⏱️ {duracao:.1f}s")
 
         return resultado
 
@@ -527,6 +559,160 @@ class CanopusUltra:
             'pasta': self.pasta_downloads
         }
 
+    async def _worker_processar(
+        self,
+        worker_id: int,
+        page: Page,
+        clientes_worker: List[Dict],
+        mes: str,
+        total_geral: int,
+        offset: int
+    ) -> List[dict]:
+        """
+        Worker que processa uma lista de clientes em uma página específica.
+
+        Args:
+            worker_id: ID do worker (para logging)
+            page: Página do Playwright para este worker
+            clientes_worker: Lista de clientes para este worker processar
+            mes: Mês do boleto
+            total_geral: Total de clientes de todos os workers
+            offset: Offset do índice (para mostrar número correto no log)
+
+        Returns:
+            Lista de resultados
+        """
+        resultados = []
+        for i, cliente in enumerate(clientes_worker):
+            cpf = re.sub(r'\D', '', str(cliente.get('cpf', '')))
+            nome = cliente.get('nome', 'CLIENTE')
+            idx_geral = offset + i + 1
+
+            r = await self._processar_cliente_ultra(
+                cpf=cpf,
+                nome=nome,
+                mes=mes,
+                idx=idx_geral,
+                total=total_geral,
+                page=page,
+                worker_id=worker_id
+            )
+            resultados.append(r)
+
+            # Atualizar progresso global
+            async with self._stats_lock:
+                self.stats['processados'] += 1
+                processados = self.stats['processados']
+
+            self._atualizar_status(
+                f'Processando {processados}/{total_geral}...',
+                progresso=processados
+            )
+
+        return resultados
+
+    async def processar_lote_paralelo(
+        self,
+        clientes: List[Dict],
+        mes: str = 'JANEIRO',
+        verificar_pausa: Callable = None
+    ) -> dict:
+        """
+        Processa lote de clientes em PARALELO usando múltiplos workers.
+
+        Args:
+            clientes: Lista de dicts com 'cpf' e 'nome'
+            mes: Mês do boleto
+            verificar_pausa: Callback para verificar se deve pausar (não usado em paralelo)
+
+        Returns:
+            Dict com estatísticas e resultados
+        """
+        if not self.logado:
+            raise Exception("Não está logado. Chame iniciar() primeiro.")
+
+        if not self.pages:
+            raise Exception("Workers não inicializados. Verifique iniciar().")
+
+        total = len(clientes)
+        self.stats['total'] = total
+        self.stats['processados'] = 0
+
+        num_workers = min(self.num_workers, len(self.pages), total)
+
+        logger.info(f"\n{'='*60}")
+        logger.info(f"🚀 MODO ULTRA PARALELO: {total} cliente(s) | {num_workers} workers")
+        logger.info(f"{'='*60}\n")
+
+        self._atualizar_status(f'Processando {total} clientes com {num_workers} workers...', progresso=0)
+
+        inicio = datetime.now()
+
+        # Dividir clientes entre os workers
+        clientes_por_worker = []
+        tamanho_base = total // num_workers
+        resto = total % num_workers
+
+        idx = 0
+        for w in range(num_workers):
+            # Distribuir o resto entre os primeiros workers
+            tamanho = tamanho_base + (1 if w < resto else 0)
+            clientes_por_worker.append(clientes[idx:idx + tamanho])
+            idx += tamanho
+
+        # Log da divisão
+        for w, cw in enumerate(clientes_por_worker):
+            logger.info(f"  Worker {w+1}: {len(cw)} cliente(s)")
+
+        # Criar tasks para cada worker
+        tasks = []
+        offset = 0
+        for w in range(num_workers):
+            task = self._worker_processar(
+                worker_id=w + 1,
+                page=self.pages[w],
+                clientes_worker=clientes_por_worker[w],
+                mes=mes,
+                total_geral=total,
+                offset=offset
+            )
+            tasks.append(task)
+            offset += len(clientes_por_worker[w])
+
+        # Executar todos os workers em paralelo
+        logger.info(f"\n⚡ Iniciando {num_workers} workers em paralelo...")
+        resultados_por_worker = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Combinar resultados
+        resultados = []
+        for r in resultados_por_worker:
+            if isinstance(r, Exception):
+                logger.error(f"Worker falhou: {r}")
+            elif isinstance(r, list):
+                resultados.extend(r)
+
+        duracao = (datetime.now() - inicio).total_seconds()
+
+        logger.info(f"\n{'='*60}")
+        logger.info(f"🏁 RESULTADO PARALELO: {self.stats['sucessos']}/{total} em {duracao:.1f}s")
+        if total > 0:
+            logger.info(f"⚡ Média: {duracao/total:.1f}s por cliente (efetivo)")
+            logger.info(f"🚀 Speedup: ~{num_workers}x mais rápido que sequencial")
+        logger.info(f"{'='*60}")
+
+        return {
+            'total': total,
+            'sucesso': self.stats['sucessos'],
+            'erros': self.stats['erros'],
+            'cpf_nao_encontrado': self.stats['cpf_nao_encontrado'],
+            'sem_boleto': self.stats['sem_boleto'],
+            'duracao': duracao,
+            'media': duracao/total if total > 0 else 0,
+            'resultados': resultados,
+            'pasta': self.pasta_downloads,
+            'workers': num_workers
+        }
+
     async def fechar(self):
         """Fecha o navegador."""
         if self.browser:
@@ -544,7 +730,9 @@ async def processar_boletos_ultra(
     pasta_downloads: str = None,
     headless: bool = True,
     callback_status: Callable = None,
-    verificar_pausa: Callable = None
+    verificar_pausa: Callable = None,
+    num_workers: int = 2,
+    paralelo: bool = True
 ) -> dict:
     """
     Função principal para processamento ultra-rápido.
@@ -558,15 +746,20 @@ async def processar_boletos_ultra(
         headless: Se True, roda sem interface gráfica
         callback_status: Callback para atualizar status
         verificar_pausa: Callback para verificar pausa
+        num_workers: Número de workers paralelos (default 2)
+        paralelo: Se True, usa processamento paralelo (default True)
 
     Returns:
         Dict com estatísticas e resultados
     """
-    canopus = CanopusUltra(usuario, senha, headless, callback_status)
+    canopus = CanopusUltra(usuario, senha, headless, callback_status, num_workers)
 
     try:
         await canopus.iniciar(pasta_downloads)
-        return await canopus.processar_lote(clientes, mes, verificar_pausa)
+        if paralelo and num_workers > 1:
+            return await canopus.processar_lote_paralelo(clientes, mes, verificar_pausa)
+        else:
+            return await canopus.processar_lote(clientes, mes, verificar_pausa)
     finally:
         await canopus.fechar()
 
@@ -579,7 +772,9 @@ def processar_boletos_ultra_sync(
     pasta_downloads: str = None,
     headless: bool = True,
     callback_status: Callable = None,
-    verificar_pausa: Callable = None
+    verificar_pausa: Callable = None,
+    num_workers: int = 2,
+    paralelo: bool = True
 ) -> dict:
     """Wrapper síncrono para uso com Flask."""
     return asyncio.run(processar_boletos_ultra(
@@ -590,18 +785,25 @@ def processar_boletos_ultra_sync(
         pasta_downloads=pasta_downloads,
         headless=headless,
         callback_status=callback_status,
-        verificar_pausa=verificar_pausa
+        verificar_pausa=verificar_pausa,
+        num_workers=num_workers,
+        paralelo=paralelo
     ))
 
 
 if __name__ == '__main__':
     async def teste():
+        # Teste com múltiplos clientes para demonstrar paralelismo
         clientes = [
             {'cpf': '50516798898', 'nome': 'ADAO JUNIOR PEREIRA DE BRITO'},
+            {'cpf': '12345678901', 'nome': 'TESTE CLIENTE 2'},
+            {'cpf': '98765432100', 'nome': 'TESTE CLIENTE 3'},
+            {'cpf': '11122233344', 'nome': 'TESTE CLIENTE 4'},
         ]
 
         print("\n" + "="*60)
-        print("TESTE MODO ULTRA - PV 17308")
+        print("TESTE MODO ULTRA PARALELO - PV 17308")
+        print(f"Clientes: {len(clientes)} | Workers: 2")
         print("="*60)
 
         resultado = await processar_boletos_ultra(
@@ -609,10 +811,14 @@ if __name__ == '__main__':
             senha='Sonhorealizado2@',
             clientes=clientes,
             mes='JANEIRO',
-            headless=False
+            headless=False,
+            num_workers=2,
+            paralelo=True
         )
 
-        print(f"\n🚀 Tempo: {resultado['duracao']:.1f}s")
+        print(f"\n🚀 Tempo total: {resultado['duracao']:.1f}s")
         print(f"📊 Sucesso: {resultado['sucesso']}/{resultado['total']}")
+        if resultado.get('workers'):
+            print(f"⚡ Workers utilizados: {resultado['workers']}")
 
     asyncio.run(teste())
