@@ -300,7 +300,7 @@ class CanopusHTTPClient:
             # 1. Navegar para busca (clicar em Atendimento primeiro)
             # POST /WWW/frmMain.aspx com img_Atendimento
             url_main = f'{self.BASE_URL}/frmMain.aspx'
-            response = self._safe_request('GET', url_main, delay_before=0.8, timeout=self.timeout)
+            response = self._safe_request('GET', url_main, delay_before=1.5, timeout=self.timeout)
 
             asp_fields = self._extract_asp_fields(response.text)
 
@@ -318,7 +318,7 @@ class CanopusHTTPClient:
             response = self._safe_request(
                 'POST',
                 url_main,
-                delay_before=0.7,
+                delay_before=1.5,
                 data=atendimento_data,
                 timeout=self.timeout,
                 allow_redirects=True
@@ -326,7 +326,7 @@ class CanopusHTTPClient:
 
             # 2. Acessar frmBuscaCota.aspx
             url_busca = f'{self.BASE_URL}/CONAT/frmBuscaCota.aspx'
-            response = self._safe_request('GET', url_busca, delay_before=0.6, timeout=self.timeout)
+            response = self._safe_request('GET', url_busca, delay_before=1.5, timeout=self.timeout)
 
             asp_fields = self._extract_asp_fields(response.text)
 
@@ -345,7 +345,7 @@ class CanopusHTTPClient:
             response = self._safe_request(
                 'POST',
                 url_busca,
-                delay_before=0.5,
+                delay_before=1.0,
                 data=select_cpf_data,
                 timeout=self.timeout
             )
@@ -368,7 +368,7 @@ class CanopusHTTPClient:
             response = self._safe_request(
                 'POST',
                 url_busca,
-                delay_before=1.0,  # Maior delay (humano digitando CPF)
+                delay_before=2.0,  # Delay maior para evitar 500
                 data=buscar_data,
                 timeout=self.timeout
             )
@@ -414,8 +414,8 @@ class CanopusHTTPClient:
 
             url_busca = f'{self.BASE_URL}/CONAT/frmBuscaCota.aspx'
 
-            # Pegar página atual (COM DELAY)
-            response = self._safe_request('GET', url_busca, delay_before=0.5, timeout=self.timeout)
+            # Pegar página atual (COM DELAY aumentado para evitar 500)
+            response = self._safe_request('GET', url_busca, delay_before=1.5, timeout=self.timeout)
             asp_fields = self._extract_asp_fields(response.text)
 
             # Extrair CPF da busca anterior (campo pode estar preenchido)
@@ -423,7 +423,7 @@ class CanopusHTTPClient:
             cpf_field = soup.find('input', {'id': 'ctl00_Conteudo_edtContextoBusca'})
             cpf_valor = cpf_field.get('value', '') if cpf_field else ''
 
-            # Clicar no link (COM DELAY - simula humano clicando)
+            # Clicar no link (COM DELAY aumentado)
             click_data = {
                 **asp_fields,
                 '__LASTFOCUS': '',
@@ -438,7 +438,7 @@ class CanopusHTTPClient:
             response = self._safe_request(
                 'POST',
                 url_busca,
-                delay_before=0.8,  # Simula clique humano
+                delay_before=2.0,  # Delay maior para evitar 500 errors
                 data=click_data,
                 timeout=self.timeout,
                 allow_redirects=True
@@ -467,9 +467,9 @@ class CanopusHTTPClient:
         try:
             logger.info("📄 Emitindo boleto...")
 
-            # 1. Acessar página de emissão (COM DELAY)
+            # 1. Acessar página de emissão (COM DELAY aumentado)
             url_emissao = f'{self.BASE_URL}/CONCO/frmConCoRelBoletoAvulso.aspx'
-            response = self._safe_request('GET', url_emissao, delay_before=0.7, timeout=self.timeout)
+            response = self._safe_request('GET', url_emissao, delay_before=1.5, timeout=self.timeout)
 
             asp_fields = self._extract_asp_fields(response.text)
 
@@ -498,12 +498,12 @@ class CanopusHTTPClient:
             response = self._safe_request(
                 'POST',
                 url_emissao,
-                delay_before=1.2,  # Delay maior (humano selecionando boleto)
+                delay_before=2.0,  # Delay aumentado para evitar 500
                 data=checkbox_data,
                 timeout=self.timeout
             )
 
-            # 3. Clicar em "Emitir" (COM DELAY)
+            # 3. Clicar em "Emitir" (COM DELAY aumentado)
             asp_fields = self._extract_asp_fields(response.text)
 
             emitir_data = {
@@ -527,7 +527,7 @@ class CanopusHTTPClient:
             response = self._safe_request(
                 'POST',
                 url_emissao,
-                delay_before=0.9,  # Simula clique no botão
+                delay_before=1.5,  # Delay aumentado
                 data=emitir_data,
                 timeout=self.timeout
             )
@@ -556,7 +556,7 @@ class CanopusHTTPClient:
             response = self._safe_request(
                 'POST',
                 url_emissao,
-                delay_before=0.5,
+                delay_before=1.0,
                 data=popup_data,
                 timeout=self.timeout
             )
