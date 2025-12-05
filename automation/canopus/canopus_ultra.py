@@ -322,87 +322,63 @@ class CanopusUltra:
             await img_cbs[-1].click()
             await asyncio.sleep(0.5)
 
-            # Emitir - usar expect_popup para capturar o popup corretamente
-            logger.info(f"  [{idx}/{total}] Clicando em Emitir Cobrança...")
+            # ESTRATÉGIA: Interceptar bytes do PDF via response handler
+            logger.info(f"  [{idx}/{total}] Configurando interceptação de PDF...")
 
-            popup = None
-            try:
-                # Método 1: Usar expect_popup (mais confiável)
-                async with self.page.expect_popup(timeout=15000) as popup_info:
-                    await self.page.click('input[value="Emitir Cobrança"]')
-                popup = await popup_info.value
-                logger.info(f"  [{idx}/{total}] Popup capturado: {popup.url[:50]}...")
+            pdf_bytes_capturado = None
+            pdf_url_capturado = None
 
-                # IMPORTANTE: Aguardar o popup sair de about:blank e carregar conteúdo real
-                if popup.url == 'about:blank':
-                    logger.info(f"  [{idx}/{total}] Aguardando popup carregar...")
-                    # Aguardar navegação para URL real
-                    try:
-                        await popup.wait_for_url(lambda url: url != 'about:blank', timeout=10000)
-                        logger.info(f"  [{idx}/{total}] Popup navegou para: {popup.url[:50]}...")
-                    except:
-                        # Se não navegou, aguardar um pouco e verificar se tem conteúdo
-                        await asyncio.sleep(2)
-
-                # Aguardar carregamento completo
-                await popup.wait_for_load_state('networkidle', timeout=self.TIMEOUT_LONGO)
-
-            except Exception as e_popup:
-                logger.warning(f"  [{idx}/{total}] expect_popup falhou: {e_popup}")
-                # Método 2: Fallback - aguardar popup manualmente
-                popup = None
-                for attempt in range(30):  # 15 segundos máximo
-                    await asyncio.sleep(0.5)
-                    for p in self.context.pages:
-                        if p != self.page and p.url != 'about:blank':
-                            popup = p
-                            logger.info(f"  [{idx}/{total}] Popup encontrado (tentativa {attempt+1}): {p.url[:50]}...")
-                            break
-                    if popup:
-                        break
-
-            if popup and popup.url != 'about:blank':
-                # Aguardar mais tempo para garantir que o PDF carregou
-                logger.info(f"  [{idx}/{total}] Aguardando PDF carregar completamente...")
-                await asyncio.sleep(3)  # Dar tempo para o PDF renderizar
-
-                # Verificar se a página tem conteúdo (não está vazia)
+            async def interceptar_pdf(response):
+                nonlocal pdf_bytes_capturado, pdf_url_capturado
                 try:
-                    await popup.wait_for_load_state('networkidle', timeout=10000)
+                    content_type = response.headers.get('content-type', '').lower()
+                    url = response.url
+
+                    # Verificar se é PDF
+                    if ('pdf' in content_type or
+                        'octet-stream' in content_type or
+                        'frmConCmImpressao' in url or
+                        url.endswith('.pdf')):
+
+                        body = await response.body()
+                        tamanho = len(body)
+
+                        # Verificar se é PDF real (começa com %PDF)
+                        if body.startswith(b'%PDF') and tamanho > 10000:
+                            pdf_bytes_capturado = body
+                            pdf_url_capturado = url
+                            logger.info(f"  [{idx}/{total}] 🎯 PDF capturado: {tamanho/1024:.0f}KB")
                 except:
                     pass
 
-                # Salvar PDF
-                nome_arquivo = self._formatar_nome(nome, mes)
-                caminho = os.path.join(self.pasta_downloads, nome_arquivo)
+            # Registrar handler no contexto
+            self.context.on('response', interceptar_pdf)
 
-                await popup.pdf(path=caminho)
-                tamanho = os.path.getsize(caminho)
+            try:
+                # Clicar em Emitir Cobrança
+                logger.info(f"  [{idx}/{total}] Clicando em Emitir Cobrança...")
+                await self.page.click('input[value="Emitir Cobrança"]')
 
-                # Verificar se o arquivo é válido (> 10KB indica PDF real)
-                if tamanho < 10000:  # Menos de 10KB = provavelmente página em branco
-                    logger.warning(f"  [{idx}/{total}] PDF muito pequeno ({tamanho} bytes), tentando novamente...")
-                    await asyncio.sleep(3)  # Aguardar mais
-                    await popup.pdf(path=caminho)
-                    tamanho = os.path.getsize(caminho)
+                # Aguardar PDF ser interceptado (até 15 segundos)
+                for _ in range(30):
+                    await asyncio.sleep(0.5)
+                    if pdf_bytes_capturado:
+                        break
 
-                await popup.close()
+                # Remover handler
+                self.context.remove_listener('response', interceptar_pdf)
 
-                # Verificar tamanho final
-                if tamanho < 10000:
+                if pdf_bytes_capturado:
+                    # Salvar PDF
+                    nome_arquivo = self._formatar_nome(nome, mes)
+                    caminho = os.path.join(self.pasta_downloads, nome_arquivo)
+
+                    with open(caminho, 'wb') as f:
+                        f.write(pdf_bytes_capturado)
+
+                    tamanho = len(pdf_bytes_capturado)
                     duracao = (datetime.now() - inicio).total_seconds()
-                    resultado['erro'] = f'PDF inválido ({tamanho} bytes)'
-                    resultado['status'] = 'erro'
-                    resultado['duracao'] = duracao
-                    self.stats['erros'] += 1
-                    logger.error(f"❌ [{idx}/{total}] ERRO - CPF: {cpf_fmt} | PDF inválido ({tamanho} bytes) | ⏱️ {duracao:.1f}s")
-                    # Remover arquivo inválido
-                    try:
-                        os.remove(caminho)
-                    except:
-                        pass
-                else:
-                    duracao = (datetime.now() - inicio).total_seconds()
+
                     resultado['ok'] = True
                     resultado['status'] = 'sucesso'
                     resultado['arquivo'] = nome_arquivo
@@ -411,19 +387,19 @@ class CanopusUltra:
                     resultado['duracao'] = duracao
                     self.stats['sucessos'] += 1
 
-                    # Log de sucesso com tempo total e tamanho
                     tamanho_kb = tamanho / 1024
                     logger.info(f"✅ [{idx}/{total}] SUCESSO - CPF: {cpf_fmt} | {nome[:25]} | {tamanho_kb:.0f}KB | ⏱️ {duracao:.1f}s")
-            else:
-                duracao = (datetime.now() - inicio).total_seconds()
-                erro_msg = 'Popup ficou em about:blank' if popup else 'Popup do PDF não abriu'
-                resultado['erro'] = erro_msg
-                resultado['status'] = 'erro'
-                resultado['duracao'] = duracao
-                self.stats['erros'] += 1
+                else:
+                    duracao = (datetime.now() - inicio).total_seconds()
+                    resultado['erro'] = 'PDF não interceptado'
+                    resultado['status'] = 'erro'
+                    resultado['duracao'] = duracao
+                    self.stats['erros'] += 1
+                    logger.error(f"❌ [{idx}/{total}] ERRO - CPF: {cpf_fmt} | PDF não interceptado | ⏱️ {duracao:.1f}s")
 
-                # Log de erro com tempo total
-                logger.error(f"❌ [{idx}/{total}] ERRO - CPF: {cpf_fmt} | {erro_msg} | ⏱️ {duracao:.1f}s")
+            except Exception as e_emitir:
+                self.context.remove_listener('response', interceptar_pdf)
+                raise e_emitir
 
         except Exception as e:
             duracao = (datetime.now() - inicio).total_seconds()
