@@ -214,7 +214,7 @@ def db_connection():
                 logger.error(f"❌ Erro ao retornar conexão ao pool: {e}")
 
 
-def registrar_download(cpf: str, status: str, caminho_arquivo: str = None, error: str = None, tamanho_kb: float = None, consultor_id: int = 1):
+def registrar_download(cpf: str, status: str, caminho_arquivo: str = None, error: str = None, tamanho_kb: float = None):
     """
     Registra um download na tabela downloads_canopus
 
@@ -224,7 +224,6 @@ def registrar_download(cpf: str, status: str, caminho_arquivo: str = None, error
         caminho_arquivo: Caminho do arquivo PDF (se sucesso)
         error: Mensagem de erro (se falhou)
         tamanho_kb: Tamanho do arquivo em KB
-        consultor_id: ID do consultor (padrão: 1 = Danner)
     """
     try:
         with db_connection() as conn:
@@ -233,9 +232,9 @@ def registrar_download(cpf: str, status: str, caminho_arquivo: str = None, error
                 nome_arquivo = Path(caminho_arquivo).name if caminho_arquivo else None
                 tamanho_bytes = int(tamanho_kb * 1024) if tamanho_kb else None
 
+                # INSERT sem consultor_id (tabela está vazia, evita FK error)
                 cur.execute("""
                     INSERT INTO downloads_canopus (
-                        consultor_id,
                         cpf,
                         nome_arquivo,
                         caminho_arquivo,
@@ -244,8 +243,8 @@ def registrar_download(cpf: str, status: str, caminho_arquivo: str = None, error
                         status,
                         mensagem_erro,
                         created_at
-                    ) VALUES (%s, %s, %s, %s, %s, NOW(), %s, %s, NOW())
-                """, (consultor_id, cpf, nome_arquivo, caminho_arquivo, tamanho_bytes, status, error))
+                    ) VALUES (%s, %s, %s, %s, NOW(), %s, %s, NOW())
+                """, (cpf, nome_arquivo, caminho_arquivo, tamanho_bytes, status, error))
 
                 conn.commit()
                 logger.info(f"✅ Download registrado: CPF {cpf}, Status: {status}, Arquivo: {nome_arquivo}")
@@ -4721,17 +4720,17 @@ def baixar_boletos_http():
         client = CanopusHTTPClient(timeout=30)
 
         # ========================================================================
-        # MODO ULTRA: Delays mínimos para máxima velocidade
+        # MODO ULTRA: Delays otimizados (rápido mas evita 500 errors)
         # ========================================================================
         MODO_ULTRA = True  # Ativar modo ultra-rápido
 
         if MODO_ULTRA:
-            DELAY_INICIAL = 0.5           # Era 2-4s
-            DELAY_POS_LOGIN = 0.3         # Era 1.5-3s
-            DELAY_ENTRE_CLIENTES = 0.3    # Era 3-8s
-            DELAY_POS_BUSCA = 0.2         # Era 0.8-1.5s
-            DELAY_POS_ACESSO = 0.2        # Era 1.2-2.5s
-            logger.info("🚀 MODO ULTRA ATIVADO - Delays mínimos!")
+            DELAY_INICIAL = 1.0           # Era 2-4s, agora 1s
+            DELAY_POS_LOGIN = 0.8         # Era 1.5-3s, agora 0.8s
+            DELAY_ENTRE_CLIENTES = 1.5    # Era 3-8s, agora 1.5s (evita 500 errors)
+            DELAY_POS_BUSCA = 0.5         # Era 0.8-1.5s, agora 0.5s
+            DELAY_POS_ACESSO = 0.5        # Era 1.2-2.5s, agora 0.5s
+            logger.info("🚀 MODO ULTRA ATIVADO - Delays otimizados!")
         else:
             DELAY_INICIAL = random.uniform(2.0, 4.0)
             DELAY_POS_LOGIN = random.uniform(1.5, 3.0)
