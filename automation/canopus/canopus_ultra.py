@@ -268,7 +268,8 @@ class CanopusUltra:
                 resultado['status'] = 'cpf_nao_encontrado'
                 self.stats['cpf_nao_encontrado'] += 1
                 duracao = (datetime.now() - inicio).total_seconds()
-                logger.info(f"  [{idx}/{total}] ⚠️ {nome[:30]} - NÃO ENCONTRADO ({duracao:.1f}s)")
+                resultado['duracao'] = duracao
+                logger.info(f"⚠️ [{idx}/{total}] NÃO ENCONTRADO - CPF: {cpf_fmt} | {nome[:25]} | ⏱️ {duracao:.1f}s")
                 return resultado
 
             # PASSO 3: Selecionar cliente (timeout curto)
@@ -313,7 +314,8 @@ class CanopusUltra:
                 resultado['status'] = 'sem_boleto'
                 self.stats['sem_boleto'] += 1
                 duracao = (datetime.now() - inicio).total_seconds()
-                logger.info(f"  [{idx}/{total}] 📄 {nome[:30]} - SEM BOLETO ({duracao:.1f}s)")
+                resultado['duracao'] = duracao
+                logger.info(f"📄 [{idx}/{total}] SEM BOLETO - CPF: {cpf_fmt} | {nome[:25]} | ⏱️ {duracao:.1f}s")
                 return resultado
 
             # Marcar último boleto
@@ -355,8 +357,6 @@ class CanopusUltra:
                 await popup.close()
 
                 duracao = (datetime.now() - inicio).total_seconds()
-                logger.info(f"  [{idx}/{total}] ✓ {nome[:30]} ({duracao:.1f}s)")
-
                 resultado['ok'] = True
                 resultado['status'] = 'sucesso'
                 resultado['arquivo'] = nome_arquivo
@@ -364,16 +364,28 @@ class CanopusUltra:
                 resultado['tamanho'] = tamanho
                 resultado['duracao'] = duracao
                 self.stats['sucessos'] += 1
+
+                # Log de sucesso com tempo total
+                logger.info(f"✅ [{idx}/{total}] SUCESSO - CPF: {cpf_fmt} | {nome[:25]} | ⏱️ {duracao:.1f}s")
             else:
+                duracao = (datetime.now() - inicio).total_seconds()
                 resultado['erro'] = 'Popup do PDF não abriu'
                 resultado['status'] = 'erro'
+                resultado['duracao'] = duracao
                 self.stats['erros'] += 1
 
+                # Log de erro com tempo total
+                logger.error(f"❌ [{idx}/{total}] ERRO - CPF: {cpf_fmt} | Popup não abriu | ⏱️ {duracao:.1f}s")
+
         except Exception as e:
-            logger.error(f"  [{idx}/{total}] ✗ {nome[:30]}: {str(e)[:60]}")
+            duracao = (datetime.now() - inicio).total_seconds()
             resultado['erro'] = str(e)[:100]
             resultado['status'] = 'erro'
+            resultado['duracao'] = duracao
             self.stats['erros'] += 1
+
+            # Log de exceção com tempo total
+            logger.error(f"❌ [{idx}/{total}] ERRO - CPF: {cpf_fmt} | {str(e)[:50]} | ⏱️ {duracao:.1f}s")
 
         finally:
             # Fechar popups extras
