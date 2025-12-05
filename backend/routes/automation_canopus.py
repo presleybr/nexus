@@ -1256,6 +1256,66 @@ def health_check():
         }), 500
 
 
+# ============================================================================
+# ROTA PARA LISTAR PONTOS DE VENDA DISPONÍVEIS
+# ============================================================================
+
+@automation_canopus_bp.route('/pontos-venda', methods=['GET'])
+def listar_pontos_venda():
+    """
+    Lista pontos de venda disponíveis com credenciais configuradas
+    Usado pelo frontend para popular dropdowns de seleção
+    """
+    try:
+        with db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute("""
+                    SELECT
+                        ponto_venda,
+                        usuario,
+                        codigo_empresa,
+                        ativo,
+                        CASE
+                            WHEN ponto_venda = '24627' THEN 'Danner (PV 24627)'
+                            WHEN ponto_venda = '17308' THEN 'PV 17308'
+                            ELSE 'PV ' || ponto_venda
+                        END as nome_exibicao,
+                        created_at,
+                        updated_at
+                    FROM credenciais_canopus
+                    WHERE ativo = true
+                    ORDER BY ponto_venda
+                """)
+
+                pontos_venda = cur.fetchall()
+
+                # Contar clientes por PV
+                for pv in pontos_venda:
+                    cur.execute("""
+                        SELECT COUNT(DISTINCT cpf) as total_clientes
+                        FROM clientes_finais
+                        WHERE ponto_venda = %s AND ativo = TRUE
+                    """, (pv['ponto_venda'],))
+
+                    resultado = cur.fetchone()
+                    pv['total_clientes'] = resultado['total_clientes'] if resultado else 0
+
+        logger.info(f"📍 Listando {len(pontos_venda)} pontos de venda disponíveis")
+
+        return jsonify({
+            'success': True,
+            'pontos_venda': pontos_venda,
+            'total': len(pontos_venda)
+        })
+
+    except Exception as e:
+        logger.error(f"Erro ao listar pontos de venda: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @automation_canopus_bp.route('/pool-status', methods=['GET'])
 @handle_errors
 def get_pool_status():
@@ -1830,32 +1890,45 @@ def baixar_boletos_ponto_venda():
         }), 409  # 409 Conflict
 
     data = request.get_json() or {}
-    ponto_venda = data.get('ponto_venda', '24627')
+    ponto_venda_param = data.get('ponto_venda', '24627')
     mes = data.get('mes')
     ano = data.get('ano')
     forcar_todos = data.get('forcar_todos', False)  # Se True, ignora verificação e baixa todos
     reprocessar_erros = data.get('reprocessar_erros', True)  # Se True, inclui os que deram erro
 
-    logger.info(f"🚀 Iniciando download de boletos - PV: {ponto_venda}, Mês: {mes}, Ano: {ano}")
+    # Se "ambos" foi selecionado, processar os dois PVs
+    if ponto_venda_param == 'ambos':
+        pvs_para_processar = ['17308', '24627']
+        logger.info(f"🚀 MODO MÚLTIPLOS PVs: Processando {pvs_para_processar}")
+    else:
+        pvs_para_processar = [ponto_venda_param]
+
+    # Usar o primeiro PV para iniciar (ou processar em sequência)
+    ponto_venda = pvs_para_processar[0]
+
+    logger.info(f"🚀 Iniciando download de boletos - PV: {ponto_venda_param}, Mês: {mes}, Ano: {ano}")
     logger.info(f"📋 Forçar todos: {forcar_todos}, Reprocessar erros: {reprocessar_erros}")
     logger.info(f"📋 Dados recebidos: {data}")
+    logger.info(f"📋 PVs a processar: {pvs_para_processar}")
 
     # Criar orquestrador
     logger.info("🔧 Criando orquestrador...")
     orquestrador = CanopusOrquestrador()
 
-    # Buscar todos os CPFs dos clientes do ponto de venda no banco
-    logger.info(f"🔍 Buscando clientes do PV {ponto_venda}...")
+    # Buscar todos os CPFs dos clientes dos pontos de venda selecionados
+    logger.info(f"🔍 Buscando clientes dos PVs {pvs_para_processar}...")
 
     try:
         with db_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute("""
-                    SELECT DISTINCT c.cpf, c.nome_completo as nome
+                # Buscar clientes de TODOS os PVs selecionados
+                placeholders = ','.join(['%s'] * len(pvs_para_processar))
+                cur.execute(f"""
+                    SELECT DISTINCT c.cpf, c.nome_completo as nome, c.ponto_venda
                     FROM clientes_finais c
-                    WHERE c.ponto_venda = %s AND c.ativo = TRUE
-                    ORDER BY c.nome_completo
-                """, (ponto_venda,))
+                    WHERE c.ponto_venda IN ({placeholders}) AND c.ativo = TRUE
+                    ORDER BY c.ponto_venda, c.nome_completo
+                """, tuple(pvs_para_processar))
 
                 clientes = cur.fetchall()
                 logger.info(f"✅ Query executada. Resultados: {len(clientes)}")
@@ -1897,16 +1970,17 @@ def baixar_boletos_ponto_venda():
             try:
                 with db_connection() as conn_filter:
                     with conn_filter.cursor(row_factory=dict_row) as cur_filter:
-                        # Buscar CPFs já baixados com SUCESSO
-                        cur_filter.execute("""
+                        # Buscar CPFs já baixados com SUCESSO (de todos os PVs selecionados)
+                        placeholders = ','.join(['%s'] * len(pvs_para_processar))
+                        cur_filter.execute(f"""
                             SELECT DISTINCT cpf
                             FROM downloads_canopus
                             WHERE status = 'sucesso'
                             AND cpf IN (
                                 SELECT cpf FROM clientes_finais
-                                WHERE ponto_venda = %s AND ativo = TRUE
+                                WHERE ponto_venda IN ({placeholders}) AND ativo = TRUE
                             )
-                        """, (ponto_venda,))
+                        """, tuple(pvs_para_processar))
 
                         cpfs_sucesso = set(row['cpf'] for row in cur_filter.fetchall())
                         logger.info(f"✅ Encontrados {len(cpfs_sucesso)} CPFs já baixados com sucesso")
@@ -1914,18 +1988,18 @@ def baixar_boletos_ponto_venda():
                         # Buscar CPFs com ERRO anterior
                         cpfs_erro = set()
                         if not reprocessar_erros:
-                            cur_filter.execute("""
+                            cur_filter.execute(f"""
                                 SELECT DISTINCT cpf
                                 FROM downloads_canopus
                                 WHERE status IN ('erro', 'sem_boleto')
                                 AND cpf IN (
                                     SELECT cpf FROM clientes_finais
-                                    WHERE ponto_venda = %s AND ativo = TRUE
+                                    WHERE ponto_venda IN ({placeholders}) AND ativo = TRUE
                                 )
                                 AND cpf NOT IN (
                                     SELECT DISTINCT cpf FROM downloads_canopus WHERE status = 'sucesso'
                                 )
-                            """, (ponto_venda,))
+                            """, tuple(pvs_para_processar))
 
                             cpfs_erro = set(row['cpf'] for row in cur_filter.fetchall())
                             logger.info(f"❌ Encontrados {len(cpfs_erro)} CPFs com erro (serão IGNORADOS)")
@@ -1968,8 +2042,20 @@ def baixar_boletos_ponto_venda():
             logger.info("=" * 80)
             sys.stdout.flush()
 
-        # Criar lista de CPFs a processar
+        # Criar lista de CPFs a processar (mantendo o PV de cada cliente)
         cpfs = [c['cpf'] for c in clientes_filtrados]
+
+        # Agrupar clientes por PV para processamento
+        clientes_por_pv = {}
+        for cliente in clientes_filtrados:
+            pv_cliente = cliente.get('ponto_venda', ponto_venda)
+            if pv_cliente not in clientes_por_pv:
+                clientes_por_pv[pv_cliente] = []
+            clientes_por_pv[pv_cliente].append(cliente)
+
+        logger.info(f"📊 Clientes agrupados por PV:")
+        for pv, lista in clientes_por_pv.items():
+            logger.info(f"   PV {pv}: {len(lista)} clientes")
 
         if len(cpfs) == 0:
             logger.info("✅ TODOS OS BOLETOS JÁ FORAM BAIXADOS!")
@@ -2035,10 +2121,27 @@ def baixar_boletos_ponto_venda():
 
                 # Usar path relativo ou variável de ambiente para Render
                 base_dir = os.getenv('DOWNLOAD_BASE_DIR', str(Path(__file__).resolve().parent.parent.parent / 'automation' / 'canopus' / 'downloads'))
-                pasta_destino = Path(base_dir) / 'Danner'
-                pasta_destino.mkdir(parents=True, exist_ok=True)
 
-                logger.info(f"📁 Pasta de destino dos boletos: {pasta_destino}")
+                # Função helper para obter pasta de destino por PV
+                def obter_pasta_destino(pv):
+                    """Retorna pasta de downloads para o PV"""
+                    pastas_pv = {
+                        '24627': 'Danner',
+                        '17308': 'PV17308'
+                    }
+                    pasta_nome = pastas_pv.get(pv, f'PV{pv}')
+                    pasta = Path(base_dir) / pasta_nome
+                    pasta.mkdir(parents=True, exist_ok=True)
+                    return pasta
+
+                # Criar pasta principal para cada PV selecionado
+                for pv in pvs_para_processar:
+                    obter_pasta_destino(pv)
+
+                # Usar pasta do primeiro PV como padrão (para log)
+                pasta_destino = obter_pasta_destino(ponto_venda)
+                logger.info(f"📁 Pasta base de destino: {base_dir}")
+                logger.info(f"📁 Pastas criadas para PVs: {pvs_para_processar}")
 
                 # Buscar credenciais do banco usando conexão centralizada
                 try:
@@ -4368,27 +4471,38 @@ def baixar_boletos_http():
         }), 409
 
     data = request.get_json() or {}
-    ponto_venda = data.get('ponto_venda', '24627')
+    ponto_venda_param = data.get('ponto_venda', '24627')
     mes = data.get('mes')
     ano = data.get('ano')
     forcar_todos = data.get('forcar_todos', False)
     reprocessar_erros = data.get('reprocessar_erros', True)
 
-    logger.info(f"🌐 MODO HTTP - PV: {ponto_venda}, Mês: {mes}, Ano: {ano}")
-    logger.info(f"📋 Forçar todos: {forcar_todos}, Reprocessar erros: {reprocessar_erros}")
+    # Se "ambos" foi selecionado, processar os dois PVs
+    if ponto_venda_param == 'ambos':
+        pvs_para_processar = ['17308', '24627']
+        logger.info(f"🌐 MODO HTTP MÚLTIPLOS PVs: Processando {pvs_para_processar}")
+    else:
+        pvs_para_processar = [ponto_venda_param]
 
-    # Buscar clientes do ponto de venda
-    logger.info(f"🔍 Buscando clientes do PV {ponto_venda}...")
+    ponto_venda = pvs_para_processar[0]
+
+    logger.info(f"🌐 MODO HTTP - PV: {ponto_venda_param}, Mês: {mes}, Ano: {ano}")
+    logger.info(f"📋 Forçar todos: {forcar_todos}, Reprocessar erros: {reprocessar_erros}")
+    logger.info(f"📋 PVs a processar: {pvs_para_processar}")
+
+    # Buscar clientes dos pontos de venda selecionados
+    logger.info(f"🔍 Buscando clientes dos PVs {pvs_para_processar}...")
 
     try:
         with db_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute("""
-                    SELECT DISTINCT c.cpf, c.nome_completo as nome
+                placeholders = ','.join(['%s'] * len(pvs_para_processar))
+                cur.execute(f"""
+                    SELECT DISTINCT c.cpf, c.nome_completo as nome, c.ponto_venda
                     FROM clientes_finais c
-                    WHERE c.ponto_venda = %s AND c.ativo = TRUE
-                    ORDER BY c.nome_completo
-                """, (ponto_venda,))
+                    WHERE c.ponto_venda IN ({placeholders}) AND c.ativo = TRUE
+                    ORDER BY c.ponto_venda, c.nome_completo
+                """, tuple(pvs_para_processar))
 
                 clientes = cur.fetchall()
                 logger.info(f"✅ Query executada. Resultados: {len(clientes)}")
@@ -4419,16 +4533,17 @@ def baixar_boletos_http():
         try:
             with db_connection() as conn_filter:
                 with conn_filter.cursor(row_factory=dict_row) as cur_filter:
-                    # Buscar CPFs já baixados com SUCESSO
-                    cur_filter.execute("""
+                    # Buscar CPFs já baixados com SUCESSO (de todos os PVs selecionados)
+                    placeholders = ','.join(['%s'] * len(pvs_para_processar))
+                    cur_filter.execute(f"""
                         SELECT DISTINCT cpf
                         FROM downloads_canopus
                         WHERE status = 'sucesso'
                         AND cpf IN (
                             SELECT cpf FROM clientes_finais
-                            WHERE ponto_venda = %s AND ativo = TRUE
+                            WHERE ponto_venda IN ({placeholders}) AND ativo = TRUE
                         )
-                    """, (ponto_venda,))
+                    """, tuple(pvs_para_processar))
 
                     cpfs_sucesso = set(row['cpf'] for row in cur_filter.fetchall())
                     logger.info(f"✅ Encontrados {len(cpfs_sucesso)} CPFs já baixados")
@@ -4436,18 +4551,18 @@ def baixar_boletos_http():
                     # Buscar CPFs com ERRO anterior
                     cpfs_erro = set()
                     if not reprocessar_erros:
-                        cur_filter.execute("""
+                        cur_filter.execute(f"""
                             SELECT DISTINCT cpf
                             FROM downloads_canopus
                             WHERE status IN ('erro', 'sem_boleto')
                             AND cpf IN (
                                 SELECT cpf FROM clientes_finais
-                                WHERE ponto_venda = %s AND ativo = TRUE
+                                WHERE ponto_venda IN ({placeholders}) AND ativo = TRUE
                             )
                             AND cpf NOT IN (
                                 SELECT DISTINCT cpf FROM downloads_canopus WHERE status = 'sucesso'
                             )
-                        """, (ponto_venda,))
+                        """, tuple(pvs_para_processar))
 
                         cpfs_erro = set(row['cpf'] for row in cur_filter.fetchall())
                         logger.info(f"❌ Encontrados {len(cpfs_erro)} CPFs com erro (serão IGNORADOS)")
@@ -4532,11 +4647,28 @@ def baixar_boletos_http():
 
         atualizar_status(etapa='Configurando diretórios...')
 
-        # Pasta de destino
+        # Pasta de destino base
         base_dir = os.getenv('DOWNLOAD_BASE_DIR', str(root_path / 'automation' / 'canopus' / 'downloads'))
-        pasta_destino = Path(base_dir) / 'Danner'
-        pasta_destino.mkdir(parents=True, exist_ok=True)
-        logger.info(f"📁 Pasta de destino: {pasta_destino}")
+
+        # Função helper para obter pasta de destino por PV
+        def obter_pasta_destino_http(pv):
+            """Retorna pasta de downloads para o PV"""
+            pastas_pv = {
+                '24627': 'Danner',
+                '17308': 'PV17308'
+            }
+            pasta_nome = pastas_pv.get(pv, f'PV{pv}')
+            pasta = Path(base_dir) / pasta_nome
+            pasta.mkdir(parents=True, exist_ok=True)
+            return pasta
+
+        # Criar pastas para todos os PVs selecionados
+        for pv in pvs_para_processar:
+            obter_pasta_destino_http(pv)
+
+        pasta_destino = obter_pasta_destino_http(ponto_venda)
+        logger.info(f"📁 Pasta base de destino: {base_dir}")
+        logger.info(f"📁 Pastas criadas para PVs: {pvs_para_processar}")
 
         # Buscar credenciais
         try:

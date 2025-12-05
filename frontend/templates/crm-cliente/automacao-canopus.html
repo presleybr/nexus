@@ -527,15 +527,18 @@
                     <!-- Seletor de Ponto de Venda -->
                     <div style="margin-bottom: 1.5rem; position: relative; z-index: 1;">
                         <label style="display: block; color: #888; font-size: 0.9rem; margin-bottom: 0.75rem;">Ponto de Venda:</label>
-                        <div style="display: flex; gap: 1.5rem;">
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: not-allowed; opacity: 0.5;">
-                                <input type="checkbox" id="pvDownload17308" value="17308" disabled style="width: 18px; height: 18px;">
-                                <span style="color: #888; font-size: 0.95rem;">PV 17308 (Sem senha)</span>
+                        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="pvDownload17308" value="17308" style="width: 18px; height: 18px;">
+                                <span style="color: #fff; font-size: 0.95rem;">PV 17308</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                                 <input type="checkbox" id="pvDownload24627" value="24627" checked style="width: 18px; height: 18px;">
                                 <span style="color: #fff; font-size: 0.95rem;">PV 24627</span>
                             </label>
+                        </div>
+                        <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #888;">
+                            Selecione um ou mais PVs para download de boletos
                         </div>
                     </div>
 
@@ -933,7 +936,7 @@
         document.getElementById('btnIniciarDownload').addEventListener('click', async () => {
             const btn = document.getElementById('btnIniciarDownload');
 
-            // Verificar qual PV foi selecionado
+            // Verificar quais PVs foram selecionados
             const pv24627Checked = document.getElementById('pvDownload24627').checked;
             const pv17308Checked = document.getElementById('pvDownload17308').checked;
 
@@ -942,8 +945,15 @@
                 return;
             }
 
-            // Como apenas 24627 está disponível, usar ele
-            const pontoVenda = pv24627Checked ? '24627' : '17308';
+            // Determinar ponto_venda: ambos, 17308 ou 24627
+            let pontoVenda;
+            if (pv24627Checked && pv17308Checked) {
+                pontoVenda = 'ambos';
+            } else if (pv17308Checked) {
+                pontoVenda = '17308';
+            } else {
+                pontoVenda = '24627';
+            }
 
             btn.disabled = true;
             btn.innerHTML = '<span>🔍 Verificando...</span>';
@@ -1008,7 +1018,19 @@
 
         // Função auxiliar para iniciar download (usada pelos 2 botões)
         async function executarDownload(forcarTodos = false) {
-            const pontoVenda = document.getElementById('pvDownload24627').checked ? '24627' : '17308';
+            // Determinar ponto_venda: ambos, 17308 ou 24627
+            const pv24627Checked = document.getElementById('pvDownload24627').checked;
+            const pv17308Checked = document.getElementById('pvDownload17308').checked;
+
+            let pontoVenda;
+            if (pv24627Checked && pv17308Checked) {
+                pontoVenda = 'ambos';
+            } else if (pv17308Checked) {
+                pontoVenda = '17308';
+            } else {
+                pontoVenda = '24627';
+            }
+
             const reprocessarErros = document.getElementById('checkReprocessarErros').checked;
 
             // Calcular mês
