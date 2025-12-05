@@ -2,8 +2,8 @@
 Rotas de Automação Canopus
 API REST para gerenciar automação de download de boletos
 
-VERSÃO: 2.0.0-ULTRA (2025-12-05)
-MODO: CanopusUltra para downloads rápidos (~9s por cliente)
+VERSÃO: 3.0.0-PARALLEL (2025-12-05)
+MODO: CanopusUltra PARALELO com 2 workers (~4-5s por cliente)
 """
 
 from flask import Blueprint, request, jsonify, send_file
@@ -2210,12 +2210,13 @@ def baixar_boletos_ponto_venda():
 
                 atualizar_status(etapa='Iniciando modo ULTRA...')
 
-                # Criar instância do CanopusUltra
+                # Criar instância do CanopusUltra com 2 workers paralelos
                 canopus_ultra = CanopusUltra(
                     usuario=usuario_login,
                     senha=senha,
                     headless=headless_mode,
-                    callback_status=atualizar_status
+                    callback_status=atualizar_status,
+                    num_workers=2  # MODO PARALELO: 2x mais rápido!
                 )
 
                 try:
@@ -2270,16 +2271,138 @@ def baixar_boletos_ponto_venda():
                     import gc
                     process = psutil.Process()
 
-                    # Processar cada CPF na mesma sessão
-                    for idx, cpf in enumerate(cpfs, 1):
-                        # VERIFICAR SE FOI SOLICITADA PAUSA
-                        global execution_status
-                        if execution_status.get('pausado', False):
-                            logger.info("=" * 80)
-                            logger.info("⏸️ PAUSA SOLICITADA!")
-                            logger.info(f"   Pausando após cliente {idx - 1}/{len(cpfs)}")
-                            logger.info(f"   Próximo CPF a processar: {cpf}")
-                            logger.info("=" * 80)
+                    # ============================================================
+                    # MODO PARALELO: Processar todos os CPFs com 2 workers
+                    # ============================================================
+                    logger.info("=" * 80)
+                    logger.info("🚀 MODO PARALELO ATIVADO!")
+                    logger.info(f"   Workers: 2")
+                    logger.info(f"   CPFs a processar: {len(cpfs)}")
+                    logger.info("=" * 80)
+                    sys.stdout.flush()
+
+                    # Preparar lista de clientes com CPF e nome
+                    clientes_para_processar = []
+                    for cpf in cpfs:
+                        nome_cliente = 'CLIENTE'
+                        try:
+                            cliente_info = next((c for c in clientes if c['cpf'] == cpf), None)
+                            if cliente_info and cliente_info.get('nome'):
+                                nome_cliente = str(cliente_info['nome']).strip().upper()
+                        except:
+                            pass
+                        clientes_para_processar.append({'cpf': cpf, 'nome': nome_cliente})
+
+                    # Processar em paralelo!
+                    atualizar_status(etapa=f'Processando {len(cpfs)} clientes em PARALELO (2 workers)...')
+                    resultados_paralelos = await bot.processar_lote_paralelo(
+                        clientes=clientes_para_processar,
+                        mes=mes or 'JANEIRO'
+                    )
+
+                    logger.info("=" * 80)
+                    logger.info("✅ DOWNLOAD PARALELO CONCLUÍDO!")
+                    logger.info(f"   Sucessos: {resultados_paralelos.get('sucesso', 0)}")
+                    logger.info(f"   Erros: {resultados_paralelos.get('erros', 0)}")
+                    logger.info(f"   Duração: {resultados_paralelos.get('duracao', 0):.1f}s")
+                    logger.info("=" * 80)
+                    sys.stdout.flush()
+
+                    # Atualizar stats do backend
+                    stats['sucessos'] = resultados_paralelos.get('sucesso', 0)
+                    stats['erros'] = resultados_paralelos.get('erros', 0)
+                    stats['cpf_nao_encontrado'] = resultados_paralelos.get('cpf_nao_encontrado', 0)
+                    stats['sem_boleto'] = resultados_paralelos.get('sem_boleto', 0)
+                    stats['processados'] = len(resultados_paralelos.get('resultados', []))
+
+                    # Registrar cada resultado no banco de dados
+                    atualizar_status(etapa='Registrando downloads no banco de dados...')
+                    for idx, resultado in enumerate(resultados_paralelos.get('resultados', []), 1):
+                        cpf = resultado.get('cpf', '')
+
+                        logger.info(f"📝 Registrando {idx}/{len(resultados_paralelos.get('resultados', []))}: CPF {cpf}")
+                        sys.stdout.flush()
+
+                        # Verificar resultado
+                        if resultado.get('status') == 'sucesso':
+                            # REGISTRAR DOWNLOAD NO BANCO
+                            try:
+                                arquivo_caminho = resultado.get('caminho')
+                                arquivo_nome = resultado.get('arquivo')
+                                arquivo_tamanho = resultado.get('tamanho', 0)
+
+                                if arquivo_caminho and Path(arquivo_caminho).exists():
+                                    # Converter PDF para base64
+                                    import base64
+                                    with open(arquivo_caminho, 'rb') as pdf_file:
+                                        pdf_bytes = pdf_file.read()
+                                        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+
+                                    with db_connection() as conn_import:
+                                        with conn_import.cursor(row_factory=dict_row) as cur_import:
+                                            # Buscar consultor_id
+                                            cur_import.execute("""
+                                                SELECT consultor_id FROM clientes_finais
+                                                WHERE cpf = %s AND ativo = TRUE LIMIT 1
+                                            """, (cpf,))
+                                            consultor_row = cur_import.fetchone()
+                                            consultor_id = consultor_row['consultor_id'] if consultor_row else None
+
+                                            # Verificar se download já existe
+                                            cur_import.execute("""
+                                                SELECT id FROM downloads_canopus
+                                                WHERE cpf = %s AND nome_arquivo = %s
+                                            """, (cpf, arquivo_nome))
+                                            existe = cur_import.fetchone()
+
+                                            if not existe:
+                                                cur_import.execute("""
+                                                    INSERT INTO downloads_canopus (
+                                                        consultor_id, cpf, nome_arquivo,
+                                                        arquivo_base64, tamanho_bytes, status,
+                                                        data_download, created_at
+                                                    ) VALUES (%s, %s, %s, %s, %s, 'sucesso', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                                                """, (consultor_id, cpf, arquivo_nome, pdf_base64, arquivo_tamanho))
+                                                conn_import.commit()
+                                                logger.info(f"💾 ✅ Download registrado: {arquivo_nome}")
+                                            else:
+                                                logger.info(f"⏭️ Download já existe: {arquivo_nome}")
+                            except Exception as e_reg:
+                                logger.error(f"❌ Erro ao registrar download: {e_reg}")
+
+                        elif resultado.get('status') in ['cpf_nao_encontrado', 'sem_boleto', 'erro']:
+                            # Registrar erro/status no banco
+                            try:
+                                with db_connection() as conn_erro:
+                                    with conn_erro.cursor(row_factory=dict_row) as cur_erro:
+                                        cur_erro.execute("""
+                                            SELECT consultor_id FROM clientes_finais
+                                            WHERE cpf = %s AND ativo = TRUE LIMIT 1
+                                        """, (cpf,))
+                                        consultor_row = cur_erro.fetchone()
+                                        consultor_id = consultor_row['consultor_id'] if consultor_row else None
+
+                                        cur_erro.execute("""
+                                            INSERT INTO downloads_canopus (
+                                                consultor_id, cpf, status, mensagem_erro,
+                                                data_download, created_at
+                                            ) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                                        """, (consultor_id, cpf, resultado.get('status'), resultado.get('erro', 'Erro')))
+                                        conn_erro.commit()
+                            except Exception as e_reg:
+                                logger.error(f"❌ Erro ao registrar status: {e_reg}")
+
+                    # CÓDIGO ANTIGO SEQUENCIAL - REMOVIDO (substituído por paralelo acima)
+                    if False:  # Bloco desativado - mantido para referência
+                        for idx, cpf in enumerate(cpfs, 1):
+                            # VERIFICAR SE FOI SOLICITADA PAUSA
+                            global execution_status
+                            if execution_status.get('pausado', False):
+                                logger.info("=" * 80)
+                                logger.info("⏸️ PAUSA SOLICITADA!")
+                                logger.info(f"   Pausando após cliente {idx - 1}/{len(cpfs)}")
+                                logger.info(f"   Próximo CPF a processar: {cpf}")
+                                logger.info("=" * 80)
                             sys.stdout.flush()
 
                             # Aguardar até que retome ou finalize
