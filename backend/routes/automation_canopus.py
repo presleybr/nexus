@@ -2293,40 +2293,14 @@ def baixar_boletos_ponto_venda():
                             pass
                         clientes_para_processar.append({'cpf': cpf, 'nome': nome_cliente})
 
-                    # Processar em paralelo!
-                    atualizar_status(etapa=f'Processando {len(cpfs)} clientes em PARALELO (2 workers)...')
-                    resultados_paralelos = await bot.processar_lote_paralelo(
-                        clientes=clientes_para_processar,
-                        mes=mes or 'JANEIRO'
-                    )
-
-                    logger.info("=" * 80)
-                    logger.info("✅ DOWNLOAD PARALELO CONCLUÍDO!")
-                    logger.info(f"   Sucessos: {resultados_paralelos.get('sucesso', 0)}")
-                    logger.info(f"   Erros: {resultados_paralelos.get('erros', 0)}")
-                    logger.info(f"   Duração: {resultados_paralelos.get('duracao', 0):.1f}s")
-                    logger.info("=" * 80)
-                    sys.stdout.flush()
-
-                    # Atualizar stats do backend
-                    stats['sucessos'] = resultados_paralelos.get('sucesso', 0)
-                    stats['erros'] = resultados_paralelos.get('erros', 0)
-                    stats['cpf_nao_encontrado'] = resultados_paralelos.get('cpf_nao_encontrado', 0)
-                    stats['sem_boleto'] = resultados_paralelos.get('sem_boleto', 0)
-                    stats['processados'] = len(resultados_paralelos.get('resultados', []))
-
-                    # Registrar cada resultado no banco de dados
-                    atualizar_status(etapa='Registrando downloads no banco de dados...')
-                    for idx, resultado in enumerate(resultados_paralelos.get('resultados', []), 1):
+                    # Callback para registrar cada download em TEMPO REAL no banco
+                    async def registrar_resultado_banco(resultado):
+                        """Registra cada resultado no banco imediatamente após o download"""
                         cpf = resultado.get('cpf', '')
+                        status_resultado = resultado.get('status', 'erro')
 
-                        logger.info(f"📝 Registrando {idx}/{len(resultados_paralelos.get('resultados', []))}: CPF {cpf}")
-                        sys.stdout.flush()
-
-                        # Verificar resultado
-                        if resultado.get('status') == 'sucesso':
-                            # REGISTRAR DOWNLOAD NO BANCO
-                            try:
+                        try:
+                            if status_resultado == 'sucesso':
                                 arquivo_caminho = resultado.get('caminho')
                                 arquivo_nome = resultado.get('arquivo')
                                 arquivo_tamanho = resultado.get('tamanho', 0)
@@ -2338,59 +2312,90 @@ def baixar_boletos_ponto_venda():
                                         pdf_bytes = pdf_file.read()
                                         pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
 
-                                    with db_connection() as conn_import:
-                                        with conn_import.cursor(row_factory=dict_row) as cur_import:
+                                    with db_connection() as conn_reg:
+                                        with conn_reg.cursor(row_factory=dict_row) as cur_reg:
                                             # Buscar consultor_id
-                                            cur_import.execute("""
+                                            cur_reg.execute("""
                                                 SELECT consultor_id FROM clientes_finais
                                                 WHERE cpf = %s AND ativo = TRUE LIMIT 1
                                             """, (cpf,))
-                                            consultor_row = cur_import.fetchone()
+                                            consultor_row = cur_reg.fetchone()
                                             consultor_id = consultor_row['consultor_id'] if consultor_row else None
 
                                             # Verificar se download já existe
-                                            cur_import.execute("""
+                                            cur_reg.execute("""
                                                 SELECT id FROM downloads_canopus
                                                 WHERE cpf = %s AND nome_arquivo = %s
                                             """, (cpf, arquivo_nome))
-                                            existe = cur_import.fetchone()
+                                            existe = cur_reg.fetchone()
 
                                             if not existe:
-                                                cur_import.execute("""
+                                                cur_reg.execute("""
                                                     INSERT INTO downloads_canopus (
                                                         consultor_id, cpf, nome_arquivo,
                                                         caminho_arquivo, tamanho_bytes, status,
                                                         data_download, created_at
                                                     ) VALUES (%s, %s, %s, %s, %s, 'sucesso', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                                                 """, (consultor_id, cpf, arquivo_nome, pdf_base64, arquivo_tamanho))
-                                                conn_import.commit()
-                                                logger.info(f"💾 ✅ Download registrado: {arquivo_nome}")
+                                                conn_reg.commit()
+                                                logger.info(f"💾 ✅ REGISTRADO EM TEMPO REAL: {arquivo_nome}")
+                                                stats['sucessos'] += 1
                                             else:
-                                                logger.info(f"⏭️ Download já existe: {arquivo_nome}")
-                            except Exception as e_reg:
-                                logger.error(f"❌ Erro ao registrar download: {e_reg}")
+                                                logger.info(f"⏭️ Já existe: {arquivo_nome}")
+                                else:
+                                    logger.warning(f"⚠️ Arquivo não encontrado: {arquivo_caminho}")
 
-                        elif resultado.get('status') in ['cpf_nao_encontrado', 'sem_boleto', 'erro']:
-                            # Registrar erro/status no banco
-                            try:
-                                with db_connection() as conn_erro:
-                                    with conn_erro.cursor(row_factory=dict_row) as cur_erro:
-                                        cur_erro.execute("""
+                            else:
+                                # Registrar erro/status no banco
+                                with db_connection() as conn_err:
+                                    with conn_err.cursor(row_factory=dict_row) as cur_err:
+                                        cur_err.execute("""
                                             SELECT consultor_id FROM clientes_finais
                                             WHERE cpf = %s AND ativo = TRUE LIMIT 1
                                         """, (cpf,))
-                                        consultor_row = cur_erro.fetchone()
+                                        consultor_row = cur_err.fetchone()
                                         consultor_id = consultor_row['consultor_id'] if consultor_row else None
 
-                                        cur_erro.execute("""
+                                        cur_err.execute("""
                                             INSERT INTO downloads_canopus (
                                                 consultor_id, cpf, status, mensagem_erro,
                                                 data_download, created_at
                                             ) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                                        """, (consultor_id, cpf, resultado.get('status'), resultado.get('erro', 'Erro')))
-                                        conn_erro.commit()
-                            except Exception as e_reg:
-                                logger.error(f"❌ Erro ao registrar status: {e_reg}")
+                                        """, (consultor_id, cpf, status_resultado, resultado.get('erro', 'Erro')))
+                                        conn_err.commit()
+                                        logger.info(f"💾 Registrado status '{status_resultado}': CPF {cpf}")
+
+                                # Atualizar stats
+                                if status_resultado == 'cpf_nao_encontrado':
+                                    stats['cpf_nao_encontrado'] += 1
+                                elif status_resultado == 'sem_boleto':
+                                    stats['sem_boleto'] += 1
+                                else:
+                                    stats['erros'] += 1
+
+                            stats['processados'] += 1
+
+                        except Exception as e_reg:
+                            logger.error(f"❌ Erro ao registrar no banco: {e_reg}")
+                            logger.exception("Traceback:")
+
+                    # Processar em paralelo COM REGISTRO EM TEMPO REAL!
+                    atualizar_status(etapa=f'Processando {len(cpfs)} clientes em PARALELO (2 workers)...')
+                    resultados_paralelos = await bot.processar_lote_paralelo(
+                        clientes=clientes_para_processar,
+                        mes=mes or 'JANEIRO',
+                        on_resultado=registrar_resultado_banco  # Callback para registro em tempo real!
+                    )
+
+                    logger.info("=" * 80)
+                    logger.info("✅ DOWNLOAD PARALELO CONCLUÍDO!")
+                    logger.info(f"   Sucessos: {stats['sucessos']}")
+                    logger.info(f"   Erros: {stats['erros']}")
+                    logger.info(f"   Duração: {resultados_paralelos.get('duracao', 0):.1f}s")
+                    logger.info("=" * 80)
+                    sys.stdout.flush()
+
+                    # Stats já foram atualizados em tempo real pelo callback
 
                     # Monitoramento final de memória
                     mem_final = process.memory_info().rss / 1024 / 1024

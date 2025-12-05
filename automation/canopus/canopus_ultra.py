@@ -566,7 +566,8 @@ class CanopusUltra:
         clientes_worker: List[Dict],
         mes: str,
         total_geral: int,
-        offset: int
+        offset: int,
+        on_resultado: Callable = None
     ) -> List[dict]:
         """
         Worker que processa uma lista de clientes em uma página específica.
@@ -578,6 +579,7 @@ class CanopusUltra:
             mes: Mês do boleto
             total_geral: Total de clientes de todos os workers
             offset: Offset do índice (para mostrar número correto no log)
+            on_resultado: Callback chamado após cada resultado (para registro em tempo real)
 
         Returns:
             Lista de resultados
@@ -599,6 +601,13 @@ class CanopusUltra:
             )
             resultados.append(r)
 
+            # Chamar callback em tempo real para registro no banco
+            if on_resultado:
+                try:
+                    await on_resultado(r)
+                except Exception as e:
+                    logger.error(f"[W{worker_id}] Erro no callback on_resultado: {e}")
+
             # Atualizar progresso global
             async with self._stats_lock:
                 self.stats['processados'] += 1
@@ -615,7 +624,8 @@ class CanopusUltra:
         self,
         clientes: List[Dict],
         mes: str = 'JANEIRO',
-        verificar_pausa: Callable = None
+        verificar_pausa: Callable = None,
+        on_resultado: Callable = None
     ) -> dict:
         """
         Processa lote de clientes em PARALELO usando múltiplos workers.
@@ -624,6 +634,7 @@ class CanopusUltra:
             clientes: Lista de dicts com 'cpf' e 'nome'
             mes: Mês do boleto
             verificar_pausa: Callback para verificar se deve pausar (não usado em paralelo)
+            on_resultado: Callback async chamado após cada resultado (para registro em tempo real)
 
         Returns:
             Dict com estatísticas e resultados
@@ -674,7 +685,8 @@ class CanopusUltra:
                 clientes_worker=clientes_por_worker[w],
                 mes=mes,
                 total_geral=total,
-                offset=offset
+                offset=offset,
+                on_resultado=on_resultado  # Callback para registro em tempo real
             )
             tasks.append(task)
             offset += len(clientes_por_worker[w])
