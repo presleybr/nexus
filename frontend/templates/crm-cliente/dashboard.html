@@ -419,6 +419,53 @@
                 </div>
             </div>
 
+            <!-- Painel de Reset - APENAS STAGING -->
+            <div id="painelResetStaging" style="display: none; margin-bottom: 2rem;">
+                <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%); border-left: 4px solid #ef4444; border-radius: 12px; padding: 1.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                        <span style="font-size: 1.2rem;">⚠️</span>
+                        <span style="font-size: 1.1rem; font-weight: 700; color: #ef4444;">MODO STAGING - Ferramentas de Desenvolvimento</span>
+                    </div>
+                    <p style="color: #888; margin-bottom: 1rem; font-size: 0.9rem;">
+                        Estas opções só aparecem no ambiente de staging e permitem resetar dados para testes.
+                    </p>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <button onclick="resetarDadosBoletos()" style="
+                            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                            color: white;
+                            border: none;
+                            padding: 0.75rem 1.5rem;
+                            border-radius: 8px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            display: flex;
+                            align-items: center;
+                            gap: 0.5rem;
+                            transition: transform 0.2s, box-shadow 0.2s;
+                        " onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 4px 15px rgba(239,68,68,0.4)';"
+                           onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';">
+                            🗑️ Resetar Clientes e Boletos
+                        </button>
+                        <button onclick="resetarApenasDownloads()" style="
+                            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                            color: white;
+                            border: none;
+                            padding: 0.75rem 1.5rem;
+                            border-radius: 8px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            display: flex;
+                            align-items: center;
+                            gap: 0.5rem;
+                            transition: transform 0.2s, box-shadow 0.2s;
+                        " onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 4px 15px rgba(245,158,11,0.4)';"
+                           onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';">
+                            📥 Resetar Apenas Downloads
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Ações Rápidas -->
             <div class="cards-grid">
                 <div class="card" style="cursor: pointer;" onclick="window.location.href='/crm/cadastro-clientes'">
@@ -428,24 +475,6 @@
                     </div>
                     <p style="color: var(--cor-texto-secundario);">Adicione novos clientes ao sistema</p>
                 </div>
-
-                <!-- REMOVIDO - Botões perigosos não devem aparecer para o cliente final
-                <div class="card" style="cursor: pointer; border-left: 4px solid #f59e0b;" onclick="resetarDados()">
-                    <div class="card-header">
-                        <span class="card-title">🗑️ Resetar Dados</span>
-                        <span class="card-icon" style="color: #f59e0b;">⚠️</span>
-                    </div>
-                    <p style="color: var(--cor-texto-secundario);">Limpa TODOS os clientes e boletos do banco</p>
-                </div>
-
-                <div class="card" style="cursor: pointer; border-left: 4px solid #ef4444;" onclick="resetarReimportar()">
-                    <div class="card-header">
-                        <span class="card-title">🔄 Resetar e Reimportar</span>
-                        <span class="card-icon" style="color: #ef4444;">⚠️</span>
-                    </div>
-                    <p style="color: var(--cor-texto-secundario);">Limpa dados antigos e reimporta do Excel + PDFs</p>
-                </div>
-                -->
 
                 <div class="card" style="cursor: pointer;" onclick="window.location.href='/crm/disparos'">
                     <div class="card-header">
@@ -831,10 +860,93 @@
         }
         */
 
+        // Verificar se está em ambiente staging
+        function isStaging() {
+            const hostname = window.location.hostname;
+            return hostname.includes('staging') ||
+                   hostname.includes('localhost') ||
+                   hostname.includes('127.0.0.1') ||
+                   hostname.includes('develop');
+        }
+
+        // Mostrar painel de reset apenas em staging
+        function verificarAmbienteStaging() {
+            if (isStaging()) {
+                const painel = document.getElementById('painelResetStaging');
+                if (painel) {
+                    painel.style.display = 'block';
+                }
+            }
+        }
+
+        // Resetar clientes, boletos e downloads
+        async function resetarDadosBoletos() {
+            if (!confirm('⚠️ ATENÇÃO!\n\nIsso vai apagar TODOS os dados de:\n- Clientes Finais\n- Boletos\n- Downloads Canopus\n\nTem certeza?')) {
+                return;
+            }
+
+            if (!confirm('🔴 ÚLTIMA CONFIRMAÇÃO!\n\nEsta ação NÃO pode ser desfeita.\n\nDigite "RESET" mentalmente e clique OK para confirmar.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/reset-dados-boletos', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ Dados resetados com sucesso!\n\n' +
+                          `Clientes removidos: ${data.clientes_removidos}\n` +
+                          `Boletos removidos: ${data.boletos_removidos}\n` +
+                          `Downloads removidos: ${data.downloads_removidos}`);
+
+                    // Recarregar estatísticas
+                    carregarDashboardStats();
+                } else {
+                    alert('❌ Erro ao resetar dados:\n' + data.error);
+                }
+            } catch (error) {
+                alert('❌ Erro ao conectar com o servidor:\n' + error.message);
+            }
+        }
+
+        // Resetar apenas downloads
+        async function resetarApenasDownloads() {
+            if (!confirm('⚠️ ATENÇÃO!\n\nIsso vai apagar TODOS os downloads da tabela downloads_canopus.\n\nTem certeza?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/reset-downloads', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ Downloads resetados com sucesso!\n\n' +
+                          `Downloads removidos: ${data.downloads_removidos}`);
+                } else {
+                    alert('❌ Erro ao resetar downloads:\n' + data.error);
+                }
+            } catch (error) {
+                alert('❌ Erro ao conectar com o servidor:\n' + error.message);
+            }
+        }
+
         // Inicializar ao carregar a página
         document.addEventListener('DOMContentLoaded', function() {
             carregarConfiguracaoAutomacao();
             carregarDashboardStats();
+            verificarAmbienteStaging();
 
             // Recarregar estatísticas a cada 30 segundos
             setInterval(carregarDashboardStats, 30000);

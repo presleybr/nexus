@@ -47,6 +47,7 @@ from routes.portal_consorcio import register_portal_routes
 from routes.boletos_modelo import register_boletos_modelo_routes
 from routes.automation_canopus import automation_canopus_bp
 from routes.crm_boletos_api import boletos_api_bp
+from routes.admin_staging import admin_staging_bp
 
 
 def create_app():
@@ -82,6 +83,7 @@ def create_app():
     app.register_blueprint(automation_bp)
     app.register_blueprint(automation_canopus_bp)  # Automação Canopus
     app.register_blueprint(boletos_api_bp)  # API de Boletos
+    app.register_blueprint(admin_staging_bp)  # Rotas admin (apenas staging)
     app.register_blueprint(webhook_bp)
 
     # Registra rotas do Portal Consórcio
