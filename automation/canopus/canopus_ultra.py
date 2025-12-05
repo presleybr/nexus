@@ -362,25 +362,58 @@ class CanopusUltra:
                         break
 
             if popup and popup.url != 'about:blank':
+                # Aguardar mais tempo para garantir que o PDF carregou
+                logger.info(f"  [{idx}/{total}] Aguardando PDF carregar completamente...")
+                await asyncio.sleep(3)  # Dar tempo para o PDF renderizar
+
+                # Verificar se a página tem conteúdo (não está vazia)
+                try:
+                    await popup.wait_for_load_state('networkidle', timeout=10000)
+                except:
+                    pass
+
                 # Salvar PDF
                 nome_arquivo = self._formatar_nome(nome, mes)
                 caminho = os.path.join(self.pasta_downloads, nome_arquivo)
 
                 await popup.pdf(path=caminho)
                 tamanho = os.path.getsize(caminho)
+
+                # Verificar se o arquivo é válido (> 10KB indica PDF real)
+                if tamanho < 10000:  # Menos de 10KB = provavelmente página em branco
+                    logger.warning(f"  [{idx}/{total}] PDF muito pequeno ({tamanho} bytes), tentando novamente...")
+                    await asyncio.sleep(3)  # Aguardar mais
+                    await popup.pdf(path=caminho)
+                    tamanho = os.path.getsize(caminho)
+
                 await popup.close()
 
-                duracao = (datetime.now() - inicio).total_seconds()
-                resultado['ok'] = True
-                resultado['status'] = 'sucesso'
-                resultado['arquivo'] = nome_arquivo
-                resultado['caminho'] = caminho
-                resultado['tamanho'] = tamanho
-                resultado['duracao'] = duracao
-                self.stats['sucessos'] += 1
+                # Verificar tamanho final
+                if tamanho < 10000:
+                    duracao = (datetime.now() - inicio).total_seconds()
+                    resultado['erro'] = f'PDF inválido ({tamanho} bytes)'
+                    resultado['status'] = 'erro'
+                    resultado['duracao'] = duracao
+                    self.stats['erros'] += 1
+                    logger.error(f"❌ [{idx}/{total}] ERRO - CPF: {cpf_fmt} | PDF inválido ({tamanho} bytes) | ⏱️ {duracao:.1f}s")
+                    # Remover arquivo inválido
+                    try:
+                        os.remove(caminho)
+                    except:
+                        pass
+                else:
+                    duracao = (datetime.now() - inicio).total_seconds()
+                    resultado['ok'] = True
+                    resultado['status'] = 'sucesso'
+                    resultado['arquivo'] = nome_arquivo
+                    resultado['caminho'] = caminho
+                    resultado['tamanho'] = tamanho
+                    resultado['duracao'] = duracao
+                    self.stats['sucessos'] += 1
 
-                # Log de sucesso com tempo total
-                logger.info(f"✅ [{idx}/{total}] SUCESSO - CPF: {cpf_fmt} | {nome[:25]} | ⏱️ {duracao:.1f}s")
+                    # Log de sucesso com tempo total e tamanho
+                    tamanho_kb = tamanho / 1024
+                    logger.info(f"✅ [{idx}/{total}] SUCESSO - CPF: {cpf_fmt} | {nome[:25]} | {tamanho_kb:.0f}KB | ⏱️ {duracao:.1f}s")
             else:
                 duracao = (datetime.now() - inicio).total_seconds()
                 erro_msg = 'Popup ficou em about:blank' if popup else 'Popup do PDF não abriu'
