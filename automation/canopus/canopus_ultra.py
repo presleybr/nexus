@@ -63,10 +63,10 @@ class CanopusUltra:
 
     BASE_URL = 'https://cnp3.consorciocanopus.com.br'
 
-    # Timeouts otimizados (em ms)
-    TIMEOUT_RAPIDO = 3000      # 3s para verificações rápidas
-    TIMEOUT_NORMAL = 5000      # 5s para operações normais
-    TIMEOUT_LONGO = 10000      # 10s para operações longas
+    # Timeouts ULTRA otimizados (em ms)
+    TIMEOUT_RAPIDO = 2000      # 2s para verificações rápidas
+    TIMEOUT_NORMAL = 4000      # 4s para operações normais
+    TIMEOUT_LONGO = 8000       # 8s para operações longas
 
     def __init__(
         self,
@@ -182,12 +182,12 @@ class CanopusUltra:
         try:
             await self.page.goto(f'{self.BASE_URL}/WWW/frmCorCCCnsLogin.aspx')
             await self.page.wait_for_load_state('networkidle')
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.3)
 
             await self.page.fill('#edtUsuario', self.usuario)
             await self.page.fill('#edtSenha', self.senha)
             await self.page.click('#btnLogin')
-            await asyncio.sleep(2)
+            await asyncio.sleep(1.2)
 
             return 'frmMain.aspx' in self.page.url
 
@@ -258,8 +258,8 @@ class CanopusUltra:
             # Buscar
             await self.page.click('input[value="Buscar"]')
 
-            # TIMEOUT CURTO para resultado da busca (~1.5s)
-            await asyncio.sleep(1.5)
+            # TIMEOUT CURTO para resultado da busca
+            await asyncio.sleep(1.0)
 
             # Verificar resultado RAPIDAMENTE
             html = await self.page.content()
@@ -277,7 +277,7 @@ class CanopusUltra:
                 link = await self.page.wait_for_selector('td a', timeout=self.TIMEOUT_RAPIDO)
                 if link:
                     await link.click()
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(0.2)
             except:
                 resultado['erro'] = 'Link do cliente não encontrado'
                 resultado['status'] = 'cpf_nao_encontrado'
@@ -299,7 +299,7 @@ class CanopusUltra:
             # PASSO 4: Emissão de boleto (navegação direta)
             await self.page.goto(f'{self.BASE_URL}/WWW/CONCO/frmConCoRelBoletoAvulso.aspx')
             await self.page.wait_for_load_state('domcontentloaded')
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.3)
 
             # Verificar se há boletos disponíveis (timeout curto)
             try:
@@ -320,7 +320,7 @@ class CanopusUltra:
 
             # Marcar último boleto
             await img_cbs[-1].click()
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.3)
 
             # ESTRATÉGIA: Usar route handler para interceptar PDF (como código antigo)
             logger.info(f"  [{idx}/{total}] Configurando interceptação de PDF...")
@@ -375,13 +375,11 @@ class CanopusUltra:
                 logger.info(f"  [{idx}/{total}] Clicando em Emitir Cobrança...")
                 await self.page.click('input[value="Emitir Cobrança"]')
 
-                # Aguardar PDF ser interceptado (até 20 segundos)
-                for i in range(40):
+                # Aguardar PDF ser interceptado (até 12 segundos)
+                for i in range(24):
                     await asyncio.sleep(0.5)
                     if pdf_bytes_capturado:
                         break
-                    if i % 10 == 0 and i > 0:
-                        logger.info(f"  [{idx}/{total}] Aguardando PDF... ({i/2:.0f}s)")
 
                 # Remover route handler
                 await self.context.unroute('**/*', route_pdf_handler)
