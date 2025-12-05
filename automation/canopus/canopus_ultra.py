@@ -3,8 +3,8 @@ Canopus ULTRA - Velocidade Máxima com Processamento Paralelo
 ============================================================
 Método otimizado para download de boletos Canopus.
 
-Versão: 3.0.0 (2025-12-04)
-Build: PARALLEL
+Versão: 3.0.1 (2025-12-05)
+Build: PARALLEL-FIX
 
 Características:
 - Login único compartilhado entre processamentos
@@ -389,7 +389,7 @@ class CanopusUltra:
                     # Buscar resposta
                     response = await route.fetch()
                     content_type = response.headers.get('content-type', '').lower()
-                    body = response.body  # bytes
+                    body = await response.body()  # bytes - body() é método async!
 
                     logger.info(f"  [W{worker_id}] 📦 Content-Type: {content_type}, Size: {len(body)} bytes")
 
