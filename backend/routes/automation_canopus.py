@@ -1,6 +1,9 @@
 """
 Rotas de Automação Canopus
 API REST para gerenciar automação de download de boletos
+
+VERSÃO: 2.0.0-ULTRA (2025-12-05)
+MODO: CanopusUltra para downloads rápidos (~9s por cliente)
 """
 
 from flask import Blueprint, request, jsonify, send_file
@@ -16,6 +19,13 @@ import os
 
 # Configurar logger PRIMEIRO
 logger = logging.getLogger(__name__)
+
+# Log de identificação da versão
+print("=" * 80)
+print("🚀 AUTOMATION_CANOPUS v2.0.0-ULTRA carregado!")
+print("📅 Build: 2025-12-05 - Modo ULTRA para downloads rápidos")
+print("=" * 80)
+sys.stdout.flush()
 
 # ESTRATÉGIA DE PATHS: Adicionar backend PRIMEIRO, depois root (para automation)
 # Isso garante que models.database funcione, e também que automation.canopus seja importável
