@@ -77,6 +77,9 @@ class CanopusHibrido:
 
         self.page = await self.context.new_page()
 
+        # Capturar logs do console JavaScript
+        self.page.on('console', lambda msg: logger.info(f"[CONSOLE] {msg.text}"))
+
         # Tentar aplicar stealth
         try:
             from playwright_stealth import stealth_async
@@ -245,10 +248,13 @@ class CanopusHibrido:
 
     const navegarAtendimento = async () => {{
         try {{
+            console.log('[JS] Navegando para atendimento...');
             const urlMain = '/WWW/frmMain.aspx';
             let resp = await fetch(urlMain, {{ credentials: 'include' }});
+            console.log('[JS] GET frmMain.aspx:', resp.status);
             let html = await resp.text();
             let campos = extrairCamposASP(html);
+            console.log('[JS] Campos ASP extraidos:', Object.keys(campos).length);
 
             const form = new URLSearchParams();
             Object.entries(campos).forEach(([k, v]) => form.append(k, v));
@@ -261,20 +267,24 @@ class CanopusHibrido:
                 body: form.toString(),
                 credentials: 'include'
             }});
+            console.log('[JS] POST Atendimento:', resp.status);
 
             return resp.ok;
         }} catch (e) {{
-            console.error('Erro ao navegar atendimento:', e);
+            console.error('[JS] Erro ao navegar atendimento:', e);
             return false;
         }}
     }};
 
     const buscarCliente = async (cpf) => {{
         try {{
+            console.log('[JS] Buscando cliente CPF:', cpf);
             const urlBusca = '/WWW/CONAT/frmBuscaCota.aspx';
             let resp = await fetch(urlBusca, {{ credentials: 'include' }});
+            console.log('[JS] GET frmBuscaCota:', resp.status);
             let html = await resp.text();
             let campos = extrairCamposASP(html);
+            console.log('[JS] Campos extraidos:', Object.keys(campos).length);
 
             // Selecionar CPF no dropdown
             let form = new URLSearchParams();
@@ -290,16 +300,19 @@ class CanopusHibrido:
                 body: form.toString(),
                 credentials: 'include'
             }});
+            console.log('[JS] POST selecionar dropdown:', resp.status);
             html = await resp.text();
             campos = extrairCamposASP(html);
 
             await delay(CONFIG.delayEntreAcoes);
 
             // Buscar CPF
+            const cpfFormatado = formatarCPF(cpf);
+            console.log('[JS] CPF formatado:', cpfFormatado);
             form = new URLSearchParams();
             Object.entries(campos).forEach(([k, v]) => form.append(k, v));
             form.set('ctl00$Conteudo$cbxCriterioBusca', 'F');
-            form.set('ctl00$Conteudo$edtContextoBusca', formatarCPF(cpf));
+            form.set('ctl00$Conteudo$edtContextoBusca', cpfFormatado);
             form.set('__EVENTTARGET', 'ctl00$Conteudo$btnBuscar');
             form.set('__EVENTARGUMENT', '');
 
@@ -309,16 +322,23 @@ class CanopusHibrido:
                 body: form.toString(),
                 credentials: 'include'
             }});
+            console.log('[JS] POST buscar:', resp.status);
             html = await resp.text();
 
             const mGrupo = html.match(/CD_Grupo=(\\d+)/);
             const mCota = html.match(/CD_Cota=(\\d+)/);
 
+            console.log('[JS] Resultado busca - Grupo:', mGrupo ? mGrupo[1] : 'null', 'Cota:', mCota ? mCota[1] : 'null');
+
             if (mGrupo && mCota) {{
                 return {{ ok: true, grupo: mGrupo[1], cota: mCota[1] }};
             }}
+
+            // Debug: mostrar parte do HTML se nao encontrou
+            console.log('[JS] HTML preview (500 chars):', html.substring(0, 500));
             return {{ ok: false, erro: 'Cliente nao encontrado' }};
         }} catch (e) {{
+            console.error('[JS] Erro na busca:', e);
             return {{ ok: false, erro: e.message }};
         }}
     }};

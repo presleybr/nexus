@@ -2114,8 +2114,8 @@ def baixar_boletos_ponto_venda():
                     sys.path.insert(0, str(root_path))
                     logger.info(f"📂 Path adicionado ao sys.path: {root_path}")
 
-                # Agora sim importar
-                from automation.canopus.canopus_automation import CanopusAutomation
+                # Agora sim importar - MODO ULTRA (otimizado para velocidade)
+                from automation.canopus.canopus_ultra import CanopusUltra
 
                 atualizar_status(etapa='Configurando diretórios...')
 
@@ -2194,61 +2194,66 @@ def baixar_boletos_ponto_venda():
                 headless_mode = is_render  # True no Render, False localmente
 
                 logger.info(f"🌐 Ambiente: {'Render (servidor)' if is_render else 'Local'}")
+                logger.info(f"🚀 MODO ULTRA: Navegador otimizado para velocidade")
                 logger.info(f"🌐 Abrindo Chromium (headless={headless_mode})...")
                 sys.stdout.flush()
 
-                atualizar_status(etapa='Abrindo navegador Chromium...')
+                atualizar_status(etapa='Iniciando modo ULTRA...')
 
-                async with CanopusAutomation(headless=headless_mode) as bot:
-                    logger.info("✅ Chromium aberto!")
-                    sys.stdout.flush()
+                # Criar instância do CanopusUltra
+                canopus_ultra = CanopusUltra(
+                    usuario=usuario_login,
+                    senha=senha,
+                    headless=headless_mode,
+                    callback_status=atualizar_status
+                )
 
-                    # Fazer login
+                try:
+                    # Iniciar navegador e fazer login
                     atualizar_status(etapa=f'Fazendo login no sistema (PV: {usuario_login})...')
 
                     logger.info("=" * 80)
-                    logger.info("🔐 FAZENDO LOGIN NO PONTO 24627")
+                    logger.info("🔐 FAZENDO LOGIN (MODO ULTRA)")
                     logger.info(f"👤 Usuário (login): {usuario_login}")
-                    logger.info(f"🏢 Código Empresa: {codigo_empresa}")
                     logger.info(f"🔐 Senha: {'*' * len(senha)}")
                     logger.info("=" * 80)
                     sys.stdout.flush()
 
-                    try:
-                        login_ok = await bot.login(
-                            usuario=usuario_login,  # Usar PV com zeros à esquerda
-                            senha=senha,
-                            codigo_empresa=codigo_empresa,
-                            ponto_venda=ponto_venda
-                        )
-                    except Exception as e_login:
-                        logger.error(f"❌ EXCEPTION durante login: {e_login}")
-                        logger.exception("Traceback completo:")
-                        sys.stdout.flush()
-                        atualizar_status(etapa=f'Erro no login: {str(e_login)}', erro=str(e_login))
-                        finalizar_execucao(sucesso=False)
-                        return
+                    await canopus_ultra.iniciar(pasta_downloads=str(pasta_destino))
 
-                    if not login_ok:
-                        logger.error("=" * 80)
-                        logger.error("❌ FALHA NO LOGIN")
-                        logger.error("Possíveis causas:")
-                        logger.error("  1. Senha incorreta")
-                        logger.error("  2. Usuário bloqueado")
-                        logger.error("  3. Sistema Canopus indisponível")
-                        logger.error("  4. Seletores CSS mudaram")
-                        logger.error("=" * 80)
-                        sys.stdout.flush()
-                        atualizar_status(etapa='Falha no login - verifique credenciais', erro='Login falhou')
-                        finalizar_execucao(sucesso=False)
-                        return
-
-                    logger.info("=" * 80)
-                    logger.info("✅ LOGIN REALIZADO COM SUCESSO!")
-                    logger.info("=" * 80)
+                except Exception as e_login:
+                    logger.error(f"❌ EXCEPTION durante login: {e_login}")
+                    logger.exception("Traceback completo:")
                     sys.stdout.flush()
+                    atualizar_status(etapa=f'Erro no login: {str(e_login)}', erro=str(e_login))
+                    finalizar_execucao(sucesso=False)
+                    return
 
-                    atualizar_status(etapa='Login realizado! Iniciando processamento de clientes...')
+                if not canopus_ultra.logado:
+                    logger.error("=" * 80)
+                    logger.error("❌ FALHA NO LOGIN")
+                    logger.error("Possíveis causas:")
+                    logger.error("  1. Senha incorreta")
+                    logger.error("  2. Usuário bloqueado")
+                    logger.error("  3. Sistema Canopus indisponível")
+                    logger.error("=" * 80)
+                    sys.stdout.flush()
+                    atualizar_status(etapa='Falha no login - verifique credenciais', erro='Login falhou')
+                    finalizar_execucao(sucesso=False)
+                    await canopus_ultra.fechar()
+                    return
+
+                logger.info("=" * 80)
+                logger.info("✅ LOGIN REALIZADO COM SUCESSO! (MODO ULTRA)")
+                logger.info("=" * 80)
+                sys.stdout.flush()
+
+                atualizar_status(etapa='Login realizado! Iniciando processamento ULTRA...')
+
+                # Alias para manter compatibilidade com código existente
+                bot = canopus_ultra
+
+                try:
 
                     # Monitorar uso de memória
                     import psutil
@@ -2315,38 +2320,34 @@ def baixar_boletos_ponto_venda():
                         )
 
                         try:
-                            from automation.canopus.canopus_config import CanopusConfig
-
-                            # BUSCAR NOME DO CLIENTE NO BANCO DE DADOS (não mais na planilha local)
+                            # BUSCAR NOME DO CLIENTE NO BANCO DE DADOS
                             nome_cliente = None
                             try:
-                                # Buscar cliente correspondente ao CPF no banco
                                 cliente_info = next((c for c in clientes if c['cpf'] == cpf), None)
                                 if cliente_info and cliente_info.get('nome'):
-                                    nome_cliente = str(cliente_info['nome']).strip().upper().replace(' ', '_')
-                                    logger.info(f"✅ Nome do cliente encontrado no banco: {nome_cliente}")
+                                    nome_cliente = str(cliente_info['nome']).strip().upper()
+                                    logger.info(f"✅ Nome do cliente: {nome_cliente}")
                                     sys.stdout.flush()
                             except Exception as e:
-                                logger.warning(f"⚠️ Erro ao buscar nome do cliente no banco: {e}")
+                                logger.warning(f"⚠️ Erro ao buscar nome do cliente: {e}")
                                 sys.stdout.flush()
 
-                            # NÃO passar nome_arquivo - deixar gerar automaticamente com nome do cliente
-                            # Processar cliente
-                            resultado = await bot.processar_cliente_completo(
+                            # MODO ULTRA: Processar cliente com velocidade máxima
+                            resultado = await bot._processar_cliente_ultra(
                                 cpf=cpf,
-                                mes=mes,
-                                ano=int(ano) if ano else 2025,
-                                destino=pasta_destino,
-                                nome_arquivo=None  # None = gera automaticamente com nome do cliente
+                                nome=nome_cliente or 'CLIENTE',
+                                mes=mes or 'JANEIRO',
+                                idx=idx,
+                                total=len(cpfs)
                             )
 
-                            # Verificar resultado e atualizar estatísticas
-                            if resultado.get('status') == CanopusConfig.Status.SUCESSO:
+                            # Verificar resultado (ULTRA retorna status como string)
+                            if resultado.get('status') == 'sucesso':
                                 stats['sucessos'] += 1
                                 stats['processados'] += 1
                                 logger.info("=" * 80)
                                 logger.info(f"✅ SUCESSO! Boleto {idx}/{len(cpfs)} baixado: {cpf}")
-                                logger.info(f"📁 Arquivo: {resultado.get('dados_boleto', {}).get('arquivo_nome', 'N/A')}")
+                                logger.info(f"📁 Arquivo: {resultado.get('arquivo', 'N/A')}")
                                 logger.info("=" * 80)
                                 sys.stdout.flush()
 
@@ -2355,9 +2356,10 @@ def baixar_boletos_ponto_venda():
                                     logger.info("🔍 DEBUG: Iniciando processo de registro no banco...")
                                     sys.stdout.flush()
 
-                                    arquivo_caminho = resultado.get('dados_boleto', {}).get('arquivo_caminho')
-                                    arquivo_nome = resultado.get('dados_boleto', {}).get('arquivo_nome')
-                                    arquivo_tamanho = resultado.get('dados_boleto', {}).get('arquivo_tamanho', 0)
+                                    # MODO ULTRA: resultado já contém caminho direto
+                                    arquivo_caminho = resultado.get('caminho')
+                                    arquivo_nome = resultado.get('arquivo')
+                                    arquivo_tamanho = resultado.get('tamanho', 0)
 
                                     logger.info(f"🔍 DEBUG: arquivo_caminho={arquivo_caminho}")
                                     logger.info(f"🔍 DEBUG: arquivo_nome={arquivo_nome}")
@@ -2600,22 +2602,19 @@ def baixar_boletos_ponto_venda():
                                     progresso=idx
                                 )
 
-                                # Aguardar 3 segundos antes do próximo (para você ver o sucesso)
-                                await asyncio.sleep(3)
+                                # MODO ULTRA: sem delay extra (já é rápido)
+                                await asyncio.sleep(0.5)
 
-                            elif resultado.get('status') == CanopusConfig.Status.CPF_NAO_ENCONTRADO:
+                            elif resultado.get('status') == 'cpf_nao_encontrado':
+                                # MODO ULTRA: Status de CPF não encontrado
                                 stats['cpf_nao_encontrado'] += 1
                                 stats['processados'] += 1
-                                logger.warning("=" * 80)
                                 logger.warning(f"⚠️ CPF {idx}/{len(cpfs)} NÃO ENCONTRADO: {cpf}")
-                                logger.warning("Aguardando 5 segundos antes de continuar...")
-                                logger.warning("=" * 80)
 
                                 # REGISTRAR ERRO NO BANCO
                                 try:
                                     with db_connection() as conn_erro:
                                         with conn_erro.cursor(row_factory=dict_row) as cur_erro:
-                                            # Buscar consultor_id
                                             cur_erro.execute("""
                                                 SELECT consultor_id FROM clientes_finais
                                                 WHERE cpf = %s AND ativo = TRUE
@@ -2624,7 +2623,6 @@ def baixar_boletos_ponto_venda():
                                             consultor_row = cur_erro.fetchone()
                                             consultor_id = consultor_row['consultor_id'] if consultor_row else None
 
-                                            # Inserir registro de erro
                                             cur_erro.execute("""
                                                 INSERT INTO downloads_canopus (
                                                     consultor_id,
@@ -2634,35 +2632,30 @@ def baixar_boletos_ponto_venda():
                                                     data_download,
                                                     created_at
                                                 ) VALUES (
-                                                    %s, %s, 'erro', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                                                    %s, %s, 'cpf_nao_encontrado', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                                                 )
                                             """, (
                                                 consultor_id,
                                                 cpf,
-                                                f"CPF não encontrado no sistema Canopus: {resultado.get('mensagem', 'Cliente não localizado')}"
+                                                resultado.get('erro', 'Cliente não encontrado no Canopus')
                                             ))
                                             conn_erro.commit()
-                                            logger.info(f"💾 ✅ Erro registrado no banco: CPF não encontrado")
-                                            sys.stdout.flush()
                                 except Exception as e_registro:
                                     logger.error(f"❌ Erro ao registrar no banco: {e_registro}")
-                                    sys.stdout.flush()
 
-                                await asyncio.sleep(5)
+                                # MODO ULTRA: sem delay extra
+                                await asyncio.sleep(0.3)
 
-                            elif resultado.get('status') == CanopusConfig.Status.SEM_BOLETO:
+                            elif resultado.get('status') == 'sem_boleto':
+                                # MODO ULTRA: Status de sem boleto
                                 stats['sem_boleto'] += 1
                                 stats['processados'] += 1
-                                logger.warning("=" * 80)
-                                logger.warning(f"📄 SEM BOLETO: {cpf} - {resultado.get('mensagem')}")
-                                logger.warning("Aguardando 5 segundos antes de continuar...")
-                                logger.warning("=" * 80)
+                                logger.warning(f"📄 SEM BOLETO: {cpf}")
 
                                 # REGISTRAR NO BANCO
                                 try:
                                     with db_connection() as conn_erro:
                                         with conn_erro.cursor(row_factory=dict_row) as cur_erro:
-                                            # Buscar consultor_id
                                             cur_erro.execute("""
                                                 SELECT consultor_id FROM clientes_finais
                                                 WHERE cpf = %s AND ativo = TRUE
@@ -2671,7 +2664,6 @@ def baixar_boletos_ponto_venda():
                                             consultor_row = cur_erro.fetchone()
                                             consultor_id = consultor_row['consultor_id'] if consultor_row else None
 
-                                            # Inserir registro
                                             cur_erro.execute("""
                                                 INSERT INTO downloads_canopus (
                                                     consultor_id,
@@ -2686,25 +2678,21 @@ def baixar_boletos_ponto_venda():
                                             """, (
                                                 consultor_id,
                                                 cpf,
-                                                f"Sem boleto disponível: {resultado.get('mensagem', 'Nenhum boleto encontrado para este cliente')}"
+                                                resultado.get('erro', 'Nenhum boleto disponível')
                                             ))
                                             conn_erro.commit()
-                                            logger.info(f"💾 ✅ Registrado no banco: Sem boleto")
-                                            sys.stdout.flush()
                                 except Exception as e_registro:
                                     logger.error(f"❌ Erro ao registrar no banco: {e_registro}")
-                                    sys.stdout.flush()
 
-                                await asyncio.sleep(5)
+                                # MODO ULTRA: sem delay extra
+                                await asyncio.sleep(0.3)
 
                             else:
+                                # MODO ULTRA: Erro genérico
                                 stats['erros'] += 1
                                 stats['processados'] += 1
-                                logger.error("=" * 80)
                                 logger.error(f"❌ ERRO no CPF {idx}/{len(cpfs)}: {cpf}")
-                                logger.error(f"Mensagem: {resultado.get('mensagem')}")
-                                logger.error("Aguardando 5 segundos antes de continuar...")
-                                logger.error("=" * 80)
+                                logger.error(f"Mensagem: {resultado.get('erro')}")
 
                                 # REGISTRAR ERRO NO BANCO
                                 try:
@@ -2743,16 +2731,14 @@ def baixar_boletos_ponto_venda():
                                     logger.error(f"❌ Erro ao registrar no banco: {e_registro}")
                                     sys.stdout.flush()
 
-                                await asyncio.sleep(5)
+                                # MODO ULTRA: delay curto
+                                await asyncio.sleep(0.5)
 
                         except Exception as e:
                             stats['erros'] += 1
                             stats['processados'] += 1
-                            logger.error("=" * 80)
                             logger.error(f"❌ EXCEÇÃO no CPF {idx}/{len(cpfs)}: {cpf}")
                             logger.error(f"Erro: {str(e)}")
-                            logger.error("Aguardando 5 segundos antes de continuar...")
-                            logger.error("=" * 80)
 
                             # REGISTRAR EXCEÇÃO NO BANCO
                             try:
@@ -2789,9 +2775,9 @@ def baixar_boletos_ponto_venda():
                                         sys.stdout.flush()
                             except Exception as e_registro:
                                 logger.error(f"❌ Erro ao registrar exceção no banco: {e_registro}")
-                                sys.stdout.flush()
 
-                            await asyncio.sleep(5)
+                            # MODO ULTRA: delay curto
+                            await asyncio.sleep(0.5)
 
                     # Monitoramento final de memória
                     mem_final = process.memory_info().rss / 1024 / 1024
@@ -2816,6 +2802,11 @@ def baixar_boletos_ponto_venda():
 
                     # Finalizar execução com sucesso
                     finalizar_execucao(sucesso=True)
+
+                finally:
+                    # MODO ULTRA: Fechar navegador
+                    logger.info("🔒 Fechando navegador...")
+                    await canopus_ultra.fechar()
 
             # Rodar o loop assíncrono
             loop = asyncio.new_event_loop()
