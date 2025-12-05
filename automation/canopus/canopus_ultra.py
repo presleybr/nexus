@@ -3,6 +3,9 @@ Canopus ULTRA - Velocidade Máxima com Stealth Mode
 ===================================================
 Método otimizado para download de boletos Canopus.
 
+Versão: 2.0.0 (2025-12-04)
+Build: Force redeploy
+
 Características:
 - Login único compartilhado entre processamentos
 - Stealth mode completo (anti-detecção de bot)
@@ -204,6 +207,10 @@ class CanopusUltra:
         Processa cliente com velocidade máxima.
         Timeouts curtos para operações que falham.
         """
+        # Formatar CPF para exibição
+        cpf_fmt = f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}" if len(cpf) == 11 else cpf
+        logger.info(f"⚡ [ULTRA] Processando cliente: {cpf_fmt} ({idx}/{total})")
+
         inicio = datetime.now()
         resultado = {
             'cpf': cpf,
